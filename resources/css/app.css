@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* dark: pakai .theme-dark di <html>, bukan prefers-color-scheme */
+@custom-variant dark (&:where(.theme-dark, .theme-dark *));
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+    /* LIGHT THEME (default) – dominan putih/abu/merah/hitam */
+    --color-background: hsl(210 20% 97%);
+    --color-foreground: hsl(210 15% 12%);
+
+    --color-card: hsl(0 0% 100%);
+    --color-card-foreground: hsl(210 15% 12%);
+
+    --color-popover: hsl(0 0% 100%);
+    --color-popover-foreground: hsl(210 15% 12%);
+
+    /* Merah sebagai primary */
+    --color-primary: hsl(0 76% 52%);
+    --color-primary-foreground: hsl(0 0% 100%);
+
+    /* Abu sebagai secondary */
+    --color-secondary: hsl(210 16% 92%);
+    --color-secondary-foreground: hsl(210 15% 20%);
+
+    --color-muted: hsl(210 16% 92%);
+    --color-muted-foreground: hsl(215 14% 45%);
+
+    --color-accent: hsl(210 20% 94%);
+    --color-accent-foreground: hsl(210 15% 18%);
+
+    --color-destructive: hsl(0 75% 50%);
+    --color-destructive-foreground: hsl(0 0% 100%);
+
+    --color-success: hsl(142 65% 40%);
+    --color-success-foreground: hsl(0 0% 100%);
+
+    --color-warning: hsl(35 92% 48%);
+    --color-warning-foreground: hsl(0 0% 100%);
+
+    --color-border: hsl(214 17% 80%);
+    --color-input: hsl(214 17% 80%);
+    --color-ring: hsl(0 76% 52%);
+
+    --color-sidebar: hsl(210 20% 7%);
+    --color-sidebar-foreground: hsl(0 0% 100%);
+    --color-sidebar-muted: hsl(210 14% 18%);
+    --color-sidebar-muted-foreground: hsl(214 15% 65%);
+    --color-sidebar-accent: hsl(210 16% 15%);
+    --color-sidebar-border: hsl(210 17% 22%);
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --radius: 0.8rem;
+}
+
+/* DARK THEME – override pakai kelas .theme-dark di <html> */
+.theme-dark {
+    color-scheme: dark;
+
+    --color-background: hsl(210 18% 11%);
+    --color-foreground: hsl(0 0% 98%);
+
+    --color-card: hsl(210 16% 16%);
+    --color-card-foreground: hsl(0 0% 98%);
+
+    --color-popover: hsl(210 16% 16%);
+    --color-popover-foreground: hsl(0 0% 98%);
+
+    --color-primary: hsl(0 76% 56%);
+    --color-primary-foreground: hsl(0 0% 100%);
+
+    --color-secondary: hsl(210 18% 20%);
+    --color-secondary-foreground: hsl(0 0% 98%);
+
+    --color-muted: hsl(210 14% 22%);
+    --color-muted-foreground: hsl(215 14% 72%);
+
+    --color-accent: hsl(210 18% 24%);
+    --color-accent-foreground: hsl(0 0% 98%);
+
+    --color-destructive: hsl(0 72% 56%);
+    --color-destructive-foreground: hsl(0 0% 100%);
+
+    --color-success: hsl(142 60% 38%);
+    --color-success-foreground: hsl(0 0% 100%);
+
+    --color-warning: hsl(35 92% 54%);
+    --color-warning-foreground: hsl(0 0% 100%);
+
+    --color-border: hsl(215 18% 25%);
+    --color-input: hsl(215 18% 25%);
+    --color-ring: hsl(0 76% 56%);
+
+    --color-sidebar: hsl(210 20% 5%);
+    --color-sidebar-foreground: hsl(0 0% 98%);
+    --color-sidebar-muted: hsl(210 16% 18%);
+    --color-sidebar-muted-foreground: hsl(215 14% 70%);
+    --color-sidebar-accent: hsl(210 16% 14%);
+    --color-sidebar-border: hsl(215 18% 22%);
+}
+
+@layer base {
+    :root {
+        color-scheme: light;
+    }
+
+    * {
+        @apply border-border;
+    }
+
+    /* Select: tampilan sama dengan Input */
+    select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.25rem 1.25rem;
+        padding-right: 2rem;
+    }
+
+    .theme-dark select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    }
+
+    /* Select option: terlihat di dark mode */
+    select option {
+        background-color: var(--color-background);
+        color: var(--color-foreground);
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+
+    :focus-visible {
+        @apply outline-ring outline-2 outline-offset-2;
+    }
+}
+
+@layer utilities {
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+}
