@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Loader2, Printer, Store } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, Printer, Store, Target } from 'lucide-vue-next'
 import { Switch } from '@/components/ui/switch'
 
 interface StoreData {
@@ -25,6 +25,7 @@ interface StoreData {
     close_time: string | null
     is_active: boolean
     receipt_print_enabled: boolean
+    daily_sales_target: number
 }
 
 const props = defineProps<{ store: StoreData | null }>()
@@ -47,6 +48,7 @@ function storeFormDefaults() {
             open_time: '',
             close_time: '',
             receipt_print_enabled: false,
+            daily_sales_target: 0,
         }
     }
     return {
@@ -60,6 +62,7 @@ function storeFormDefaults() {
         open_time: s.open_time ?? '',
         close_time: s.close_time ?? '',
         receipt_print_enabled: !!s.receipt_print_enabled,
+        daily_sales_target: s.daily_sales_target ?? 0,
     }
 }
 
@@ -102,7 +105,8 @@ function submit() {
         email: form.email,
         open_time: form.open_time,
         close_time: form.close_time,
-        receipt_print_enabled: !!form.receipt_print_enabled, // PAKSA ambil dari form state
+        receipt_print_enabled: !!form.receipt_print_enabled,
+        daily_sales_target: form.daily_sales_target,
     }
     
     console.log('[SUBMIT] submitData:', submitData)
@@ -248,6 +252,36 @@ const provinces = [
                                 maxlength="10"
                                 :disabled="form.processing"
                             />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Targets & Alerts -->
+                <Card>
+                    <CardHeader>
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <Target class="h-4 w-4" />
+                            </div>
+                            <div>
+                                <CardTitle>Target & Notifikasi</CardTitle>
+                                <CardDescription>Target harian dan pengaturan alert otomatis</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <div class="space-y-2">
+                            <Label for="daily_sales_target">Target Penjualan Harian (Rp)</Label>
+                            <Input
+                                id="daily_sales_target"
+                                v-model.number="form.daily_sales_target"
+                                type="number"
+                                min="0"
+                                placeholder="Misal: 5000000"
+                                :disabled="form.processing"
+                            />
+                            <p class="text-[10px] text-muted-foreground">Kirim notifikasi ke owner/admin jika target harian tercapai.</p>
+                            <p v-if="form.errors.daily_sales_target" class="text-xs text-destructive">{{ form.errors.daily_sales_target }}</p>
                         </div>
                     </CardContent>
                 </Card>

@@ -24,6 +24,14 @@
 | 18 | **Payment Methods** | Custom payment methods per brand |
 | 19 | **Settings** | Manajemen metode pembayaran, receipt print toggle |
 | 20 | **Receipt Printing** | Toggle cetak struk per toko |
+| 21 | **HPP (COGS)** | Kalkulasi modal historis per item terjual (PriceLog) |
+| 22 | **Promo & Voucher** | Kode voucher (%, nominal, min purchase, usage limit) |
+| 23 | **Export Laporan** | Laporan dapat diunduh dalam format CSV, XLSX, dan PDF |
+| 24 | **Produk Varian** | Perkecil stok per item, dukung Size/Topping/Level (Modifier) |
+| 25 | **Supplier & PO** | Manajemen supplier dan Purchase Order (PO) masuk barang |
+| 26 | **Shift Kasir** | Buka/Tutup shift dengan pencatatan modal awal (Cash Reconciliation) |
+| 27 | **Notifikasi / Alert** | Push notification: stok habis, order masuk, target penjualan tercapai |
+| 28 | **Customer Feedback** | Minta rating/review dari customer setelah transaksi |
 
 ---
 
@@ -35,9 +43,8 @@
 |---|-------|-----------|:---:|
 | 1 | **Refund / Retur** | Proses pengembalian barang/uang, partial refund, auto restock | ⭐⭐⭐ |
 | 2 | **Struk / Receipt Template** | Custom template struk (logo, footer, info toko), preview & cetak thermal | ⭐⭐⭐ |
-| 3 | **Open/Close Shift (Kasir)** | Buka/tutup shift kasir, hitung cash awal & akhir, cash drawer reconciliation | ⭐⭐⭐ |
-| 4 | **Faktur / Invoice & Struk** | Cetak struk belanja (thermal) & Faktur formal (A4/A5/PDF) | ⭐⭐⭐ |
-| 5 | **Barcode / QR Scanner** | Scan barcode produk untuk tambah ke cart langsung | ⭐⭐ |
+| 3 | **Faktur / Invoice & Struk** | Cetak struk belanja (thermal) & Faktur formal (A4/A5/PDF) | ⭐⭐⭐ |
+| 4 | **Barcode / QR Scanner** | Scan barcode produk untuk tambah ke cart langsung | ⭐⭐ |
 
 ---
 
@@ -46,10 +53,7 @@
 | # | Fitur | Deskripsi | Kompleksitas |
 |---|-------|-----------|:---:|
 | 7 | **Program Loyalitas (Poin)** | Customer dapat poin setiap belanja, tukarkan poin jadi diskon/reward | ⭐⭐⭐ |
-| 8 | **Promo & Voucher** | Buat voucher kode promo (%, nominal, min purchase, batas waktu, max usage) | ⭐⭐⭐ |
-| 9 | **Supplier Management** | CRUD supplier, link produk ke supplier, riwayat pembelian | ⭐⭐ |
-| 10 | **Purchase Order (PO)** | Buat PO ke supplier, terima barang, otomatis update stok | ⭐⭐⭐ |
-| 11 | **Stock Opname** | Hitung fisik stok, bandingkan dengan sistem, adjustment otomatis | ⭐⭐⭐ |
+| 8 | **Stock Opname** | Hitung fisik stok, bandingkan dengan sistem, adjustment otomatis | ⭐⭐⭐ |
 | 12 | **Transfer Stok Antar Toko** | Kirim stok dari toko A ke toko B, tracking status pengiriman | ⭐⭐⭐ |
 | 13 | **Multi-Unit / Konversi Satuan** | 1 Karton = 12 Pcs, jual per pcs tapi beli per karton | ⭐⭐⭐ |
 | 14 | **Pajak Fleksibel** | Multi tax rate (PPN, pajak daerah), tax inclusive/exclusive per produk | ⭐⭐ |
@@ -63,8 +67,7 @@
 | 15 | **Laporan Laba Rugi** | P&L statement bulanan/tahunan dengan breakdown detail | ⭐⭐⭐ |
 | 16 | **Laporan per Karyawan** | Performa kasir: jumlah transaksi, total penjualan, rata-rata per transaksi | ⭐⭐ |
 | 17 | **Laporan per Jam** | Analisis peak hours untuk optimasi shift & stok | ⭐⭐ |
-| 18 | **Export Laporan** | Export ke Excel/CSV/PDF untuk semua laporan | ⭐⭐ |
-| 19 | **Audit Log / Activity Log** | Catat semua aktivitas user (siapa ubah harga, hapus produk, void order, dsb) | ⭐⭐⭐ |
+| 18 | **Audit Log / Activity Log** | Catat semua aktivitas user (siapa ubah harga, hapus produk, void order, dsb) | ⭐⭐⭐ |
 
 ---
 
@@ -74,12 +77,10 @@
 |---|-------|-----------|:---:|
 | 20 | **Kitchen Display System (KDS)** | Layar dapur real-time: pesanan masuk, status sedang dimasak, selesai | ⭐⭐⭐ |
 | 21 | **Produk Bundling / Paket** | Gabungkan beberapa produk jadi 1 paket dengan harga khusus | ⭐⭐ |
-| 22 | **Produk Varian** | Size (S/M/L), topping, level gula/es — modifier per produk | ⭐⭐⭐ |
-| 23 | **Notifikasi / Alert** | Push notification: stok habis, order masuk, target penjualan tercapai | ⭐⭐ |
 | 24 | **Multi-Currency** | Support mata uang asing (untuk kafe di area wisata, dsb) | ⭐⭐ |
 | 25 | **Reservasi Meja** | Customer booking meja via online, tampil di floor plan | ⭐⭐⭐ |
 | 26 | **Happy Hour / Time-Based Pricing** | Harga otomatis berubah berdasarkan jam (misal diskon 20% jam 14-16) | ⭐⭐ |
-| 27 | **Customer Feedback** | Minta rating/review dari customer setelah transaksi | ⭐⭐ |
+| 26 | **Happy Hour / Time-Based Pricing** | Harga otomatis berubah berdasarkan jam (misal diskon 20% jam 14-16) | ⭐⭐ |
 | 28 | **Integrasi Online Payment** | Midtrans / Xendit / QRIS real-time payment gateway | ⭐⭐⭐ |
 
 ---
@@ -88,11 +89,11 @@
 
 > [!IMPORTANT]
 > **Top 5 fitur yang paling berdampak** untuk menjadikan ini "Ultimate POS":
-> 1. **Open/Close Shift Kasir** — fundamental untuk akuntabilitas kasir
-> 2. **Refund / Retur** — wajib ada di POS manapun
-> 3. **Promo & Voucher** — driver utama penjualan
-> 4. **Struk / Receipt Template** — kebutuhan dasar retail/F&B
-> 5. **Produk Varian (Modifier)** — essential untuk bisnis F&B
+> 1. **Refund / Retur** — wajib ada di POS manapun
+> 2. **Kitchen Display System** — sangat membantu operasional F&B
+> 3. **Struk / Receipt Template** — kebutuhan dasar retail/F&B
+> 4. **Program Loyalitas** — meningkatkan retention customer
+> 5. **Audit Log** — keamanan data dan tracking anomali
 
 > [!TIP]
 > Saya rekomendasikan mengerjakan fitur per **batch/sprint**:

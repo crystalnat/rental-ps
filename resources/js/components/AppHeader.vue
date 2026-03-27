@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Menu, SunMedium, MoonStar } from 'lucide-vue-next'
+import { Menu, SunMedium, MoonStar, Bell } from 'lucide-vue-next'
 import { useTheme } from '@/lib/theme'
+import NotificationDrawer from '@/components/NotificationDrawer.vue'
 
 defineProps<{ title?: string }>()
 defineEmits<{ toggleSidebar: [] }>()
@@ -24,6 +25,7 @@ const { theme, toggleTheme } = useTheme()
 
         <div class="header-actions flex items-center gap-2">
             <slot name="actions" />
+            <NotificationDrawer />
             <button
                 type="button"
                 class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white shadow-sm hover:bg-red-800"

@@ -57,6 +57,11 @@ class Product extends Model
         return $this->hasMany(StockMutation::class);
     }
 
+    public function modifierGroups(): HasMany
+    {
+        return $this->hasMany(ProductModifierGroup::class)->orderBy('sort_order');
+    }
+
     protected function casts(): array
     {
         return [

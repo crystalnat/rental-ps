@@ -76,6 +76,7 @@ class StoreController extends Controller
             'open_time'              => ['nullable', 'date_format:H:i'],
             'close_time'             => ['nullable', 'date_format:H:i'],
             'receipt_print_enabled'  => ['sometimes', 'boolean'],
+            'daily_sales_target'     => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $slug = $this->generateUniqueSlug($data['name']);
@@ -101,7 +102,7 @@ class StoreController extends Controller
             'store' => array_merge(
                 $store->only([
                     'id', 'name', 'slug', 'address', 'city', 'province',
-                    'postal_code', 'phone', 'email', 'open_time', 'close_time', 'is_active',
+                    'postal_code', 'phone', 'email', 'open_time', 'close_time', 'is_active', 'daily_sales_target',
                 ]),
                 [
                     'receipt_print_enabled' => (bool) $store->receipt_print_enabled,
@@ -132,6 +133,7 @@ class StoreController extends Controller
             'open_time'              => ['nullable', 'date_format:H:i'],
             'close_time'             => ['nullable', 'date_format:H:i'],
             'receipt_print_enabled'  => ['required', 'boolean'],
+            'daily_sales_target'     => ['nullable', 'numeric', 'min:0'],
         ]);
 
         if ($data['name'] !== $store->name) {

@@ -53,6 +53,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function feedback(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(OrderFeedback::class);
+    }
+
     public function grossProfit(): float
     {
         return (float) $this->items->sum(fn ($item) =>

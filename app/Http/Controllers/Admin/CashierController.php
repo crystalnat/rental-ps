@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\Promo;
+use Illuminate\Support\Facades\Cache;
 
 class CashierController extends Controller
 {
@@ -42,12 +43,18 @@ class CashierController extends Controller
             ]);
         }
 
-        $products = $this->getProductsForStore($store);
-        $categories = Category::where('brand_id', $store->brand_id)
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get(['id', 'name', 'color']);
+        $products = Cache::remember("store_products_{$store->id}", 3600, function() use ($store) {
+            return $this->getProductsForStore($store);
+        });
+
+        $categories = Cache::remember("brand_categories_{$store->brand_id}", 3600, function() use ($store) {
+            return Category::where('brand_id', $store->brand_id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'color']);
+        });
+
         $tables = DiningTable::where('store_id', $store->id)
             ->where('is_active', true)
             ->orderBy('floor')
@@ -119,6 +126,8 @@ class CashierController extends Controller
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity'   => ['required', 'numeric', 'min:0.001'],
             'items.*.notes'      => ['nullable', 'string', 'max:500'],
+            'items.*.modifiers'  => ['nullable', 'array'],
+            'items.*.modifiers.*.option_id' => ['required', 'exists:product_modifier_options,id'],
             'notes'            => ['nullable', 'string', 'max:1000'],
             'payment_method'   => ['required', Rule::in($validCodes)],
             'cash_received'    => ['nullable', 'numeric', 'min:0'],
@@ -160,7 +169,26 @@ class CashierController extends Controller
                 $buyPrice = (float) $priceLog->buy_price;
                 $discountPercent = (float) $product->discount_percent;
                 $discount = $discountPercent > 0 ? round($unitPrice * ($discountPercent / 100)) : 0;
-                $itemSubtotal = ($unitPrice - $discount) * $qty;
+                
+                $modifierPriceExtra = 0;
+                $selectedModifiers = [];
+                if (!empty($item['modifiers'])) {
+                    foreach ($item['modifiers'] as $mSelection) {
+                        $opt = \App\Models\ProductModifierOption::with('group')->findOrFail($mSelection['option_id']);
+                        if (! $opt->is_active || ! $opt->is_available) {
+                            throw new \RuntimeException("Opsi '{$opt->name}' sedang tidak tersedia.");
+                        }
+                        $modifierPriceExtra += (float) $opt->price_extra;
+                        $selectedModifiers[] = [
+                            'modifier_option_id' => $opt->id,
+                            'modifier_group_name' => $opt->group->name,
+                            'modifier_option_name' => $opt->name,
+                            'price_extra' => (float) $opt->price_extra,
+                        ];
+                    }
+                }
+
+                $itemSubtotal = ($unitPrice + $modifierPriceExtra - $discount) * $qty;
                 $subtotal += $itemSubtotal;
 
                 // Check stock if tracking
@@ -183,6 +211,7 @@ class CashierController extends Controller
                     'discount'   => $discount,
                     'subtotal'   => $itemSubtotal,
                     'notes'      => $item['notes'] ?? null,
+                    'selected_modifiers' => $selectedModifiers,
                 ];
             }
 
@@ -260,7 +289,7 @@ class CashierController extends Controller
             ]);
 
             foreach ($itemsData as $item) {
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id'       => $order->id,
                     'product_id'     => $item['product']->id,
                     'price_log_id'   => $item['price_log']->id,
@@ -274,6 +303,10 @@ class CashierController extends Controller
                     'notes'          => $item['notes'],
                 ]);
 
+                foreach ($item['selected_modifiers'] as $m) {
+                    $orderItem->modifiers()->create($m);
+                }
+
                 // Deduct stock
                 if ($item['product']->track_stock) {
                     StoreInventory::where('store_id', $store->id)
@@ -286,6 +319,9 @@ class CashierController extends Controller
                 Customer::where('id', $customerId)->increment('total_orders');
                 Customer::where('id', $customerId)->increment('total_spent', $finalAmount);
             }
+
+            // Trigger Notifications
+            $this->handlePostOrderNotifications($order);
 
             return $order;
         });
@@ -458,7 +494,11 @@ class CashierController extends Controller
 
     private function getProductsForStore(Store $store): array
     {
-        return Product::with(['category', 'inventories' => fn ($q) => $q->where('store_id', $store->id)])
+        return Product::with([
+            'category', 
+            'inventories' => fn ($q) => $q->where('store_id', $store->id),
+            'modifierGroups.options' => fn ($q) => $q->where('is_active', true)
+        ])
             ->where('brand_id', $store->brand_id)
             ->where('is_available', true)
             ->where('is_active', true)
@@ -490,6 +530,20 @@ class CashierController extends Controller
                     'discount_percent' => (float) $product->discount_percent,
                     'sell_price'     => $sellPrice,
                     'image_url'      => $product->image ? \Storage::disk('public')->url($product->image) : null,
+                    'modifier_groups' => $product->modifierGroups->map(fn($g) => [
+                        'id' => $g->id,
+                        'name' => $g->name,
+                        'is_required' => $g->is_required,
+                        'min_select' => $g->min_select,
+                        'max_select' => $g->max_select,
+                        'options' => $g->options->map(fn($o) => [
+                            'id' => $o->id,
+                            'name' => $o->name,
+                            'price_extra' => (float) $o->price_extra,
+                            'is_active' => (bool) $o->is_active,
+                            'is_available' => (bool) $o->is_available,
+                        ])
+                    ])
                 ];
             })
             ->filter()
@@ -569,5 +623,64 @@ class CashierController extends Controller
                 'tables'        => $tables,
             ];
         })->toArray();
+    }
+    private function handlePostOrderNotifications(Order $order): void
+    {
+        $order->load(['store', 'items.product', 'table']);
+        $store = $order->store;
+        $brandId = $store->brand_id;
+
+        // Get users to notify (Admins of store + Brand Owner)
+        $usersToNotify = User::where('brand_id', $brandId)
+            ->where(function($q) use ($store) {
+                $q->where('role', 'owner')
+                  ->orWhere(function($sq) use ($store) {
+                      $sq->where('store_id', $store->id)
+                         ->whereIn('role', ['admin', 'manager']);
+                  });
+            })
+            ->where('is_active', true)
+            ->get();
+
+        // 1. New Order Notification
+        \Illuminate\Support\Facades\Notification::send($usersToNotify, new \App\Notifications\NewOrderNotification($order));
+
+        // 2. Low Stock Checking
+        foreach ($order->items as $item) {
+            $product = $item->product;
+            if ($product && $product->track_stock) {
+                $inventory = StoreInventory::where('store_id', $store->id)
+                    ->where('product_id', $product->id)
+                    ->first();
+                
+                if ($inventory && $inventory->current_stock <= $inventory->min_stock && $inventory->min_stock > 0) {
+                    \Illuminate\Support\Facades\Notification::send($usersToNotify, new \App\Notifications\LowStockNotification(
+                        $product->name,
+                        $store->name,
+                        (float) $inventory->current_stock,
+                        $product->unit ?? 'pcs'
+                    ));
+                }
+            }
+        }
+
+        // 3. Daily Target Checking
+        if ($store->daily_sales_target > 0) {
+            $todayRevenue = (float) Order::where('store_id', $store->id)
+                ->whereDate('created_at', now()->toDateString())
+                ->where('payment_status', 'paid')
+                ->sum('final_amount');
+
+            // Find previous and current revenue to check if crossing the threshold
+            $prevRevenue = $todayRevenue - $order->final_amount;
+            
+            if ($prevRevenue < $store->daily_sales_target && $todayRevenue >= $store->daily_sales_target) {
+                \Illuminate\Support\Facades\Notification::send($usersToNotify, new \App\Notifications\DailyTargetReachedNotification(
+                    $store->name,
+                    (float) $store->daily_sales_target,
+                    $todayRevenue
+                ));
+            }
+        }
     }
 }

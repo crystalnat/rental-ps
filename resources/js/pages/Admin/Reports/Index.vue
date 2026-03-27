@@ -33,6 +33,9 @@ import {
     Store,
     ChevronDown,
     ShoppingBag,
+    FileSpreadsheet,
+    FileText,
+    Printer,
 } from 'lucide-vue-next'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
@@ -230,6 +233,62 @@ const hasData = computed(() =>
     props.overall.expenses > 0 ||
     props.per_store.some(s => s.order_count > 0 || s.expenses > 0),
 )
+
+function exportCsv() {
+    let csv = "Laporan Laba Rugi POS\n\n"
+    csv += "Toko,Pendapatan,HPP,Laba Kotor,Pengeluaran,Laba Bersih,Total Transaksi\n"
+    csv += `Total Keseluruhan,${props.overall.income},${props.overall.hpp},${props.overall.gross_profit},${props.overall.expenses},${props.overall.net},${props.overall.order_count}\n`
+    
+    props.per_store.forEach(s => {
+        csv += `"${s.name}",${s.income},${s.hpp},${s.gross_profit},${s.expenses},${s.net},${s.order_count}\n`
+    })
+
+    csv += "\nProduk Terlaris\nNama Produk,Terjual,Omzet\n"
+    props.overall.top_products.forEach(p => {
+        csv += `"${p.product_name}",${p.total_qty},${p.total_amount}\n`
+    })
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `laporan-pos-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+}
+
+function exportXlsx() {
+    if (!(window as any).XLSX) {
+        const script = document.createElement('script')
+        script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+        script.onload = () => buildXlsx()
+        document.head.appendChild(script)
+    } else {
+        buildXlsx()
+    }
+}
+
+function buildXlsx() {
+    const XLSX = (window as any).XLSX
+    const wb = XLSX.utils.book_new()
+    
+    const ws1_data = [
+        ["Laporan Keseluruhan", "Pendapatan", "HPP", "Laba Kotor", "Pengeluaran", "Laba Bersih", "Total Transaksi"],
+        ["Total Keseluruhan", props.overall.income, props.overall.hpp, props.overall.gross_profit, props.overall.expenses, props.overall.net, props.overall.order_count]
+    ]
+    props.per_store.forEach(s => ws1_data.push([s.name, s.income, s.hpp, s.gross_profit, s.expenses, s.net, s.order_count]))
+    const ws1 = XLSX.utils.aoa_to_sheet(ws1_data)
+    XLSX.utils.book_append_sheet(wb, ws1, "Laporan Keuangan")
+
+    const ws2_data = [["Produk Terlaris", "Terjual", "Omzet"]]
+    props.overall.top_products.forEach(p => ws2_data.push([p.product_name, p.total_qty, p.total_amount]))
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2_data)
+    XLSX.utils.book_append_sheet(wb, ws2, "Kinerja Produk")
+
+    XLSX.writeFile(wb, `laporan-pos-${new Date().toISOString().slice(0, 10)}.xlsx`)
+}
+
+function exportPdf() {
+    window.print();
+}
 </script>
 
 <template>
@@ -261,11 +320,24 @@ const hasData = computed(() =>
                                     <Input v-model="filterState.date_to" type="date" class="h-10 pl-9 font-medium" />
                                 </div>
                             </div>
+                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
+                            <Button class="h-10 font-bold px-4" @click="applyFilters">
+                                <Search class="mr-2 h-4 w-4" />
+                                Cari Data
+                            </Button>
+                            
+                            <div class="flex items-center gap-2 border-l pl-2 ml-1" v-if="hasData">
+                                <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200" @click="exportXlsx" title="Export Excel">
+                                    <FileSpreadsheet class="h-4 w-4 mr-2" /> XLSX
+                                </Button>
+                                <Button variant="outline" class="h-10 px-3 hover:bg-muted" @click="exportCsv" title="Export CSV">
+                                    <FileText class="h-4 w-4 mr-2" /> CSV
+                                </Button>
+                                <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200" @click="exportPdf" title="Export PDF">
+                                    <Printer class="h-4 w-4 mr-2" /> PDF
+                                </Button>
+                            </div>
                         </div>
-                        <Button class="h-10 w-full md:w-auto font-bold px-6" @click="applyFilters">
-                            <Search class="mr-2 h-4 w-4" />
-                            Tampilkan Data
-                        </Button>
                     </div>
                 </CardContent>
             </Card>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { router, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
     TicketPercent, Receipt
 } from 'lucide-vue-next'
 import axios from 'axios'
+import FeedbackModal from '@/components/FeedbackModal.vue'
 
 interface Product {
     id: number
@@ -33,6 +34,18 @@ interface Product {
     sell_price: number
     discount_percent: number
     image_url: string | null
+    modifier_groups?: Array<{
+        id: number
+        name: string
+        is_required: boolean
+        min_select: number
+        max_select: number
+        options: Array<{
+            id: number
+            name: string
+            price_extra: number
+        }>
+    }>
 }
 
 interface Category {
@@ -65,6 +78,7 @@ interface PaymentMethodItem {
 }
 
 interface CartItem {
+    id: string // internal unique id
     product_id: number
     name: string
     unit: string
@@ -72,6 +86,11 @@ interface CartItem {
     discount_percent: number
     quantity: number
     notes?: string
+    modifiers: Array<{
+        option_id: number
+        name: string
+        price_extra: number
+    }>
 }
 
 const props = defineProps<{
@@ -82,6 +101,7 @@ const props = defineProps<{
     tables: Table[]
     stores: Store[]
     payment_methods: PaymentMethodItem[]
+    last_order_id?: number
     floor_plan?: Array<{
         id: number
         name: string
@@ -148,12 +168,36 @@ const promoLoading = ref(false)
 const discountAmount = ref<number | string>('')
 const showPaymentDialog = ref(false)
 const showFloorPlan = ref(false)
+const showFeedbackModal = ref(false)
+const currentFeedbackOrderId = ref<number | null>(null)
+
+watch(() => props.last_order_id, (newVal) => {
+    if (newVal) {
+        currentFeedbackOrderId.value = newVal
+        showFeedbackModal.value = true
+    }
+}, { immediate: true })
 const showMobileCart = ref(false)
 const paymentMethod = ref<string>('')
 const cashReceived = ref('')
 const processing = ref(false)
 const isListening = ref(false)
 const newOrderNotification = ref<{ order_code: string; table_name?: string; amount: number } | null>(null)
+
+// Modifier Modal State
+const showModifierDialog = ref(false)
+const selectedProductForModifiers = ref<Product | null>(null)
+const modifierSelections = ref<Record<number, number[]>>({}) // group_id -> option_ids[]
+
+const canConfirmModifiers = computed(() => {
+    if (!selectedProductForModifiers.value) return false
+    for (const group of selectedProductForModifiers.value.modifier_groups || []) {
+        const selectedIds = modifierSelections.value[group.id] || []
+        const min = group.is_required ? (group.min_select || 1) : 0
+        if (selectedIds.length < min) return false
+    }
+    return true
+})
 type PendingOrderItem = {
     id: number
     order_code: string
@@ -580,8 +624,10 @@ const filteredProducts = computed(() => {
 
 const subtotal = computed(() =>
     cart.value.reduce((sum, i) => {
+        const modifierTotal = i.modifiers.reduce((mSum, m) => mSum + m.price_extra, 0)
+        const itemUnitPrice = i.sell_price + modifierTotal
         const discount = i.discount_percent > 0 ? Math.round(i.sell_price * (i.discount_percent / 100)) : 0
-        return sum + (i.sell_price - discount) * i.quantity
+        return sum + (itemUnitPrice - discount) * i.quantity
     }, 0),
 )
 
@@ -631,20 +677,91 @@ const canCheckout = computed(() => cart.value.length > 0)
 
 function addToCart(product: Product, qty = 1) {
     if (product.track_stock && product.current_stock < qty) return
-    const existing = cart.value.find((c) => c.product_id === product.id)
+
+    // If product has modifiers, show dialog instead of direct add
+    if (product.modifier_groups && product.modifier_groups.length > 0) {
+        selectedProductForModifiers.value = product
+        modifierSelections.value = {}
+        // Pre-fill required groups with first option if max_select is 1
+        product.modifier_groups.forEach(g => {
+            if (g.is_required && g.max_select === 1 && g.options.length > 0) {
+                modifierSelections.value[g.id] = [g.options[0].id]
+            } else {
+                modifierSelections.value[g.id] = []
+            }
+        })
+        showModifierDialog.value = true
+        return
+    }
+
+    addFinalToCart(product, qty, [])
+}
+
+function addFinalToCart(product: Product, qty: number, selectedModifiers: Array<{ option_id: number; name: string; price_extra: number }>) {
+    // Generate a unique ID for this cart entry based on product + modifiers
+    const modifierKey = selectedModifiers.map(m => m.option_id).sort().join('-')
+    const cartId = `${product.id}-${modifierKey}`
+
+    const existing = cart.value.find((c) => c.id === cartId)
     if (existing) {
         const newQty = existing.quantity + qty
         if (product.track_stock && product.current_stock < newQty) return
         existing.quantity = newQty
     } else {
         cart.value.push({
+            id: cartId,
             product_id: product.id,
             name: product.name,
             unit: product.unit,
             sell_price: product.sell_price,
             discount_percent: product.discount_percent,
             quantity: qty,
+            modifiers: selectedModifiers,
         })
+    }
+}
+
+function confirmModifiers() {
+    if (!selectedProductForModifiers.value) return
+
+    const product = selectedProductForModifiers.value
+    const finalModifiers: Array<{ option_id: number; name: string; price_extra: number }> = []
+
+    // Validate requirements
+    for (const group of product.modifier_groups || []) {
+        const selectedIds = modifierSelections.value[group.id] || []
+        if (group.is_required && selectedIds.length < (group.min_select || 1)) {
+            alert(`Silakan pilih "${group.name}" terlebih dahulu.`)
+            return
+        }
+        
+        selectedIds.forEach(optId => {
+            const opt = group.options.find(o => o.id === optId)
+            if (opt) {
+                finalModifiers.push({
+                    option_id: opt.id,
+                    name: opt.name,
+                    price_extra: opt.price_extra
+                })
+            }
+        })
+    }
+
+    addFinalToCart(product, 1, finalModifiers)
+    showModifierDialog.value = false
+    selectedProductForModifiers.value = null
+}
+
+function toggleModifierOption(groupId: number, optionId: number, maxSelect: number) {
+    const current = modifierSelections.value[groupId] || []
+    if (current.includes(optionId)) {
+        modifierSelections.value[groupId] = current.filter(id => id !== optionId)
+    } else {
+        if (maxSelect === 1) {
+            modifierSelections.value[groupId] = [optionId]
+        } else if (current.length < maxSelect) {
+            modifierSelections.value[groupId] = [...current, optionId]
+        }
     }
 }
 
@@ -654,12 +771,12 @@ function updateQty(item: CartItem, delta: number) {
     if (product?.track_stock && product.current_stock < newQty) return
     item.quantity = newQty
     if (item.quantity <= 0) {
-        cart.value = cart.value.filter((c) => c.product_id !== item.product_id)
+        cart.value = cart.value.filter((c) => c.id !== item.id)
     }
 }
 
 function removeFromCart(item: CartItem) {
-    cart.value = cart.value.filter((c) => c.product_id !== item.product_id)
+    cart.value = cart.value.filter((c) => c.id !== item.id)
 }
 
 const currentPaymentMethod = computed(() =>
@@ -688,6 +805,7 @@ function submitOrder() {
             product_id: i.product_id,
             quantity: i.quantity,
             notes: i.notes,
+            modifiers: i.modifiers.map(m => ({ option_id: m.option_id })),
         })),
         notes: notes.value,
         payment_method: paymentMethod.value,
@@ -1106,15 +1224,23 @@ const showQrOrAccount = computed(() => {
                             <div v-else class="space-y-2">
                                 <div
                                     v-for="item in cart"
-                                    :key="item.product_id"
+                                    :key="item.id"
                                     class="flex items-center gap-2 rounded-lg border p-2"
                                 >
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium">{{ item.name }}</p>
-                                        <p class="text-xs text-muted-foreground">
+                                        <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-0.5">
+                                            <span v-for="m in item.modifiers" :key="m.option_id" class="text-[9px] bg-muted px-1 rounded text-muted-foreground uppercase tracking-tighter">
+                                                {{ m.name }}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-muted-foreground mt-0.5">
                                             <span v-if="item.discount_percent > 0" class="line-through text-muted-foreground/50 mr-1">{{ formatCurrency(item.sell_price) }}</span>
                                             <span v-if="item.discount_percent > 0" class="font-bold text-destructive">{{ formatCurrency(item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100))) }}</span>
                                             <span v-else>{{ formatCurrency(item.sell_price) }}</span>
+                                            <span v-if="item.modifiers.length > 0" class="text-primary font-medium ml-1">
+                                                +{{ formatCurrency(item.modifiers.reduce((s, m) => s + m.price_extra, 0)) }}
+                                            </span>
                                             × {{ item.quantity }} {{ item.unit }}
                                         </p>
                                     </div>
@@ -1475,6 +1601,57 @@ const showQrOrAccount = computed(() => {
             </DialogContent>
         </Dialog>
 
+        <!-- Modifier Selection Dialog -->
+        <Dialog v-model:open="showModifierDialog">
+            <DialogContent class="max-w-md" v-if="selectedProductForModifiers">
+                <DialogHeader>
+                    <DialogTitle>Pilih Varian & Topping</DialogTitle>
+                    <DialogDescription>
+                        {{ selectedProductForModifiers.name }} · {{ formatCurrency(selectedProductForModifiers.sell_price) }}
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="space-y-6 py-4 max-h-[60vh] overflow-y-auto pr-2 px-1">
+                    <div v-for="group in selectedProductForModifiers.modifier_groups" :key="group.id" class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <Label class="text-sm font-bold flex items-center gap-2">
+                                {{ group.name }}
+                                <Badge v-if="group.is_required" variant="destructive" class="text-[10px] px-1 py-0 h-4">Wajib</Badge>
+                            </Label>
+                            <span class="text-[10px] text-muted-foreground">Max {{ group.max_select }}</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button
+                                v-for="opt in group.options"
+                                :key="opt.id"
+                                type="button"
+                                class="flex flex-col items-start rounded-lg border p-3 text-left transition-all"
+                                :class="[
+                                    modifierSelections[group.id]?.includes(opt.id) ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-input',
+                                    !opt.is_available ? 'opacity-40 grayscale cursor-not-allowed bg-muted' : 'hover:bg-accent'
+                                ]"
+                                :disabled="!opt.is_available"
+                                @click="toggleModifierOption(group.id, opt.id, group.max_select)"
+                            >
+                                <div class="flex items-center justify-between w-full">
+                                    <span class="text-sm font-medium leading-none">{{ opt.name }}</span>
+                                    <Badge v-if="!opt.is_available" variant="outline" class="text-[8px] h-3 px-1">Habis</Badge>
+                                </div>
+                                <span v-if="opt.price_extra > 0" class="mt-1 text-xs text-primary font-bold">+{{ formatCurrency(opt.price_extra) }}</span>
+                                <span v-else class="mt-1 text-xs text-muted-foreground italic">Tanpa Tambahan</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" @click="showModifierDialog = false">Batal</Button>
+                    <Button :disabled="!canConfirmModifiers" @click="confirmModifiers">Tambah ke Keranjang</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
         <!-- Order Success Dialog -->
         <Dialog :open="showSuccessDialog" @update:open="showSuccessDialog = $event">
             <DialogContent class="max-w-xs sm:max-w-md text-center">
@@ -1516,6 +1693,10 @@ const showQrOrAccount = computed(() => {
                 </div>
             </div>
         </Transition>
+        <FeedbackModal 
+            :order-id="showFeedbackModal ? currentFeedbackOrderId : null" 
+            @close="showFeedbackModal = false" 
+        />
     </AdminLayout>
 </template>
 

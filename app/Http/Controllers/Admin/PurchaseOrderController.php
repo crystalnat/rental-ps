@@ -292,7 +292,22 @@ class PurchaseOrderController extends Controller
                         ['current_stock' => 0]
                     );
                     
-                    $inventory->increment('current_stock', $item->quantity);
+                    $stockBefore = $inventory->current_stock;
+                    $stockAfter = $stockBefore + $item->quantity;
+                    $inventory->update(['current_stock' => $stockAfter]);
+
+                    \App\Models\StockMutation::create([
+                        'store_id' => $purchaseOrder->store_id,
+                        'product_id' => $item->product_id,
+                        'created_by' => Auth::id(),
+                        'type' => 'addition',
+                        'quantity' => $item->quantity,
+                        'stock_before' => $stockBefore,
+                        'stock_after' => $stockAfter,
+                        'mutatable_type' => get_class($purchaseOrder),
+                        'mutatable_id' => $purchaseOrder->id,
+                        'notes' => 'Penerimaan PO: ' . $purchaseOrder->po_number,
+                    ]);
                 }
             }
 

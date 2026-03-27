@@ -170,7 +170,7 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load(['store', 'cashier', 'customer', 'table', 'items']);
+        $order->load(['store', 'cashier', 'customer', 'table', 'items.modifiers']);
 
         return response()->json([
             'id'              => $order->id,
@@ -198,6 +198,10 @@ class OrderController extends Controller
                 'unit'         => $i->unit,
                 'unit_price'   => (float) $i->unit_price,
                 'subtotal'     => (float) $i->subtotal,
+                'modifiers'    => $i->modifiers->map(fn($m) => [
+                    'name' => $m->modifier_option_name,
+                    'price_extra' => (float) $m->price_extra,
+                ]),
             ]),
         ]);
     }
@@ -213,7 +217,7 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load(['store', 'cashier', 'customer', 'table', 'items']);
+        $order->load(['store', 'cashier', 'customer', 'table', 'items.modifiers']);
 
         $paymentMethods = PaymentMethod::where('brand_id', $order->store->brand_id)
             ->where('is_active', true)
@@ -255,6 +259,10 @@ class OrderController extends Controller
                     'unit'         => $i->unit,
                     'unit_price'   => (float) $i->unit_price,
                     'subtotal'     => (float) $i->subtotal,
+                    'modifiers'    => $i->modifiers->map(fn($m) => [
+                        'name' => $m->modifier_option_name,
+                        'price_extra' => (float) $m->price_extra,
+                    ]),
                 ]),
             ],
             'payment_methods' => $paymentMethods,
@@ -264,7 +272,7 @@ class OrderController extends Controller
     public function receipt(Order $order): Response
     {
         $this->authorizeOrder($order);
-        $order->load(['store', 'cashier', 'customer', 'table', 'items']);
+        $order->load(['store', 'cashier', 'customer', 'table', 'items.modifiers']);
 
         return Inertia::render('Admin/Orders/Receipt', [
             'order' => $this->formatOrderForPrint($order),
@@ -275,7 +283,7 @@ class OrderController extends Controller
     public function invoice(Order $order): Response
     {
         $this->authorizeOrder($order);
-        $order->load(['store', 'cashier', 'customer', 'table', 'items']);
+        $order->load(['store', 'cashier', 'customer', 'table', 'items.modifiers']);
 
         return Inertia::render('Admin/Orders/Invoice', [
             'order' => $this->formatOrderForPrint($order),
@@ -326,6 +334,10 @@ class OrderController extends Controller
                 'unit_price'      => (float) $i->unit_price,
                 'discount_amount' => (float) $i->discount_amount,
                 'subtotal'        => (float) $i->subtotal,
+                'modifiers'       => $i->modifiers->map(fn($m) => [
+                    'name' => $m->modifier_option_name,
+                    'price_extra' => (float) $m->price_extra,
+                ]),
             ]),
         ];
     }

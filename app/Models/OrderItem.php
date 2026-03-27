@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['order_id', 'product_id', 'price_log_id', 'product_name', 'quantity', 'unit', 'unit_price', 'buy_price', 'discount_amount', 'subtotal', 'notes'])]
 class OrderItem extends Model
@@ -22,6 +23,11 @@ class OrderItem extends Model
     public function priceLog(): BelongsTo
     {
         return $this->belongsTo(PriceLog::class);
+    }
+
+    public function modifiers(): HasMany
+    {
+        return $this->hasMany(OrderItemModifier::class);
     }
 
     public function margin(): float

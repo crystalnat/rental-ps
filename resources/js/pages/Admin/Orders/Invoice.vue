@@ -8,6 +8,10 @@ interface OrderItem {
     unit_price: number
     discount_amount: number
     subtotal: number
+    modifiers?: Array<{
+        name: string
+        price_extra: number
+    }>
 }
 
 interface Order {
@@ -155,7 +159,14 @@ onMounted(() => {
                 <tbody>
                     <tr v-for="(item, i) in order.items" :key="i">
                         <td class="col-no">{{ i + 1 }}</td>
-                        <td class="col-product">{{ item.product_name }}</td>
+                        <td class="col-product">
+                            <div class="p-name">{{ item.product_name }}</div>
+                            <div v-if="item.modifiers && item.modifiers.length > 0" class="item-modifiers">
+                                <div v-for="m in item.modifiers" :key="m.name" class="modifier-row">
+                                    + {{ m.name }}
+                                </div>
+                            </div>
+                        </td>
                         <td class="col-qty">{{ item.quantity }}</td>
                         <td class="col-unit">{{ item.unit }}</td>
                         <td class="col-price">{{ formatRp(item.unit_price) }}</td>
@@ -399,7 +410,23 @@ onMounted(() => {
 .items-table td {
     padding: 10px 12px;
     border-bottom: 1px solid #f3f4f6;
-    vertical-align: middle;
+    vertical-align: top;
+}
+
+.p-name {
+    font-weight: 600;
+}
+
+.item-modifiers {
+    font-size: 10px;
+    color: #6b7280;
+    padding-left: 12px;
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.modifier-row {
+    line-height: 1.3;
 }
 
 .items-table tbody tr:last-child td {

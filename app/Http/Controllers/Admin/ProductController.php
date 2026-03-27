@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -91,32 +92,66 @@ class ProductController extends Controller
             'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'buy_price'    => ['required', 'numeric', 'min:0'],
             'sell_price'   => ['required', 'numeric', 'min:0'],
+            'modifiers'    => ['nullable', 'array'],
+            'modifiers.*.name' => ['required', 'string', 'max:100'],
+            'modifiers.*.is_required' => ['boolean'],
+            'modifiers.*.min_select' => ['required', 'integer', 'min:0'],
+            'modifiers.*.max_select' => ['required', 'integer', 'min:1'],
+            'modifiers.*.options' => ['required', 'array', 'min:1'],
+            'modifiers.*.options.*.name' => ['required', 'string', 'max:100'],
+            'modifiers.*.options.*.price_extra' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $slug = $this->generateUniqueSlug($data['name']);
+        $product = DB::transaction(function () use ($data, $brandId) {
+            $slug = $this->generateUniqueSlug($data['name']);
 
-        $product = Product::create([
-            'brand_id'     => $brandId,
-            'category_id'  => $data['category_id'] ?? null,
-            'name'         => $data['name'],
-            'slug'         => $slug,
-            'sku'          => $data['sku'] ?? null,
-            'description'  => $data['description'] ?? null,
-            'unit'         => $data['unit'],
-            'track_stock'  => $data['track_stock'] ?? true,
-            'is_available' => $data['is_available'] ?? true,
-            'discount_percent' => $data['discount_percent'] ?? 0,
-            'is_active'    => true,
-        ]);
+            $product = Product::create([
+                'brand_id'     => $brandId,
+                'category_id'  => $data['category_id'] ?? null,
+                'name'         => $data['name'],
+                'slug'         => $slug,
+                'sku'          => $data['sku'] ?? null,
+                'description'  => $data['description'] ?? null,
+                'unit'         => $data['unit'],
+                'track_stock'  => $data['track_stock'] ?? true,
+                'is_available' => $data['is_available'] ?? true,
+                'discount_percent' => $data['discount_percent'] ?? 0,
+                'is_active'    => true,
+            ]);
 
-        PriceLog::create([
-            'product_id' => $product->id,
-            'store_id'   => null,
-            'buy_price'  => $data['buy_price'],
-            'sell_price' => $data['sell_price'],
-            'started_at' => now(),
-            'created_by' => Auth::id(),
-        ]);
+            PriceLog::create([
+                'product_id' => $product->id,
+                'store_id'   => null,
+                'buy_price'  => $data['buy_price'],
+                'sell_price' => $data['sell_price'],
+                'started_at' => now(),
+                'created_by' => Auth::id(),
+            ]);
+
+            if (!empty($data['modifiers'])) {
+                foreach ($data['modifiers'] as $order => $groupData) {
+                    $group = $product->modifierGroups()->create([
+                        'name' => $groupData['name'],
+                        'is_required' => $groupData['is_required'] ?? false,
+                        'min_select' => $groupData['min_select'],
+                        'max_select' => $groupData['max_select'],
+                        'sort_order' => $order,
+                    ]);
+
+                    foreach ($groupData['options'] as $optOrder => $optData) {
+                        $group->options()->create([
+                            'name' => $optData['name'],
+                            'price_extra' => $optData['price_extra'],
+                            'sort_order' => $optOrder,
+                            'is_active' => $optData['is_active'] ?? true,
+                            'is_available' => $optData['is_available'] ?? true,
+                        ]);
+                    }
+                }
+            }
+
+            return $product;
+        });
 
         return redirect()->route('admin.products.index')
             ->with('success', "Produk \"{$product->name}\" berhasil ditambahkan.");
@@ -153,6 +188,22 @@ class ProductController extends Controller
                 'is_active'    => $product->is_active,
                 'buy_price'    => $globalPrice?->buy_price ?? 0,
                 'sell_price'   => $globalPrice?->sell_price ?? 0,
+                'modifiers'    => $product->modifierGroups->map(function($group) {
+                    return [
+                        'id' => $group->id,
+                        'name' => $group->name,
+                        'is_required' => $group->is_required,
+                        'min_select' => $group->min_select,
+                        'max_select' => $group->max_select,
+                        'options' => $group->options->map(function($opt) {
+                            return [
+                                'id' => $opt->id,
+                                'name' => $opt->name,
+                                'price_extra' => (float) $opt->price_extra,
+                            ];
+                        })
+                    ];
+                }),
             ],
             'categories' => $categories,
         ]);
@@ -173,47 +224,106 @@ class ProductController extends Controller
             'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'buy_price'    => ['required', 'numeric', 'min:0'],
             'sell_price'   => ['required', 'numeric', 'min:0'],
+            'modifiers'    => ['nullable', 'array'],
+            'modifiers.*.id'   => ['nullable'],
+            'modifiers.*.name' => ['required', 'string', 'max:100'],
+            'modifiers.*.is_required' => ['boolean'],
+            'modifiers.*.min_select' => ['required', 'integer', 'min:0'],
+            'modifiers.*.max_select' => ['required', 'integer', 'min:1'],
+            'modifiers.*.options' => ['required', 'array', 'min:1'],
+            'modifiers.*.options.*.id'   => ['nullable'],
+            'modifiers.*.options.*.name' => ['required', 'string', 'max:100'],
+            'modifiers.*.options.*.price_extra' => ['required', 'numeric', 'min:0'],
         ]);
 
-        if ($data['name'] !== $product->name) {
-            $data['slug'] = $this->generateUniqueSlug($data['name'], $product->id);
-        }
-
-        $product->update([
-            'category_id'  => $data['category_id'] ?? null,
-            'name'         => $data['name'],
-            'slug'         => $data['slug'] ?? $product->slug,
-            'sku'          => $data['sku'] ?? null,
-            'description'  => $data['description'] ?? null,
-            'unit'         => $data['unit'],
-            'track_stock'  => $data['track_stock'] ?? true,
-            'is_available' => $data['is_available'] ?? true,
-            'discount_percent' => $data['discount_percent'] ?? 0,
-        ]);
-
-        $currentPrice = PriceLog::where('product_id', $product->id)
-            ->whereNull('store_id')
-            ->whereNull('ended_at')
-            ->first();
-
-        if (
-            ! $currentPrice ||
-            $currentPrice->buy_price != $data['buy_price'] ||
-            $currentPrice->sell_price != $data['sell_price']
-        ) {
-            if ($currentPrice) {
-                $currentPrice->update(['ended_at' => now()]);
+        DB::transaction(function () use ($data, $product) {
+            if ($data['name'] !== $product->name) {
+                $data['slug'] = $this->generateUniqueSlug($data['name'], $product->id);
             }
 
-            PriceLog::create([
-                'product_id' => $product->id,
-                'store_id'   => null,
-                'buy_price'  => $data['buy_price'],
-                'sell_price' => $data['sell_price'],
-                'started_at' => now(),
-                'created_by' => Auth::id(),
+            $product->update([
+                'category_id'  => $data['category_id'] ?? null,
+                'name'         => $data['name'],
+                'slug'         => $data['slug'] ?? $product->slug,
+                'sku'          => $data['sku'] ?? null,
+                'description'  => $data['description'] ?? null,
+                'unit'         => $data['unit'],
+                'track_stock'  => $data['track_stock'] ?? true,
+                'is_available' => $data['is_available'] ?? true,
+                'discount_percent' => $data['discount_percent'] ?? 0,
             ]);
-        }
+
+            $currentPrice = PriceLog::where('product_id', $product->id)
+                ->whereNull('store_id')
+                ->whereNull('ended_at')
+                ->first();
+
+            if (
+                ! $currentPrice ||
+                $currentPrice->buy_price != $data['buy_price'] ||
+                $currentPrice->sell_price != $data['sell_price']
+            ) {
+                if ($currentPrice) {
+                    $currentPrice->update(['ended_at' => now()]);
+                }
+
+                PriceLog::create([
+                    'product_id' => $product->id,
+                    'store_id'   => null,
+                    'buy_price'  => $data['buy_price'],
+                    'sell_price' => $data['sell_price'],
+                    'started_at' => now(),
+                    'created_by' => Auth::id(),
+                ]);
+            }
+
+            // MODIFIERS UPDATE LOGIC
+            // Simple approach: Delete all and recreate for now, or sync by ID
+            // Let's do a basic sync by ID to preserve histories if possible, 
+            // but for MVP, delete/recreate is easier. Let's do a refined update.
+            
+            $existingGroupIds = $product->modifierGroups()->pluck('id')->toArray();
+            $newGroupIds = [];
+
+            if (!empty($data['modifiers'])) {
+                foreach ($data['modifiers'] as $order => $groupData) {
+                    $group = $product->modifierGroups()->updateOrCreate(
+                        ['id' => $groupData['id'] ?? null],
+                        [
+                            'name' => $groupData['name'],
+                            'is_required' => $groupData['is_required'] ?? false,
+                            'min_select' => $groupData['min_select'],
+                            'max_select' => $groupData['max_select'],
+                            'sort_order' => $order,
+                        ]
+                    );
+                    $newGroupIds[] = $group->id;
+
+                    $existingOptionIds = $group->options()->pluck('id')->toArray();
+                    $newOptionIds = [];
+
+                    foreach ($groupData['options'] as $optOrder => $optData) {
+                        $option = $group->options()->updateOrCreate(
+                            ['id' => $optData['id'] ?? null],
+                            [
+                                'name' => $optData['name'],
+                                'price_extra' => $optData['price_extra'],
+                                'sort_order' => $optOrder,
+                                'is_active' => $optData['is_active'] ?? true,
+                                'is_available' => $optData['is_available'] ?? true,
+                            ]
+                        );
+                        $newOptionIds[] = $option->id;
+                    }
+
+                    // Delete removed options
+                    $group->options()->whereNotIn('id', $newOptionIds)->delete();
+                }
+            }
+
+            // Delete removed groups
+            $product->modifierGroups()->whereNotIn('id', $newGroupIds)->delete();
+        });
 
         return redirect()->route('admin.products.index')
             ->with('success', "Produk \"{$product->name}\" berhasil diperbarui.");

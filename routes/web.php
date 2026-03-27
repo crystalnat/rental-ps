@@ -69,6 +69,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
         Route::post('/orders/{order}/pay', [OrderController::class, 'pay'])->name('admin.orders.pay');
         Route::put('/orders/{order}', [OrderController::class, 'update'])->name('admin.orders.update');
         Route::delete('/orders/{order}', [OrderController::class, 'destroy'])->name('admin.orders.destroy');
+        Route::post('/orders/{order}/feedback', [\App\Http\Controllers\Admin\FeedbackController::class, 'store'])->name('admin.orders.feedback');
 
         // Refunds
         Route::get('/refunds', [RefundController::class, 'index'])->name('admin.refunds.index');
@@ -216,6 +217,11 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
             Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/copy', [FloorPlanController::class, 'copyTable'])->name('admin.stores.floor-plan.copy-table');
             Route::post('/stores/{store}/floor-plan/{floor}/elements/{element}/copy', [FloorPlanController::class, 'copyElement'])->name('admin.stores.floor-plan.copy-element');
         });
+
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'index'])->name('admin.notifications.index');
+    Route::post('/notifications/mark-read', [\App\Http\Controllers\Admin\NotificationController::class, 'markAsRead'])->name('admin.notifications.mark-read');
+    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\Admin\NotificationController::class, 'markAllAsRead'])->name('admin.notifications.mark-all-read');
 });
 
 // Redirect root to dashboard or login

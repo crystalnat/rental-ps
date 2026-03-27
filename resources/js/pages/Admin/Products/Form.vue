@@ -8,7 +8,24 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { ArrowLeft, Loader2, Package } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, Package, Plus, Trash2, GripVertical } from 'lucide-vue-next'
+
+interface ModifierOption {
+    id?: number
+    name: string
+    price_extra: number
+    is_active: boolean
+    is_available: boolean
+}
+
+interface ModifierGroup {
+    id?: number
+    name: string
+    is_required: boolean
+    min_select: number
+    max_select: number
+    options: ModifierOption[]
+}
 
 interface ProductData {
     id: number
@@ -24,6 +41,7 @@ interface ProductData {
     buy_price: number
     sell_price: number
     discount_percent: number
+    modifiers?: ModifierGroup[]
 }
 
 interface Category {
@@ -50,7 +68,30 @@ const form = useForm({
     buy_price:    props.product?.buy_price    ?? 0,
     sell_price:   props.product?.sell_price   ?? 0,
     discount_percent: props.product?.discount_percent ?? 0,
+    modifiers:    (props.product?.modifiers ?? []) as ModifierGroup[],
 })
+
+function addModifierGroup() {
+    form.modifiers.push({
+        name: '',
+        is_required: false,
+        min_select: 0,
+        max_select: 1,
+        options: [{ name: '', price_extra: 0, is_active: true, is_available: true }]
+    })
+}
+
+function removeModifierGroup(index: number) {
+    form.modifiers.splice(index, 1)
+}
+
+function addOption(groupIndex: number) {
+    form.modifiers[groupIndex].options.push({ name: '', price_extra: 0, is_active: true, is_available: true })
+}
+
+function removeOption(groupIndex: number, optionIndex: number) {
+    form.modifiers[groupIndex].options.splice(optionIndex, 1)
+}
 
 function submit() {
     if (isEdit.value) {
@@ -208,6 +249,102 @@ const units = ['pcs', 'kg', 'gram', 'liter', 'ml', 'porsi', 'pack', 'box', 'lusi
                             <p class="text-lg font-semibold">
                                 {{ ((form.sell_price - form.buy_price) / form.sell_price * 100).toFixed(1) }}%
                             </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Modifiers -->
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between space-y-0">
+                        <div>
+                            <CardTitle>Varian & Modifier</CardTitle>
+                            <CardDescription>Pilihan tambahan (Size, Topping, Gula, dll)</CardDescription>
+                        </div>
+                        <Button type="button" variant="outline" size="sm" @click="addModifierGroup">
+                            <Plus class="mr-1 h-3.5 w-3.5" />
+                            Tambah Group
+                        </Button>
+                    </CardHeader>
+                    <CardContent class="space-y-6">
+                        <div v-if="form.modifiers.length === 0" class="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-xl">
+                            <p class="text-sm text-muted-foreground">Belum ada varian produk.</p>
+                        </div>
+
+                        <div v-for="(group, gIdx) in form.modifiers" :key="gIdx" class="relative rounded-xl border bg-muted/30 p-4 space-y-4">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                class="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
+                                @click="removeModifierGroup(gIdx)"
+                            >
+                                <Trash2 class="h-4 w-4" />
+                            </Button>
+
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div class="space-y-2">
+                                    <Label class="text-xs">Nama Group (Contoh: Ukuran, Topping)</Label>
+                                    <Input v-model="group.name" placeholder="Pilih Ukuran" required />
+                                </div>
+                                <div class="flex items-center gap-4 pt-6">
+                                    <div class="flex items-center gap-2">
+                                        <Switch v-model:checked="group.is_required" />
+                                        <Label class="text-xs">Wajib Pilih</Label>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <Label class="text-xs">Max Pilih</Label>
+                                        <Input v-model.number="group.max_select" type="number" min="1" class="h-8 w-16" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3">
+                                <Label class="text-xs font-bold text-muted-foreground">Pilihan Opsi</Label>
+                                <div v-for="(opt, oIdx) in group.options" :key="oIdx" class="flex items-center gap-2">
+                                    <div class="flex h-10 w-full items-center gap-2 rounded-md bg-background px-2 border">
+                                        <GripVertical class="h-4 w-4 text-muted-foreground/30" />
+                                        <input
+                                            v-model="opt.name"
+                                            class="flex-1 bg-transparent border-none text-sm outline-none placeholder:text-muted-foreground/50"
+                                            placeholder="Nama Opsi (Hot / Large)"
+                                            required
+                                        />
+                                        <div class="h-4 w-px bg-border mx-1" />
+                                        <span class="text-[10px] text-muted-foreground">+Rp</span>
+                                        <input
+                                            v-model.number="opt.price_extra"
+                                            type="number"
+                                            class="w-20 bg-transparent border-none text-sm font-bold text-right outline-none"
+                                            min="0"
+                                        />
+                                        <div class="h-4 w-px bg-border mx-1" />
+                                        <div class="flex items-center gap-1.5 px-1 py-0.5 rounded bg-muted/50">
+                                            <Switch 
+                                                :checked="opt.is_available" 
+                                                @update:checked="opt.is_available = $event" 
+                                                class="scale-[0.7]" 
+                                                title="Tersedia (Ready Stock)"
+                                            />
+                                            <span class="text-[9px] font-bold" :class="opt.is_available ? 'text-green-600' : 'text-destructive'">
+                                                {{ opt.is_available ? 'READY' : 'EMPTY' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        v-if="group.options.length > 1"
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        @click="removeOption(gIdx, oIdx)"
+                                    >
+                                        <Trash2 class="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                                <Button type="button" variant="ghost" size="sm" class="h-8 text-xs text-primary" @click="addOption(gIdx)">
+                                    <Plus class="mr-1 h-3 w-3" /> Tambah Opsi
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
