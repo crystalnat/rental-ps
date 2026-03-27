@@ -16,7 +16,7 @@ import CashierFloorPlan from '@/components/CashierFloorPlan.vue'
 import {
     Search, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone,
     ShoppingBag, Mic, MicOff, LayoutGrid, X, Clock, Loader2, RotateCcw, ShoppingCart,
-    TicketPercent
+    TicketPercent, Receipt
 } from 'lucide-vue-next'
 import axios from 'axios'
 
@@ -725,7 +725,7 @@ function changeStore(storeId: number) {
 const orderTypeLabel = {
     dine_in: 'Makan di Tempat',
     takeaway: 'Bungkus',
-    walk_in: 'Walk-in',
+    walk_in: 'Pesan Langsung',
 }
 
 function openPayModal(order: PendingOrderItem) {
@@ -852,6 +852,18 @@ const showQrOrAccount = computed(() => {
                             <MicOff v-else class="h-4 w-4 animate-pulse" />
                         </Button>
                     </div>
+
+                    <div v-if="activeShift" class="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/50 border text-[11px] font-medium text-muted-foreground">
+                        <div class="flex items-center gap-1.5">
+                            <Clock class="h-3 w-3 text-primary" />
+                            <span>Shift: #{{ activeShift.id }}</span>
+                        </div>
+                        <div class="w-px h-3 bg-border" />
+                        <div class="flex items-center gap-1.5">
+                            <Banknote class="h-3 w-3 text-emerald-500" />
+                            <span>Modal: {{ formatCurrency(activeShift.opening_cash) }}</span>
+                        </div>
+                    </div>
                     
                     <p v-if="sttError" class="text-xs text-destructive">{{ sttError }}</p>
                     
@@ -904,6 +916,17 @@ const showQrOrAccount = computed(() => {
                         >
                             <LayoutGrid class="mr-2 h-4 w-4" />
                             Denah Meja
+                        </Button>
+
+                        <Button
+                            v-if="activeShift"
+                            variant="outline"
+                            size="sm"
+                            class="shrink-0 h-9 text-destructive border-destructive/20 hover:bg-destructive/10"
+                            @click="router.visit(`/admin/shifts/${activeShift.id}`)"
+                        >
+                            <Clock class="mr-2 h-4 w-4" />
+                            Tutup Shift
                         </Button>
                     </div>
                 </div>
@@ -1125,75 +1148,94 @@ const showQrOrAccount = computed(() => {
                                 </div>
                             </div>
                         </div>
-                        <div class="border-t p-4">
-                            <div class="mb-2 flex justify-between text-sm">
-                                <span class="text-muted-foreground">Subtotal</span>
-                                <span class="font-medium">{{ formatCurrency(subtotal) }}</span>
-                            </div>
-                            <div class="mb-4">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <Input
-                                        v-model="promoCodeInput"
-                                        placeholder="Kode Promo"
-                                        class="h-8 text-sm uppercase"
-                                        :disabled="activePromo !== null || promoLoading"
-                                        @keyup.enter="applyPromoCode"
-                                    />
-                                    <Button
-                                        v-if="!activePromo"
-                                        size="sm"
-                                        variant="secondary"
-                                        class="h-8"
-                                        :disabled="!promoCodeInput || promoLoading"
-                                        @click="applyPromoCode"
-                                    >
-                                        <Loader2 v-if="promoLoading" class="h-4 w-4 animate-spin mr-1" />
-                                        Terapkan
-                                    </Button>
-                                    <Button
-                                        v-else
-                                        size="sm"
-                                        variant="outline"
-                                        class="h-8 text-destructive border-destructive"
-                                        @click="removePromo"
-                                    >
-                                        Batal
-                                    </Button>
-                                </div>
-                                <p v-if="promoError" class="text-[10px] text-destructive">{{ promoError }}</p>
-                                <p v-if="activePromo" class="text-[10px] text-green-600 dark:text-green-400 font-medium">
-                                    Promo diterapkan: {{ activePromo.type === 'percentage' ? activePromo.value + '%' : 'Rp ' + activePromo.value }}
-                                </p>
+                        <div v-if="cart.length > 0" class="border-t p-4 space-y-4">
+                            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">
+                                <Receipt class="h-3.5 w-3.5" />
+                                <span>Ringkasan Pesanan</span>
                             </div>
 
-                            <div class="mb-2 flex items-center justify-between text-sm font-medium">
-                                <span>Diskon Keseluruhan (Rp)</span>
-                                <Input
-                                    v-model="discountAmount"
-                                    type="number"
-                                    class="h-8 w-28 text-right text-sm px-2 font-black tabular-nums border-orange-200 focus-visible:ring-orange-500"
-                                    placeholder="0"
-                                    min="0"
-                                    :disabled="activePromo !== null"
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-muted-foreground">Subtotal</span>
+                                    <span class="font-medium tabular-nums">{{ formatCurrency(subtotal) }}</span>
+                                </div>
+                                
+                                <div class="space-y-1.5 pt-1">
+                                    <Label class="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/80">Kode Promo (Opsional)</Label>
+                                    <div class="flex items-center gap-2">
+                                        <div class="relative flex-1">
+                                            <TicketPercent class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
+                                            <Input
+                                                v-model="promoCodeInput"
+                                                placeholder="KODEPROMO"
+                                                class="h-9 pl-8 text-xs uppercase tracking-wider focus-visible:ring-primary/30"
+                                                :disabled="activePromo !== null || promoLoading"
+                                                @keyup.enter="applyPromoCode"
+                                            />
+                                        </div>
+                                        <Button
+                                            v-if="!activePromo"
+                                            size="sm"
+                                            variant="secondary"
+                                            class="h-9 px-4 text-xs font-semibold shrink-0"
+                                            :disabled="!promoCodeInput || promoLoading"
+                                            @click="applyPromoCode"
+                                        >
+                                            <Loader2 v-if="promoLoading" class="h-3 w-3 animate-spin mr-1.5" />
+                                            Terapkan
+                                        </Button>
+                                        <Button
+                                            v-else
+                                            size="sm"
+                                            variant="outline"
+                                            class="h-9 px-4 text-xs font-semibold text-destructive border-destructive/20 hover:bg-destructive/10 shrink-0"
+                                            @click="removePromo"
+                                        >
+                                            Batal
+                                        </Button>
+                                    </div>
+                                    <p v-if="promoError" class="text-[10px] text-destructive px-1">{{ promoError }}</p>
+                                    <p v-if="activePromo" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded inline-block">
+                                        ✨ Promo aktif: {{ activePromo.type === 'percentage' ? activePromo.value + '%' : 'Rp ' + activePromo.value }}
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center justify-between gap-4 pt-1">
+                                    <Label class="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/80">Diskon Laci / Manual (Rp)</Label>
+                                    <Input
+                                        v-model="discountAmount"
+                                        type="number"
+                                        class="h-8 w-32 text-right text-xs px-2 font-bold tabular-nums border-muted focus-visible:ring-primary/30"
+                                        placeholder="0"
+                                        min="0"
+                                        :disabled="activePromo !== null"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="mb-4 flex flex-col pt-3 border-t">
+                                <Label class="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/80 mb-1.5">Catatan Pesanan</Label>
+                                <textarea
+                                    v-model="notes"
+                                    placeholder="Contoh: Sambal pisah, pedas sedang..."
+                                    rows="1"
+                                    class="w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30 resize-none min-h-[40px]"
                                 />
                             </div>
-                            <div class="mb-3 flex justify-between font-bold text-lg mt-3 pt-3 border-t">
-                                <span>Total Tagihan</span>
-                                <span class="text-primary tabular-nums">{{ formatCurrency(finalAmount) }}</span>
+
+                            <div class="flex justify-between font-bold text-xl pt-2 border-t-2 border-dashed border-primary/20">
+                                <span class="text-muted-foreground text-sm uppercase self-center">Total Tagihan</span>
+                                <span class="text-primary tabular-nums tracking-tighter">{{ formatCurrency(finalAmount) }}</span>
                             </div>
-                            <textarea
-                                v-model="notes"
-                                placeholder="Catatan pesanan..."
-                                rows="2"
-                                class="mb-3 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            />
+
                             <Button
-                                class="w-full"
+                                class="w-full h-12 text-base font-bold shadow-lg shadow-primary/10"
                                 size="lg"
                                 :disabled="!canCheckout"
                                 @click="openPaymentDialog"
                             >
-                                Bayar {{ formatCurrency(finalAmount) }}
+                                <CreditCard class="mr-2 h-5 w-5" />
+                                Bayar Sekarang
                             </Button>
                         </div>
                     </CardContent>
@@ -1340,16 +1382,6 @@ const showQrOrAccount = computed(() => {
                                 {{ pm.name }}
                             </option>
                         </select>
-                        <Button
-                            v-if="activeShift"
-                            variant="outline"
-                            size="sm"
-                            class="shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
-                            @click="router.visit(`/admin/shifts/${activeShift.id}`)"
-                        >
-                            <Clock class="mr-2 h-4 w-4" />
-                            Tutup Shift
-                        </Button>
                     </div>
                     <div v-if="getRequiresCashInput()">
                         <Label for="pay_cash_received">Uang Diterima</Label>

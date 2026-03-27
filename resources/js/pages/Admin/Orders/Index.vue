@@ -99,15 +99,24 @@ watch(() => props.filters, (f) => {
 }, { deep: true })
 
 const typeLabels: Record<string, string> = {
-    dine_in: 'Dine In',
-    takeaway: 'Take Away',
-    walk_in: 'Walk In',
+    dine_in: 'Makan di Tempat',
+    takeaway: 'Bungkus',
+    walk_in: 'Pesan Langsung',
 }
 
 const typeBadgeClass: Record<string, string> = {
     dine_in: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
     takeaway: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
     walk_in: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800',
+}
+
+const statusBadgeClass: Record<string, string> = {
+    pending: 'bg-muted text-muted-foreground border-muted-foreground/20',
+    confirmed: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800',
+    processing: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+    ready: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800',
+    done: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
+    cancelled: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800',
 }
 
 const paymentLabels: Record<string, string> = {
@@ -130,7 +139,7 @@ const sortKey = computed(() => props.filters.sort ?? 'created_at')
 const sortDir = computed(() => (props.filters.dir === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc')
 
 function changeStore(storeId: number) {
-    router.get(route('admin.orders.index'), {
+    router.get('/admin/orders', {
         store: storeId,
         ...buildQueryParams(),
     })
@@ -152,7 +161,7 @@ function buildQueryParams() {
 }
 
 function applyFilters() {
-    router.get(route('admin.orders.index'), {
+    router.get('/admin/orders', {
         store: props.store.id,
         ...buildQueryParams(),
     }, { preserveState: true })
@@ -160,7 +169,7 @@ function applyFilters() {
 
 function setSort(key: string) {
     const newDir = sortKey.value === key && sortDir.value === 'desc' ? 'asc' : 'desc'
-    router.get(route('admin.orders.index'), {
+    router.get('/admin/orders', {
         store: props.store.id,
         ...buildQueryParams(),
         sort: key,
@@ -173,7 +182,7 @@ function goToPage(url: string | null) {
 }
 
 function viewOrder(id: number) {
-    router.visit(route('admin.orders.show', id))
+    router.visit(`/admin/orders/${id}`)
 }
 
 const hasActiveFilters = computed(() =>
@@ -199,7 +208,7 @@ const cancellingOrderId = ref<number | null>(null)
 function updateStatus(order: Order, newStatus: string) {
     if (order.status === 'done' || order.status === 'cancelled') return
     updatingOrderId.value = order.id
-    router.put(route('admin.orders.update', order.id), { status: newStatus }, {
+    router.put(`/admin/orders/${order.id}`, { status: newStatus }, {
         preserveScroll: true,
         onFinish: () => { updatingOrderId.value = null },
     })
@@ -209,7 +218,7 @@ function cancelOrder(order: Order) {
     if (order.payment_status === 'paid') return
     if (!confirm(`Batalkan pesanan ${order.order_code}?`)) return
     cancellingOrderId.value = order.id
-    router.delete(route('admin.orders.destroy', order.id), {
+    router.delete(`/admin/orders/${order.id}`, {
         preserveScroll: true,
         onFinish: () => { cancellingOrderId.value = null },
     })
@@ -245,7 +254,7 @@ function submitPayOrder() {
     const order = selectedPayOrder.value
     if (!order) return
     payProcessing.value = true
-    router.post(route('admin.orders.pay', order.id), {
+    router.post(`/admin/orders/${order.id}/pay`, {
         payment_method: payForm.value.payment_method,
         cash_received: getRequiresCashInput() ? payForm.value.cash_received : null,
     }, {
