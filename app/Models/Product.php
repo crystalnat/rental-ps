@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['brand_id', 'category_id', 'name', 'slug', 'sku', 'description', 'image', 'unit', 'is_available', 'track_stock', 'is_active'])]
+#[Fillable(['brand_id', 'category_id', 'name', 'slug', 'sku', 'description', 'image', 'unit', 'is_available', 'track_stock', 'discount_percent', 'is_active'])]
 class Product extends Model
 {
     use SoftDeletes;
@@ -60,9 +60,10 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'is_available' => 'boolean',
-            'track_stock'  => 'boolean',
-            'is_active'    => 'boolean',
+            'is_available'     => 'boolean',
+            'track_stock'      => 'boolean',
+            'is_active'        => 'boolean',
+            'discount_percent' => 'float',
         ];
     }
 }

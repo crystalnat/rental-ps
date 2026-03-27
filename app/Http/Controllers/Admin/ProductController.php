@@ -41,6 +41,7 @@ class ProductController extends Controller
                     'unit'              => $product->unit,
                     'is_available'      => $product->is_available,
                     'track_stock'       => $product->track_stock,
+                    'discount_percent'  => (float) $product->discount_percent,
                     'is_active'         => $product->is_active,
                     'inventories_count' => $product->inventories_count,
                     'sell_price'        => $globalPrice?->sell_price ?? 0,
@@ -87,6 +88,7 @@ class ProductController extends Controller
             'unit'         => ['required', 'string', 'max:30'],
             'track_stock'  => ['boolean'],
             'is_available' => ['boolean'],
+            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'buy_price'    => ['required', 'numeric', 'min:0'],
             'sell_price'   => ['required', 'numeric', 'min:0'],
         ]);
@@ -103,6 +105,7 @@ class ProductController extends Controller
             'unit'         => $data['unit'],
             'track_stock'  => $data['track_stock'] ?? true,
             'is_available' => $data['is_available'] ?? true,
+            'discount_percent' => $data['discount_percent'] ?? 0,
             'is_active'    => true,
         ]);
 
@@ -146,6 +149,7 @@ class ProductController extends Controller
                 'unit'         => $product->unit,
                 'track_stock'  => $product->track_stock,
                 'is_available' => $product->is_available,
+                'discount_percent' => (float) $product->discount_percent,
                 'is_active'    => $product->is_active,
                 'buy_price'    => $globalPrice?->buy_price ?? 0,
                 'sell_price'   => $globalPrice?->sell_price ?? 0,
@@ -166,6 +170,7 @@ class ProductController extends Controller
             'unit'         => ['required', 'string', 'max:30'],
             'track_stock'  => ['boolean'],
             'is_available' => ['boolean'],
+            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'buy_price'    => ['required', 'numeric', 'min:0'],
             'sell_price'   => ['required', 'numeric', 'min:0'],
         ]);
@@ -183,6 +188,7 @@ class ProductController extends Controller
             'unit'         => $data['unit'],
             'track_stock'  => $data['track_stock'] ?? true,
             'is_available' => $data['is_available'] ?? true,
+            'discount_percent' => $data['discount_percent'] ?? 0,
         ]);
 
         $currentPrice = PriceLog::where('product_id', $product->id)

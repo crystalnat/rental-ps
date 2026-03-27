@@ -23,6 +23,7 @@ interface ProductData {
     is_active: boolean
     buy_price: number
     sell_price: number
+    discount_percent: number
 }
 
 interface Category {
@@ -48,6 +49,7 @@ const form = useForm({
     is_available: props.product?.is_available ?? true,
     buy_price:    props.product?.buy_price    ?? 0,
     sell_price:   props.product?.sell_price   ?? 0,
+    discount_percent: props.product?.discount_percent ?? 0,
 })
 
 function submit() {
@@ -173,16 +175,32 @@ const units = ['pcs', 'kg', 'gram', 'liter', 'ml', 'porsi', 'pack', 'box', 'lusi
                             </div>
                         </div>
 
-                        <div class="space-y-2">
-                            <Label for="unit">Satuan <span class="text-destructive">*</span></Label>
-                            <select
-                                id="unit"
-                                v-model="form.unit"
-                                :disabled="form.processing"
-                                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
-                            </select>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label for="unit">Satuan <span class="text-destructive">*</span></Label>
+                                <select
+                                    id="unit"
+                                    v-model="form.unit"
+                                    :disabled="form.processing"
+                                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <Label for="discount_percent">Diskon Penjualan (%)</Label>
+                                <Input
+                                    id="discount_percent"
+                                    v-model.number="form.discount_percent"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    :disabled="form.processing"
+                                />
+                                <p class="text-[10px] text-muted-foreground">Diskon otomatis aktif saat masuk keranjang Kasir.</p>
+                                <p v-if="form.errors.discount_percent" class="text-xs text-destructive">{{ form.errors.discount_percent }}</p>
+                            </div>
                         </div>
 
                         <div v-if="form.sell_price > 0 && form.buy_price > 0" class="rounded-lg bg-muted/50 p-3">

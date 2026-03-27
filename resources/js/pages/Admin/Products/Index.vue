@@ -25,6 +25,7 @@ interface Product {
     unit: string
     is_available: boolean
     track_stock: boolean
+    discount_percent: number
     is_active: boolean
     inventories_count: number
     sell_price: number
@@ -213,14 +214,27 @@ function handleDelete() {
                         {{ product.category }}
                     </span>
 
-                    <div class="flex items-center justify-between border-t pt-2">
+                    <div class="flex items-center justify-between border-t pt-2 mt-2">
                         <div>
                             <p class="text-xs text-muted-foreground">Harga Jual</p>
-                            <p class="font-semibold text-sm">{{ formatCurrency(product.sell_price) }}</p>
+                            <div v-if="product.discount_percent > 0">
+                                <p class="text-[10px] text-muted-foreground line-through">{{ formatCurrency(product.sell_price) }}</p>
+                                <p class="font-bold text-sm text-destructive">
+                                    {{ formatCurrency(product.sell_price - Math.round(product.sell_price * (product.discount_percent / 100))) }}
+                                </p>
+                            </div>
+                            <div v-else>
+                                <p class="font-semibold text-sm">{{ formatCurrency(product.sell_price) }}</p>
+                            </div>
                         </div>
-                        <Badge :variant="product.is_available ? 'success' : 'secondary'" class="text-xs opacity-100">
-                            {{ product.is_available ? 'Tersedia' : 'Tidak' }}
-                        </Badge>
+                        <div class="flex flex-col items-end gap-1">
+                            <Badge v-if="product.discount_percent > 0" variant="destructive" class="text-[10px] px-1 py-0 h-4">
+                                <span class="font-mono">{{ product.discount_percent }}%</span>
+                            </Badge>
+                            <Badge :variant="product.is_available ? 'success' : 'secondary'" class="text-[10px] opacity-100">
+                                {{ product.is_available ? 'Tersedia' : 'Tidak' }}
+                            </Badge>
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-2 pt-2">

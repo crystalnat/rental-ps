@@ -32,6 +32,7 @@ import {
     Search,
     Store,
     ChevronDown,
+    ShoppingBag,
 } from 'lucide-vue-next'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
@@ -81,6 +82,7 @@ interface StoreReport {
     name: string
     slug: string
     income: number
+    hpp: number
     expenses: number
     order_count: number
     gross_profit: number
@@ -94,6 +96,7 @@ interface StoreReport {
 
 interface OverallReport {
     income: number
+    hpp: number
     expenses: number
     net: number
     gross_profit: number
@@ -285,7 +288,7 @@ const hasData = computed(() =>
                     </div>
 
                     <!-- Overall Summary Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <StatCard variant="success" class="border-none shadow-sm">
                             <template #title>Penjualan</template>
                             <template #value>
@@ -293,6 +296,14 @@ const hasData = computed(() =>
                             </template>
                             <template #subtitle>{{ overall.order_count }} Transaksi</template>
                             <template #icon><TrendingUp class="h-6 w-6" /></template>
+                        </StatCard>
+                        <StatCard variant="outline" class="border-none shadow-sm">
+                            <template #title>Total HPP</template>
+                            <template #value>
+                                <p class="text-2xl md:text-3xl font-black text-orange-600 dark:text-orange-400 tabular-nums">{{ formatCurrency(overall.hpp) }}</p>
+                            </template>
+                            <template #subtitle>Modal Barang Terjual</template>
+                            <template #icon><ShoppingBag class="h-6 w-6 text-orange-500" /></template>
                         </StatCard>
                         <StatCard variant="destructive" class="border-none shadow-sm">
                             <template #title>Pengeluaran</template>
@@ -578,10 +589,14 @@ const hasData = computed(() =>
                         <div v-show="isStoreExpanded(store.id)" class="border-t">
                                 <div class="border-t px-4 pb-4 pt-2 space-y-6">
                                     <!-- Per-store summary -->
-                                    <div class="grid gap-4 sm:grid-cols-4">
+                                    <div class="grid gap-4 sm:grid-cols-5">
                                         <div class="rounded-lg border p-3">
                                             <p class="text-xs text-muted-foreground">Penjualan</p>
                                             <p class="text-lg font-bold text-emerald-600">{{ formatCurrency(store.income) }}</p>
+                                        </div>
+                                        <div class="rounded-lg border p-3">
+                                            <p class="text-xs text-muted-foreground">Total HPP</p>
+                                            <p class="text-lg font-bold text-orange-600">{{ formatCurrency(store.hpp) }}</p>
                                         </div>
                                         <div class="rounded-lg border p-3">
                                             <p class="text-xs text-muted-foreground">Pengeluaran</p>

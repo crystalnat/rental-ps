@@ -25,7 +25,7 @@ return new class extends Migration
             $table->decimal('tax_amount', 12, 2)->default(0);
             $table->decimal('final_amount', 12, 2)->default(0);
 
-            $table->enum('payment_method', ['cash', 'qris', 'bank_transfer', 'other'])->nullable();
+            $table->string('payment_method', 30)->nullable();
             $table->enum('payment_status', ['unpaid', 'paid', 'refunded'])->default('unpaid');
             $table->decimal('cash_received', 12, 2)->nullable();
             $table->decimal('change_amount', 12, 2)->nullable();

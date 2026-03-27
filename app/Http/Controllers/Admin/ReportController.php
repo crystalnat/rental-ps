@@ -58,6 +58,7 @@ class ReportController extends Controller
                     ->whereDate('expense_date', '>=', $dateFrom)->whereDate('expense_date', '<=', $dateTo)->sum('amount'),
                 'order_count'=> Order::where('store_id', $store->id)->where('payment_status', 'paid')
                     ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->count(),
+                'hpp'          => $this->hppForStores(collect([$store->id]), $dateFrom, $dateTo),
                 'gross_profit'=> $this->grossProfitForStores(collect([$store->id]), $dateFrom, $dateTo),
                 'chart_sales' => $this->buildChartSales($store->id, $dateFrom, $dateTo),
                 'chart_expense_by_category' => $this->buildChartExpenseByCategory($store->id, $dateFrom, $dateTo),
@@ -105,9 +106,11 @@ class ReportController extends Controller
         $orderCount = Order::whereIn('store_id', $storeIds)->where('payment_status', 'paid')
             ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->count();
         $grossProfit = $this->grossProfitForStores($storeIds, $dateFrom, $dateTo);
+        $hpp = $this->hppForStores($storeIds, $dateFrom, $dateTo);
 
         return [
             'income'       => $income,
+            'hpp'          => $hpp,
             'expenses'     => $expenses,
             'net'          => $income - $expenses,
             'gross_profit' => $grossProfit,
@@ -128,6 +131,7 @@ class ReportController extends Controller
     {
         return [
             'income'       => 0,
+            'hpp'          => 0,
             'expenses'     => 0,
             'net'          => 0,
             'gross_profit' => 0,
@@ -153,6 +157,18 @@ class ReportController extends Controller
             ->whereDate('orders.created_at', '>=', $dateFrom)
             ->whereDate('orders.created_at', '<=', $dateTo)
             ->selectRaw('SUM((order_items.unit_price - order_items.buy_price) * order_items.quantity - COALESCE(order_items.discount_amount, 0)) as total')
+            ->value('total') ?? 0);
+    }
+
+    private function hppForStores(Collection $storeIds, string $dateFrom, string $dateTo): float
+    {
+        return (float) (OrderItem::query()
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.store_id', $storeIds)
+            ->where('orders.payment_status', 'paid')
+            ->whereDate('orders.created_at', '>=', $dateFrom)
+            ->whereDate('orders.created_at', '<=', $dateTo)
+            ->selectRaw('SUM(order_items.buy_price * order_items.quantity) as total')
             ->value('total') ?? 0);
     }
 

@@ -244,6 +244,7 @@ class CashierController extends Controller
             'notes'            => ['nullable', 'string', 'max:1000'],
             'payment_method'   => ['required', 'string', 'in:' . implode(',', $validCodes)],
             'cash_received'    => ['nullable', 'numeric', 'min:0'],
+            'discount_amount'  => ['nullable', 'numeric', 'min:0'],
             'created_at'       => ['nullable', 'string', 'date'],
             'paid_at'          => ['nullable', 'string', 'date'],
         ];
@@ -317,7 +318,8 @@ class CashierController extends Controller
                     $qty = (float) $item['quantity'];
                     $unitPrice = (float) $priceLog->sell_price;
                     $buyPrice = (float) $priceLog->buy_price;
-                    $discount = 0;
+                    $discountPercent = (float) $product->discount_percent;
+                    $discount = $discountPercent > 0 ? round($unitPrice * ($discountPercent / 100)) : 0;
                     $itemSubtotal = ($unitPrice - $discount) * $qty;
                     $subtotal += $itemSubtotal;
 
@@ -343,10 +345,10 @@ class CashierController extends Controller
                     ];
                 }
 
-                $discountAmount = 0;
+                $discountAmount = (float) ($data['discount_amount'] ?? 0);
                 $taxRate = 0;
                 $taxAmount = 0;
-                $finalAmount = $subtotal - $discountAmount + $taxAmount;
+                $finalAmount = max(0, $subtotal - $discountAmount) + $taxAmount;
 
                 if ($paymentMethod->requires_cash_input) {
                     $cashReceived = (float) ($data['cash_received'] ?? 0);
@@ -1064,6 +1066,7 @@ class CashierController extends Controller
                     'unit'           => $product->unit,
                     'track_stock'    => $product->track_stock,
                     'current_stock'  => (float) ($inventory?->current_stock ?? 0),
+                    'discount_percent' => (float) $product->discount_percent,
                     'sell_price'     => $sellPrice,
                     'image_url'      => $product->image ? \Storage::disk('public')->url($product->image) : null,
                 ];

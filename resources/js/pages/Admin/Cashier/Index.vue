@@ -28,6 +28,7 @@ interface Product {
     track_stock: boolean
     current_stock: number
     sell_price: number
+    discount_percent: number
     image_url: string | null
 }
 
@@ -65,6 +66,7 @@ interface CartItem {
     name: string
     unit: string
     sell_price: number
+    discount_percent: number
     quantity: number
     notes?: string
 }
@@ -114,6 +116,7 @@ const customerName = ref('')
 const customerPhone = ref('')
 const customerEmail = ref('')
 const notes = ref('')
+const discountAmount = ref<number | string>('')
 const showPaymentDialog = ref(false)
 const showFloorPlan = ref(false)
 const showMobileCart = ref(false)
@@ -441,8 +444,15 @@ const filteredProducts = computed(() => {
 })
 
 const subtotal = computed(() =>
-    cart.value.reduce((sum, i) => sum + i.sell_price * i.quantity, 0),
+    cart.value.reduce((sum, i) => {
+        const discount = i.discount_percent > 0 ? Math.round(i.sell_price * (i.discount_percent / 100)) : 0
+        return sum + (i.sell_price - discount) * i.quantity
+    }, 0),
 )
+
+const finalAmount = computed(() => {
+    return Math.max(0, subtotal.value - (Number(discountAmount.value) || 0))
+})
 
 const canCheckout = computed(() => cart.value.length > 0)
 
@@ -459,6 +469,7 @@ function addToCart(product: Product, qty = 1) {
             name: product.name,
             unit: product.unit,
             sell_price: product.sell_price,
+            discount_percent: product.discount_percent,
             quantity: qty,
         })
     }
@@ -488,7 +499,7 @@ function openPaymentDialog() {
     if (!paymentMethod.value && props.payment_methods.length > 0) {
         paymentMethod.value = props.payment_methods[0].code
     }
-    cashReceived.value = String(subtotal.value)
+    cashReceived.value = String(finalAmount.value)
     showPaymentDialog.value = true
 }
 
@@ -508,6 +519,7 @@ function submitOrder() {
         notes: notes.value,
         payment_method: paymentMethod.value,
         cash_received: requiresCashInput.value ? Number(cashReceived.value) || 0 : 0,
+        discount_amount: Number(discountAmount.value) || 0,
     }
     router.post(route('admin.cashier.store'), { ...payload, store: props.store.id }, {
         preserveScroll: true,
@@ -518,6 +530,7 @@ function submitOrder() {
             showMobileCart.value = false
             cart.value = []
             notes.value = ''
+            discountAmount.value = ''
             selectedTableId.value = null
             customerName.value = ''
             customerPhone.value = ''
@@ -714,7 +727,10 @@ const showQrOrAccount = computed(() => {
                             <div class="min-w-0">
                                 <p class="truncate text-xs md:text-sm font-semibold leading-tight mb-1">{{ p.name }}</p>
                                 <p class="truncate text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
-                                    {{ formatCurrency(p.sell_price) }}
+                                    <span v-if="p.discount_percent > 0" class="line-through text-muted-foreground/50 mr-1">{{ formatCurrency(p.sell_price) }}</span>
+                                    <span v-if="p.discount_percent > 0" class="font-bold text-destructive">{{ formatCurrency(p.sell_price - Math.round(p.sell_price * (p.discount_percent / 100))) }}</span>
+                                    <span v-else>{{ formatCurrency(p.sell_price) }}</span>
+                                    <span v-if="p.discount_percent > 0" class="ml-1 rounded bg-destructive/10 px-1 py-0.5 text-[8px] font-bold text-destructive overflow-hidden">-{{ p.discount_percent }}%</span>
                                 </p>
                                 <p v-if="p.track_stock" class="truncate text-[9px] md:text-[10px] text-muted-foreground/80 mt-0.5">
                                     Stok: {{ p.current_stock }}
@@ -855,7 +871,10 @@ const showQrOrAccount = computed(() => {
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium">{{ item.name }}</p>
                                         <p class="text-xs text-muted-foreground">
-                                            {{ formatCurrency(item.sell_price) }} × {{ item.quantity }} {{ item.unit }}
+                                            <span v-if="item.discount_percent > 0" class="line-through text-muted-foreground/50 mr-1">{{ formatCurrency(item.sell_price) }}</span>
+                                            <span v-if="item.discount_percent > 0" class="font-bold text-destructive">{{ formatCurrency(item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100))) }}</span>
+                                            <span v-else>{{ formatCurrency(item.sell_price) }}</span>
+                                            × {{ item.quantity }} {{ item.unit }}
                                         </p>
                                     </div>
                                     <div class="flex items-center gap-1">
@@ -893,6 +912,23 @@ const showQrOrAccount = computed(() => {
                                 <span class="text-muted-foreground">Subtotal</span>
                                 <span class="font-medium">{{ formatCurrency(subtotal) }}</span>
                             </div>
+                            <div class="mb-2 flex items-center justify-between text-sm">
+                                <span class="text-muted-foreground text-xs">Akan dipotong dari subtotal sebelum pajak/biaya</span>
+                            </div>
+                            <div class="mb-2 flex items-center justify-between text-sm font-medium">
+                                <span>Diskon Tambahan (Rp)</span>
+                                <Input
+                                    v-model="discountAmount"
+                                    type="number"
+                                    class="h-8 w-28 text-right text-sm px-2 font-black tabular-nums border-orange-200 focus-visible:ring-orange-500"
+                                    placeholder="0"
+                                    min="0"
+                                />
+                            </div>
+                            <div class="mb-3 flex justify-between font-bold text-lg mt-3 pt-3 border-t">
+                                <span>Total Tagihan</span>
+                                <span class="text-primary tabular-nums">{{ formatCurrency(finalAmount) }}</span>
+                            </div>
                             <textarea
                                 v-model="notes"
                                 placeholder="Catatan pesanan..."
@@ -905,7 +941,7 @@ const showQrOrAccount = computed(() => {
                                 :disabled="!canCheckout"
                                 @click="openPaymentDialog"
                             >
-                                Bayar {{ formatCurrency(subtotal) }}
+                                Bayar {{ formatCurrency(finalAmount) }}
                             </Button>
                         </div>
                     </CardContent>
@@ -917,7 +953,7 @@ const showQrOrAccount = computed(() => {
         <div class="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t bg-background p-3 shadow-[0_-4px_10px_-2px_rgba(0,0,0,0.1)] lg:hidden">
             <div class="flex flex-col">
                 <span class="text-xs font-medium text-muted-foreground">{{ cart.length }} Item</span>
-                <span class="text-base font-bold text-primary">{{ formatCurrency(subtotal) }}</span>
+                <span class="text-base font-bold text-primary">{{ formatCurrency(finalAmount) }}</span>
             </div>
             <Button size="lg" class="shadow-sm" @click="showMobileCart = true">
                 <ShoppingBag class="mr-2 h-4 w-4" /> Keranjang
@@ -989,12 +1025,12 @@ const showQrOrAccount = computed(() => {
                             step="0.01"
                         />
                         <p class="mt-1 text-xs text-muted-foreground">
-                            Kembalian: {{ formatCurrency(Math.max(0, (Number(cashReceived) || 0) - subtotal)) }}
+                            Kembalian: {{ formatCurrency(Math.max(0, (Number(cashReceived) || 0) - finalAmount)) }}
                         </p>
                     </div>
                     <div class="rounded-lg bg-muted p-3">
-                        <p class="text-sm text-muted-foreground">Total</p>
-                        <p class="text-xl font-bold">{{ formatCurrency(subtotal) }}</p>
+                        <p class="text-sm text-muted-foreground">Total Dibayar</p>
+                        <p class="text-2xl font-black text-primary">{{ formatCurrency(finalAmount) }}</p>
                     </div>
                 </div>
                 <DialogFooter>
@@ -1002,7 +1038,7 @@ const showQrOrAccount = computed(() => {
                         Batal
                     </Button>
                     <Button
-                        :disabled="processing || payment_methods.length === 0 || (requiresCashInput && (Number(cashReceived) || 0) < subtotal)"
+                        :disabled="processing || payment_methods.length === 0 || (requiresCashInput && (Number(cashReceived) || 0) < finalAmount)"
                         @click="submitOrder"
                     >
                         {{ processing ? 'Memproses...' : 'Selesaikan Pembayaran' }}

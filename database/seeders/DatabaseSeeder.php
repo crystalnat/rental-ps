@@ -30,6 +30,26 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
+        $defaultPaymentMethods = [
+            ['name' => 'Tunai', 'code' => 'cash', 'sort_order' => 1, 'requires_cash_input' => true],
+            ['name' => 'QRIS', 'code' => 'qris', 'sort_order' => 2, 'requires_cash_input' => false],
+            ['name' => 'Transfer Bank', 'code' => 'bank_transfer', 'sort_order' => 3, 'requires_cash_input' => false],
+            ['name' => 'E-Wallet', 'code' => 'e_wallet', 'sort_order' => 4, 'requires_cash_input' => false],
+            ['name' => 'Lainnya', 'code' => 'other', 'sort_order' => 5, 'requires_cash_input' => false],
+        ];
+
+        foreach ($defaultPaymentMethods as $pm) {
+            \App\Models\PaymentMethod::firstOrCreate(
+                ['brand_id' => $brand->id, 'code' => $pm['code']],
+                [
+                    'name' => $pm['name'],
+                    'sort_order' => $pm['sort_order'],
+                    'is_active' => true,
+                    'requires_cash_input' => $pm['requires_cash_input'],
+                ]
+            );
+        }
+
         $owner = User::create([
             'brand_id'  => $brand->id,
             'store_id'  => null,
