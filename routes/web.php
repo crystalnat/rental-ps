@@ -12,8 +12,10 @@ use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\RefundController;
 use App\Http\Controllers\Admin\SalesController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\ShiftController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\StoreProductController;
 use App\Http\Controllers\Admin\UserController;
@@ -45,7 +47,15 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
         Route::get('/cashier', [CashierController::class, 'index'])->name('admin.cashier.index');
         Route::post('/cashier', [CashierController::class, 'store'])->name('admin.cashier.store');
+        Route::post('/cashier/check-promo', [CashierController::class, 'checkPromo'])->name('admin.cashier.check-promo');
         Route::get('/cashier/pending-orders', [CashierController::class, 'pendingOrders'])->name('admin.cashier.pending-orders');
+
+        // Shifts
+        Route::get('/shifts', [ShiftController::class, 'index'])->name('admin.shifts.index');
+        Route::get('/shifts/active', [ShiftController::class, 'active'])->name('admin.shifts.active');
+        Route::post('/shifts/open', [ShiftController::class, 'open'])->name('admin.shifts.open');
+        Route::post('/shifts/{shift}/close', [ShiftController::class, 'close'])->name('admin.shifts.close');
+        Route::get('/shifts/{shift}', [ShiftController::class, 'show'])->name('admin.shifts.show');
     });
 
     // Orders / Pesanan (owner, admin, cashier)
@@ -54,9 +64,18 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
         Route::get('/sales', [SalesController::class, 'index'])->name('admin.sales.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])->name('admin.orders.show');
         Route::get('/orders/{order}/detail', [OrderController::class, 'detail'])->name('admin.orders.detail');
+        Route::get('/orders/{order}/receipt', [OrderController::class, 'receipt'])->name('admin.orders.receipt');
+        Route::get('/orders/{order}/invoice', [OrderController::class, 'invoice'])->name('admin.orders.invoice');
         Route::post('/orders/{order}/pay', [OrderController::class, 'pay'])->name('admin.orders.pay');
         Route::put('/orders/{order}', [OrderController::class, 'update'])->name('admin.orders.update');
         Route::delete('/orders/{order}', [OrderController::class, 'destroy'])->name('admin.orders.destroy');
+
+        // Refunds
+        Route::get('/refunds', [RefundController::class, 'index'])->name('admin.refunds.index');
+        Route::post('/refunds/lookup', [RefundController::class, 'lookup'])->name('admin.refunds.lookup');
+        Route::get('/refunds/create/{order}', [RefundController::class, 'create'])->name('admin.refunds.create');
+        Route::post('/refunds', [RefundController::class, 'store'])->name('admin.refunds.store');
+        Route::get('/refunds/{refund}', [RefundController::class, 'show'])->name('admin.refunds.show');
     });
 
     // Cashflow & Pembukuan Harian (owner, admin, cashier)
@@ -120,6 +139,37 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('admin.users.edit');
         Route::put('/users/{user}', [UserController::class, 'update'])->name('admin.users.update');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
+    });
+
+    // Promos / Voucher (owner & admin)
+    Route::middleware(EnsureAuthenticated::class . ':owner,admin')->group(function () {
+        Route::get('/promos', [\App\Http\Controllers\Admin\PromoController::class, 'index'])->name('admin.promos.index');
+        Route::get('/promos/create', [\App\Http\Controllers\Admin\PromoController::class, 'create'])->name('admin.promos.create');
+        Route::post('/promos', [\App\Http\Controllers\Admin\PromoController::class, 'store'])->name('admin.promos.store');
+        Route::get('/promos/{promo}/edit', [\App\Http\Controllers\Admin\PromoController::class, 'edit'])->name('admin.promos.edit');
+        Route::put('/promos/{promo}', [\App\Http\Controllers\Admin\PromoController::class, 'update'])->name('admin.promos.update');
+        Route::delete('/promos/{promo}', [\App\Http\Controllers\Admin\PromoController::class, 'destroy'])->name('admin.promos.destroy');
+    });
+
+    // Suppliers (owner & admin)
+    Route::middleware(EnsureAuthenticated::class . ':owner,admin')->group(function () {
+        Route::get('/suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'index'])->name('admin.suppliers.index');
+        Route::post('/suppliers', [\App\Http\Controllers\Admin\SupplierController::class, 'store'])->name('admin.suppliers.store');
+        Route::put('/suppliers/{supplier}', [\App\Http\Controllers\Admin\SupplierController::class, 'update'])->name('admin.suppliers.update');
+        Route::delete('/suppliers/{supplier}', [\App\Http\Controllers\Admin\SupplierController::class, 'destroy'])->name('admin.suppliers.destroy');
+    });
+
+    // Purchase Orders (owner & admin)
+    Route::middleware(EnsureAuthenticated::class . ':owner,admin')->group(function () {
+        Route::get('/purchase-orders', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'index'])->name('admin.purchase-orders.index');
+        Route::get('/purchase-orders/create', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'create'])->name('admin.purchase-orders.create');
+        Route::post('/purchase-orders', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'store'])->name('admin.purchase-orders.store');
+        Route::get('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'show'])->name('admin.purchase-orders.show');
+        Route::get('/purchase-orders/{purchaseOrder}/edit', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'edit'])->name('admin.purchase-orders.edit');
+        Route::put('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'update'])->name('admin.purchase-orders.update');
+        Route::post('/purchase-orders/{purchaseOrder}/receive', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'receive'])->name('admin.purchase-orders.receive');
+        Route::post('/purchase-orders/{purchaseOrder}/cancel', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'cancel'])->name('admin.purchase-orders.cancel');
+        Route::delete('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\PurchaseOrderController::class, 'destroy'])->name('admin.purchase-orders.destroy');
     });
 
     // Settings (owner & admin)

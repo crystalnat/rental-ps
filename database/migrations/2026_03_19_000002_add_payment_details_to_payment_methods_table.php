@@ -11,11 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('payment_methods', function (Blueprint $table) {
-            $table->string('qrcode_image')->nullable()->after('requires_cash_input')->comment('QRIS: gambar barcode/QR static');
-            $table->string('account_name', 100)->nullable()->after('qrcode_image')->comment('Transfer/E-Wallet: nama rekening');
-            $table->string('account_number', 50)->nullable()->after('account_name')->comment('Transfer/E-Wallet: nomor rekening');
-        });
+        if (!Schema::hasColumn('payment_methods', 'qrcode_image')) {
+            Schema::table('payment_methods', function (Blueprint $table) {
+                $table->string('qrcode_image')->nullable()->after('requires_cash_input')->comment('QRIS: gambar barcode/QR static');
+                $table->string('account_name', 100)->nullable()->after('qrcode_image')->comment('Transfer/E-Wallet: nama rekening');
+                $table->string('account_number', 50)->nullable()->after('account_name')->comment('Transfer/E-Wallet: nomor rekening');
+            });
+        }
     }
 
     public function down(): void

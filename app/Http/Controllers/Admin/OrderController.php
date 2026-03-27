@@ -261,6 +261,87 @@ class OrderController extends Controller
         ]);
     }
 
+    public function receipt(Order $order): Response
+    {
+        $this->authorizeOrder($order);
+        $order->load(['store', 'cashier', 'customer', 'table', 'items']);
+
+        return Inertia::render('Admin/Orders/Receipt', [
+            'order' => $this->formatOrderForPrint($order),
+            'store' => $this->formatStoreForPrint($order->store),
+        ]);
+    }
+
+    public function invoice(Order $order): Response
+    {
+        $this->authorizeOrder($order);
+        $order->load(['store', 'cashier', 'customer', 'table', 'items']);
+
+        return Inertia::render('Admin/Orders/Invoice', [
+            'order' => $this->formatOrderForPrint($order),
+            'store' => $this->formatStoreForPrint($order->store),
+        ]);
+    }
+
+    private function authorizeOrder(Order $order): void
+    {
+        $user = Auth::user();
+        if ($user->role !== 'owner' && $user->role !== 'admin') {
+            if ($order->store_id !== $user->store_id) {
+                abort(403);
+            }
+        } elseif ($order->store->brand_id !== $user->brand_id) {
+            abort(403);
+        }
+    }
+
+    private function formatOrderForPrint(Order $order): array
+    {
+        return [
+            'id'              => $order->id,
+            'order_code'      => $order->order_code,
+            'type'            => $order->type,
+            'status'          => $order->status,
+            'payment_method'  => $order->payment_method,
+            'payment_status'  => $order->payment_status,
+            'subtotal'        => (float) $order->subtotal,
+            'discount_amount' => (float) $order->discount_amount,
+            'tax_rate'        => (float) $order->tax_rate,
+            'tax_amount'      => (float) $order->tax_amount,
+            'final_amount'    => (float) $order->final_amount,
+            'cash_received'   => $order->cash_received ? (float) $order->cash_received : null,
+            'change_amount'   => $order->change_amount ? (float) $order->change_amount : null,
+            'notes'           => $order->notes,
+            'table_name'      => $order->table?->name,
+            'cashier_name'    => $order->cashier?->name,
+            'customer_name'   => $order->customer?->name,
+            'customer_phone'  => $order->customer?->phone,
+            'customer_email'  => $order->customer?->email,
+            'created_at'      => $order->created_at->format('d M Y H:i'),
+            'paid_at'         => $order->paid_at?->format('d M Y H:i'),
+            'items'           => $order->items->map(fn ($i) => [
+                'product_name'    => $i->product_name,
+                'quantity'        => (float) $i->quantity,
+                'unit'            => $i->unit,
+                'unit_price'      => (float) $i->unit_price,
+                'discount_amount' => (float) $i->discount_amount,
+                'subtotal'        => (float) $i->subtotal,
+            ]),
+        ];
+    }
+
+    private function formatStoreForPrint($store): array
+    {
+        return [
+            'name'     => $store->name,
+            'address'  => $store->address,
+            'city'     => $store->city,
+            'phone'    => $store->phone,
+            'email'    => $store->email,
+            'logo'     => $store->logo ? \Storage::disk('public')->url($store->logo) : null,
+        ];
+    }
+
     public function pay(Order $order, Request $request): RedirectResponse
     {
         $user = Auth::user();
@@ -312,7 +393,9 @@ class OrderController extends Controller
             'completed_at'   => now(),
         ]);
 
-        return back()->with('success', "Pembayaran {$order->order_code} berhasil diterima.");
+        return back()
+            ->with('success', "Pembayaran {$order->order_code} berhasil diterima.")
+            ->with('last_order_id', $order->id);
     }
 
     public function update(Order $order, Request $request): RedirectResponse

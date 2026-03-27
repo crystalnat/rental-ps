@@ -11,18 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('payment_methods')) {
-            Schema::create('payment_methods', function (Blueprint $table) {
+        if (!Schema::hasTable('suppliers')) {
+            Schema::create('suppliers', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('brand_id')->constrained()->cascadeOnDelete();
-                $table->string('name', 50);
-                $table->string('code', 30)->comment('e.g. cash, qris, bank_transfer');
-                $table->unsignedTinyInteger('sort_order')->default(0);
+                $table->string('name');
+                $table->string('contact_person')->nullable();
+                $table->string('phone', 50)->nullable();
+                $table->string('email')->nullable();
+                $table->text('address')->nullable();
                 $table->boolean('is_active')->default(true);
-                $table->boolean('requires_cash_input')->default(false)->comment('true for cash - show cash received input');
                 $table->timestamps();
-
-                $table->unique(['brand_id', 'code']);
+                $table->softDeletes();
             });
         }
     }
@@ -32,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('payment_methods');
+        Schema::dropIfExists('suppliers');
     }
 };

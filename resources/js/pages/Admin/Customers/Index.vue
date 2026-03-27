@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StatCard from '@/components/StatCard.vue'
+import TableToolbar from '@/components/TableToolbar.vue'
+import Pagination from '@/components/Pagination.vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,8 +14,11 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { formatCurrency } from '@/lib/utils'
-import { UserCircle, Search, Plus, Pencil, Trash2, History, Loader2, Eye } from 'lucide-vue-next'
+import { 
+    UserCircle, Search, Plus, Pencil, Trash2, 
+    History, Loader2, Eye, Contact, Mail, Phone, ShoppingBag
+} from 'lucide-vue-next'
+import { debounce } from 'lodash'
 
 interface CustomerItem {
     id: number
@@ -57,25 +62,19 @@ const props = defineProps<{
     filters: { search: string }
 }>()
 
-const filterState = ref({
-    search: props.filters.search ?? '',
-})
+const searchQuery = ref(props.filters.search ?? '')
 
-watch(() => props.filters, (f) => {
-    filterState.value.search = f.search ?? ''
-}, { deep: true })
+// Live search consistency
+watch(searchQuery, debounce((value: string) => {
+    router.get('/admin/customers', { search: value }, {
+        preserveState: true,
+        replace: true,
+    })
+}, 300))
 
-function applyFilters() {
-    router.get('/admin/customers', {
-        search: filterState.value.search || undefined,
-    }, { preserveState: true })
-}
-
-const hasActiveFilters = computed(() => !!filterState.value.search)
-
-function clearFilters() {
-    filterState.value.search = ''
-    applyFilters()
+function formatCurrency(amount: number | string | null) {
+    if (amount === null) return '-'
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(amount))
 }
 
 const processing = ref(false)
@@ -106,14 +105,18 @@ function openEdit(c: CustomerItem) {
 function submitForm() {
     if (!form.value.name.trim()) return
     processing.value = true
+    
+    // Pattern Categories: Close modal early
+    formOpen.value = false
+    
     const payload = {
         name: form.value.name.trim(),
-        email: form.value.email.trim() || undefined,
-        phone: form.value.phone.trim() || undefined,
+        email: form.value.email.trim() || null,
+        phone: form.value.phone.trim() || null,
     }
+
     if (editingId.value != null) {
         const id = editingId.value
-        formOpen.value = false
         router.put(`/admin/customers/${id}`, payload, {
             preserveScroll: true,
             onError: () => {
@@ -125,7 +128,6 @@ function submitForm() {
             },
         })
     } else {
-        formOpen.value = false
         router.post('/admin/customers', payload, {
             preserveScroll: true,
             onError: () => {
@@ -168,7 +170,6 @@ async function openHistory(c: CustomerItem) {
         historyPayload.value = await res.json()
     } catch {
         historyError.value = 'Gagal memuat riwayat pesanan.'
-        historyPayload.value = null
     } finally {
         historyLoading.value = false
     }
@@ -179,279 +180,234 @@ function closeHistory() {
     historyPayload.value = null
     historyError.value = ''
 }
+
+const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_orders, 0))
 </script>
 
 <template>
+    <Head title="Manajemen Pelanggan" />
+
     <AdminLayout title="Pelanggan">
-        <div class="space-y-6">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="grid flex-1 grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard variant="primary" class="border-none shadow-sm">
-                        <template #title>Pelanggan</template>
-                        <template #value>
-                            <p class="text-xl md:text-2xl font-black tabular-nums">{{ customers.length }}</p>
-                        </template>
-                        <template #icon><UserCircle class="h-5 w-5" /></template>
-                    </StatCard>
-                    <StatCard variant="success" class="border-none shadow-sm">
-                        <template #title>Total Transaksi</template>
-                        <template #value>
-                            <p class="text-xl md:text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{{ customers.reduce((s, c) => s + c.total_orders, 0) }}</p>
-                        </template>
-                        <template #icon><History class="h-5 w-5" /></template>
-                    </StatCard>
-                    <div class="col-span-2 relative group hidden md:block">
-                        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <Input
-                            v-model="filterState.search"
-                            placeholder="Cari nama, email, atau telepon..."
-                            class="h-full pl-10 border-none bg-muted/50 focus-visible:ring-1"
-                            @keydown.enter="applyFilters"
-                        />
-                    </div>
-                </div>
-                <Button class="h-11 md:h-12 font-bold px-8 shadow-lg shadow-primary/20" @click="openCreate">
-                    <Plus class="mr-2 h-5 w-5" />
-                    Tambah Pelanggan Baru
-                </Button>
-            </div>
-
-            <!-- Mobile Search Only -->
-            <div class="md:hidden relative group">
-                <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                    v-model="filterState.search"
-                    placeholder="Cari pelanggan..."
-                    class="h-12 pl-10 border-none bg-muted/50 focus-visible:ring-1"
-                    @keydown.enter="applyFilters"
-                />
-            </div>
-
-            <!-- Table -->
-            <Card class="border-none shadow-sm md:shadow-md overflow-hidden">
-                <CardContent class="p-0">
-                    <div class="hidden md:block overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="bg-muted/50 border-b">
-                                    <th class="px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Nama Pelanggan</th>
-                                    <th class="px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Kontak</th>
-                                    <th class="px-4 py-4 text-center font-black uppercase tracking-widest text-[10px] text-muted-foreground">Order</th>
-                                    <th class="px-4 py-4 text-right font-black uppercase tracking-widest text-[10px] text-muted-foreground">Total Belanja</th>
-                                    <th class="px-4 py-4 text-right font-black uppercase tracking-widest text-[10px] text-muted-foreground">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                <tr v-for="customer in customers" :key="customer.id" class="hover:bg-primary/5 transition-colors group">
-                                    <td class="px-4 py-3">
-                                        <div class="font-bold text-primary group-hover:underline cursor-pointer" @click="openHistory(customer)">
-                                            {{ customer.name }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="text-xs space-y-0.5">
-                                            <p v-if="customer.email">{{ customer.email }}</p>
-                                            <p v-if="customer.phone" class="text-muted-foreground">{{ customer.phone }}</p>
-                                            <p v-if="!customer.email && !customer.phone" class="italic text-muted-foreground/50">Tidak ada kontak</p>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-center tabular-nums">{{ customer.total_orders }}</td>
-                                    <td class="px-4 py-3 text-right font-black text-primary tabular-nums">{{ formatCurrency(customer.total_spent) }}</td>
-                                    <td class="px-4 py-3">
-                                        <div class="flex items-center justify-end gap-1">
-                                            <Button variant="ghost" size="icon" class="h-8 w-8 rounded-full" @click="openEdit(customer)">
-                                                <Pencil class="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" class="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" @click="deleteTarget = customer">
-                                                <Trash2 class="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" class="h-8 w-8 rounded-full" @click="openHistory(customer)">
-                                                <History class="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Mobile Cards -->
-                    <div class="md:hidden divide-y">
-                        <div v-for="customer in customers" :key="customer.id" class="p-4 space-y-3 active:bg-muted/50 transition-colors" @click="openHistory(customer)">
-                            <div class="flex items-start justify-between gap-4">
-                                <div class="space-y-1">
-                                    <h3 class="font-bold text-primary text-base">{{ customer.name }}</h3>
-                                    <div class="text-xs space-y-1">
-                                        <p v-if="customer.email" class="flex items-center gap-1.5"><Eye class="h-3 w-3" /> {{ customer.email }}</p>
-                                        <p v-if="customer.phone" class="flex items-center gap-1.5"><Loader2 class="h-3 w-3" /> {{ customer.phone }}</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1 shrink-0" @click.stop>
-                                    <Button variant="secondary" size="icon" class="h-9 w-9 rounded-full shadow-sm" @click="openEdit(customer)">
-                                        <Pencil class="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="secondary" size="icon" class="h-9 w-9 rounded-full shadow-sm text-destructive" @click="deleteTarget = customer">
-                                        <Trash2 class="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-between border-t border-dashed pt-2">
-                                <div class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Belanja ({{ customer.total_orders }} Order)</div>
-                                <div class="font-black text-primary tabular-nums">{{ formatCurrency(customer.total_spent) }}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div
-                        v-if="customers.length === 0 && !hasActiveFilters"
-                        class="flex flex-col items-center justify-center border-t px-4 py-16 text-center"
-                    >
-                        <UserCircle class="mb-3 h-12 w-12 text-muted-foreground/50" />
-                        <p class="text-muted-foreground">Belum ada pelanggan tercatat</p>
-                        <p class="mt-1 max-w-md text-sm text-muted-foreground">
-                            Tambahkan pelanggan secara manual, atau pelanggan akan muncul otomatis saat order dengan data kontak diisi.
-                        </p>
-                        <Button type="button" class="mt-4" @click="openCreate">
-                            <Plus class="mr-2 h-4 w-4" />
-                            Tambah Pelanggan
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+        <!-- Summary Cards -->
+        <div class="mb-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
+            <StatCard variant="primary" class="p-3 md:p-5">
+                <template #title>Total Pelanggan</template>
+                <template #value>
+                    <p class="text-xl md:text-2xl font-bold">{{ customers.length }}</p>
+                </template>
+                <template #icon><UserCircle class="h-5 w-5" /></template>
+            </StatCard>
+            <StatCard variant="success" class="p-3 md:p-5">
+                <template #title>Total Transaksi</template>
+                <template #value>
+                    <p class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{{ totalOrders }}</p>
+                </template>
+                <template #icon><ShoppingBag class="h-5 w-5" /></template>
+            </StatCard>
+            <StatCard variant="warning" class="p-3 md:p-5 hidden lg:block">
+                <template #title>Loyalitas</template>
+                <template #value>
+                    <p class="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">Database</p>
+                </template>
+                <template #icon><Contact class="h-5 w-5" /></template>
+            </StatCard>
         </div>
 
-        <!-- Form tambah / ubah -->
-        <Dialog :open="formOpen" @update:open="(v) => { formOpen = v }">
+        <!-- Toolbar -->
+        <TableToolbar
+            v-model="searchQuery"
+            search-placeholder="Cari nama, email, atau telepon..."
+        >
+            <template #filters>
+                <Button size="sm" class="h-9" @click="openCreate">
+                    <Plus class="mr-1 h-4 w-4" />
+                    Tambah Pelanggan
+                </Button>
+            </template>
+        </TableToolbar>
+
+        <!-- Customers Table -->
+        <Card variant="elevated" class="mt-4">
+            <CardContent class="p-0">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-muted/30 text-muted-foreground border-b text-xs font-semibold uppercase tracking-wide">
+                            <tr>
+                                <th class="h-11 px-4">Nama Pelanggan</th>
+                                <th class="h-11 px-4">Informasi Kontak</th>
+                                <th class="h-11 px-4 text-center">Total Order</th>
+                                <th class="h-11 px-4 text-right">Total Belanja</th>
+                                <th class="h-11 px-4 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y text-foreground">
+                            <tr v-for="customer in customers" :key="customer.id" class="hover:bg-muted/10 transition-colors group">
+                                <td class="p-4 align-middle">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                            <UserCircle class="h-5 w-5" />
+                                        </div>
+                                        <span class="font-bold cursor-pointer hover:underline" @click="openHistory(customer)">
+                                            {{ customer.name }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="p-4 align-middle">
+                                    <div class="flex flex-col gap-0.5 text-xs">
+                                        <div v-if="customer.email" class="flex items-center gap-1.5 text-muted-foreground">
+                                            <Mail class="h-3 w-3" /> {{ customer.email }}
+                                        </div>
+                                        <div v-if="customer.phone" class="flex items-center gap-1.5 text-muted-foreground">
+                                            <Phone class="h-3 w-3" /> {{ customer.phone }}
+                                        </div>
+                                        <span v-if="!customer.email && !customer.phone" class="text-muted-foreground/40 italic">Tanpa Kontak</span>
+                                    </div>
+                                </td>
+                                <td class="p-4 align-middle text-center tabular-nums font-medium">
+                                    {{ customer.total_orders }}
+                                </td>
+                                <td class="p-4 align-middle text-right font-bold text-primary tabular-nums">
+                                    {{ formatCurrency(customer.total_spent) }}
+                                </td>
+                                <td class="p-4 align-middle text-right">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary" @click="openEdit(customer)" title="Edit">
+                                            <Pencil class="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary" @click="openHistory(customer)" title="Riwayat">
+                                            <History class="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-destructive" @click="deleteTarget = customer" title="Hapus">
+                                            <Trash2 class="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="customers.length === 0">
+                                <td colspan="5" class="py-20 text-center text-muted-foreground">
+                                    <div class="flex flex-col items-center">
+                                        <UserCircle class="h-10 w-10 text-muted-foreground/20 mb-3" />
+                                        <p class="font-medium text-sm">Belum ada pelanggan ditemukan</p>
+                                        <p class="text-xs text-muted-foreground max-w-xs mx-auto mt-1">
+                                            Halaman ini mencatat semua pelanggan yang pernah bertransaksi atau didaftarkan secara manual.
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Form Dialog -->
+        <Dialog :open="formOpen" @update:open="formOpen = $event">
             <DialogContent class="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{{ editingId != null ? 'Ubah Pelanggan' : 'Tambah Pelanggan' }}</DialogTitle>
+                    <DialogTitle>{{ editingId != null ? 'Ubah Data Pelanggan' : 'Tambah Pelanggan Baru' }}</DialogTitle>
                     <DialogDescription>
-                        {{ editingId != null ? 'Perbarui nama dan kontak pelanggan.' : 'Catat pelanggan baru untuk brand Anda.' }}
+                        Lengkapi informasi kontak pelanggan untuk database brand Anda.
                     </DialogDescription>
                 </DialogHeader>
-                <form class="space-y-4" @submit.prevent="submitForm">
-                    <div>
-                        <Label for="cust-name">Nama <span class="text-destructive">*</span></Label>
-                        <Input
-                            id="cust-name"
-                            v-model="form.name"
-                            class="mt-1.5"
-                            placeholder="Nama lengkap"
-                            required
-                        />
+                <form class="space-y-4 py-2" @submit.prevent="submitForm">
+                    <div class="space-y-2">
+                        <Label for="cust-name">Nama Pelanggan <span class="text-destructive">*</span></Label>
+                        <Input id="cust-name" v-model="form.name" placeholder="Misal: Budi Santoso" required class="text-foreground" />
                     </div>
-                    <div>
-                        <Label for="cust-email">Email</Label>
-                        <Input
-                            id="cust-email"
-                            v-model="form.email"
-                            type="email"
-                            class="mt-1.5"
-                            placeholder="opsional"
-                            autocomplete="off"
-                        />
+                    <div class="space-y-2">
+                        <Label for="cust-email">Email (Opsional)</Label>
+                        <Input id="cust-email" v-model="form.email" type="email" placeholder="budi@email.com" class="text-foreground" />
                     </div>
-                    <div>
-                        <Label for="cust-phone">Telepon</Label>
-                        <Input
-                            id="cust-phone"
-                            v-model="form.phone"
-                            class="mt-1.5"
-                            placeholder="opsional"
-                            autocomplete="off"
-                        />
+                    <div class="space-y-2">
+                        <Label for="cust-phone">Nomor Telepon (Opsional)</Label>
+                        <Input id="cust-phone" v-model="form.phone" placeholder="08123456789" class="text-foreground" />
                     </div>
-                    <DialogFooter class="gap-2 sm:gap-0">
-                        <Button type="button" variant="outline" @click="formOpen = false">
-                            Batal
-                        </Button>
+                    <DialogFooter class="pt-4">
+                        <Button type="button" variant="outline" @click="formOpen = false" :disabled="processing">Batal</Button>
                         <Button type="submit" :disabled="processing || !form.name.trim()">
-                            {{ processing ? 'Menyimpan...' : (editingId != null ? 'Simpan' : 'Tambah') }}
+                            <Loader2 v-if="processing" class="mr-2 h-4 w-4 animate-spin" />
+                            {{ editingId != null ? 'Simpan Perubahan' : 'Tambah Pelanggan' }}
                         </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
 
-        <ConfirmDialog
-            :open="!!deleteTarget"
-            title="Hapus Pelanggan"
-            :description="deleteTarget ? ('Hapus ' + deleteTarget.name + '? Data pesanan lama tetap ada di sistem.') : ''"
-            variant="destructive"
-            confirm-label="Ya, Hapus"
-            @update:open="(v) => !v && (deleteTarget = null)"
-            @confirm="handleDelete"
-        />
-
-        <!-- Riwayat pesanan -->
+        <!-- History Dialog -->
         <Dialog :open="historyOpen" @update:open="(v) => !v && closeHistory()">
-            <DialogContent class="flex max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-                <div class="border-b px-6 py-4">
+            <DialogContent class="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+                <div class="border-b px-6 py-5 bg-muted/20">
                     <DialogHeader>
-                        <DialogTitle>Riwayat pesanan</DialogTitle>
-                        <DialogDescription v-if="historyPayload">
+                        <DialogTitle class="flex items-center gap-2">
+                            <History class="h-5 w-5 text-primary" />
+                            Riwayat Pesanan Pelanggan
+                        </DialogTitle>
+                        <DialogDescription v-if="historyPayload" class="text-foreground font-medium text-base mt-2">
                             {{ historyPayload.customer.name }}
-                            <span v-if="historyPayload.customer.email || historyPayload.customer.phone" class="block text-xs">
-                                <span v-if="historyPayload.customer.email">{{ historyPayload.customer.email }}</span>
-                                <span v-if="historyPayload.customer.email && historyPayload.customer.phone"> · </span>
-                                <span v-if="historyPayload.customer.phone">{{ historyPayload.customer.phone }}</span>
-                            </span>
+                            <span v-if="historyPayload.customer.phone" class="text-xs text-muted-foreground ml-2">({{ historyPayload.customer.phone }})</span>
                         </DialogDescription>
                     </DialogHeader>
                 </div>
 
-                <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-                    <div v-if="historyLoading" class="flex justify-center py-16">
-                        <Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+                <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                    <div v-if="historyLoading" class="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                        <Loader2 class="h-8 w-8 animate-spin" />
+                        <span class="text-xs italic">Memuat riwayat belanja...</span>
                     </div>
-                    <p v-else-if="historyError" class="text-center text-sm text-destructive">{{ historyError }}</p>
+                    <p v-else-if="historyError" class="text-center py-10 text-sm text-destructive font-medium">{{ historyError }}</p>
+                    
                     <template v-else-if="historyPayload">
-                        <div class="mb-4 flex flex-wrap gap-2">
-                            <Badge variant="outline">{{ historyPayload.customer.total_orders }} pesanan</Badge>
-                            <Badge variant="secondary">{{ formatCurrency(historyPayload.customer.total_spent) }} total belanja</Badge>
+                        <div class="mb-6 grid grid-cols-2 gap-4">
+                            <div class="rounded-lg border bg-card p-4 shadow-sm">
+                                <p class="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-1">Total Kunjungan</p>
+                                <p class="text-2xl font-bold">{{ historyPayload.customer.total_orders }} <span class="text-sm font-normal text-muted-foreground ml-1">Order</span></p>
+                            </div>
+                            <div class="rounded-lg border bg-card p-4 shadow-sm">
+                                <p class="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-1">Total Kontribusi</p>
+                                <p class="text-2xl font-bold text-primary">{{ formatCurrency(historyPayload.customer.total_spent) }}</p>
+                            </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm [&_td]:align-middle">
-                                <thead>
-                                    <tr class="border-b bg-muted/30">
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kode</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Waktu</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Toko</th>
-                                        <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipe</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meja</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kasir</th>
-                                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</th>
-                                        <th class="w-20 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aksi</th>
+
+                        <div class="overflow-x-auto rounded-md border">
+                            <table class="w-full text-sm">
+                                <thead class="bg-muted/50 border-b">
+                                    <tr class="text-xs font-black uppercase text-muted-foreground tracking-wider">
+                                        <th class="px-4 py-3 text-left">Nota</th>
+                                        <th class="px-4 py-3 text-left">Waktu</th>
+                                        <th class="px-4 py-3 text-left">Toko</th>
+                                        <th class="px-4 py-3 text-center">Tipe</th>
+                                        <th class="px-4 py-3 text-right">Total</th>
+                                        <th class="px-4 py-3 text-right">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody class="divide-y text-foreground">
                                     <tr
                                         v-for="order in historyPayload.orders"
                                         :key="order.id"
-                                        class="border-b transition-colors last:border-0 hover:bg-muted/20"
+                                        class="hover:bg-muted/30 transition-colors"
                                     >
-                                        <td class="px-4 py-3 font-mono text-[10px] font-black">{{ order.order_code }}</td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">{{ order.created_at }}</td>
-                                        <td class="px-4 py-3 text-xs">{{ order.store_name }}</td>
-                                        <td class="whitespace-nowrap px-4 py-3">
-                                            <span class="inline-flex rounded-full border bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-widest">
-                                                {{ typeLabels[order.type] ?? order.type }}
-                                            </span>
+                                        <td class="px-4 py-3 font-mono text-[11px] font-bold">{{ order.order_code }}</td>
+                                        <td class="px-4 py-3 text-[11px] text-muted-foreground">
+                                            {{ new Date(order.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
                                         </td>
-                                        <td class="px-4 py-3 text-xs text-muted-foreground">{{ order.table_name ?? '—' }}</td>
-                                        <td class="px-4 py-3 text-[10px] text-muted-foreground">{{ order.cashier_name ?? '—' }}</td>
-                                        <td class="px-4 py-3 text-right font-black text-primary tabular-nums">{{ formatCurrency(order.final_amount) }}</td>
+                                        <td class="px-4 py-3 text-[11px]">{{ order.store_name }}</td>
+                                        <td class="px-4 py-3 text-center">
+                                            <Badge variant="outline" class="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0 whitespace-nowrap">
+                                                {{ typeLabels[order.type] ?? order.type }}
+                                            </Badge>
+                                        </td>
+                                        <td class="px-4 py-3 text-right font-bold tabular-nums">{{ formatCurrency(order.final_amount) }}</td>
                                         <td class="px-4 py-3 text-right">
-                                            <Button variant="ghost" size="icon" class="h-8 w-8 rounded-full" as-child>
-                                                <a :href="`/admin/orders/${order.id}`">
-                                                    <Eye class="h-4 w-4" />
-                                                </a>
+                                            <Button variant="ghost" size="icon" class="h-7 w-7 rounded-full" as-child>
+                                                <Link :href="`/admin/orders/${order.id}`">
+                                                    <Eye class="h-3.5 w-3.5" />
+                                                </Link>
                                             </Button>
                                         </td>
                                     </tr>
                                     <tr v-if="historyPayload.orders.length === 0">
-                                        <td colspan="8" class="px-4 py-12 text-center text-muted-foreground">
-                                            Belum ada riwayat pesanan
+                                        <td colspan="6" class="px-4 py-16 text-center text-muted-foreground italic">
+                                            Belum ada riwayat pesanan tercatat.
                                         </td>
                                     </tr>
                                 </tbody>
@@ -459,7 +415,20 @@ function closeHistory() {
                         </div>
                     </template>
                 </div>
+                <DialogFooter class="px-6 py-4 border-t bg-muted/10">
+                    <Button variant="outline" @click="closeHistory">Tutup</Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+            :open="!!deleteTarget"
+            title="Hapus Pelanggan"
+            :description="deleteTarget ? ('Hapus data pelanggan ' + deleteTarget.name + '? Catatan transaksi lama akan tetap tersimpan.') : ''"
+            variant="destructive"
+            confirm-label="Ya, Hapus"
+            @update:open="(v) => !v && (deleteTarget = null)"
+            @confirm="handleDelete"
+        />
     </AdminLayout>
 </template>

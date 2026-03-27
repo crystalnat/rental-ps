@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
-import { Receipt, ArrowLeft, CreditCard } from 'lucide-vue-next'
+import { Receipt, ArrowLeft, CreditCard, Printer, FileText, RotateCcw } from 'lucide-vue-next'
 
 interface PaymentMethodItem {
     id: number
@@ -90,11 +90,31 @@ function goBack() {
 <template>
     <AdminLayout :title="`Order ${order.order_code}`">
         <div class="space-y-6">
-            <div class="flex items-center gap-4">
+            <div class="flex items-center justify-between gap-4">
                 <Button variant="ghost" size="sm" @click="goBack">
                     <ArrowLeft class="mr-2 h-4 w-4" />
                     Kembali
                 </Button>
+                <div class="flex items-center gap-2">
+                    <a :href="route('admin.orders.receipt', order.id)" target="_blank">
+                        <Button variant="outline" size="sm">
+                            <Printer class="mr-2 h-4 w-4" />
+                            Cetak Struk
+                        </Button>
+                    </a>
+                    <a :href="route('admin.orders.invoice', order.id)" target="_blank">
+                        <Button variant="outline" size="sm">
+                            <FileText class="mr-2 h-4 w-4" />
+                            Cetak Faktur
+                        </Button>
+                    </a>
+                    <a v-if="order.payment_status === 'paid'" :href="`/admin/refunds/create/${order.id}`">
+                        <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10">
+                            <RotateCcw class="mr-2 h-4 w-4" />
+                            Refund
+                        </Button>
+                    </a>
+                </div>
             </div>
 
             <Card>

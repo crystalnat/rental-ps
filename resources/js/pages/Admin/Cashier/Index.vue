@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { router, Link } from '@inertiajs/vue3'
+import { router, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,12 +15,15 @@ import { formatCurrency } from '@/lib/utils'
 import CashierFloorPlan from '@/components/CashierFloorPlan.vue'
 import {
     Search, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone,
-    ShoppingBag, Mic, MicOff, LayoutGrid, X,
+    ShoppingBag, Mic, MicOff, LayoutGrid, X, Clock, Loader2, RotateCcw, ShoppingCart,
+    TicketPercent
 } from 'lucide-vue-next'
+import axios from 'axios'
 
 interface Product {
     id: number
     name: string
+    sku: string | null
     category_id: number | null
     category_name: string | null
     category_color: string | null
@@ -105,7 +108,26 @@ const props = defineProps<{
             has_orders: boolean
         }>
     }>
+    last_order_id?: number | null
 }>()
+
+const showSuccessDialog = ref(false)
+const lastCreatedOrderId = ref<number | null>(null)
+
+import { watch } from 'vue'
+watch(() => props.last_order_id, (newVal) => {
+    if (newVal) {
+        lastCreatedOrderId.value = newVal
+        showSuccessDialog.value = true
+    }
+}, { immediate: true })
+
+function printLastOrder() {
+    if (lastCreatedOrderId.value) {
+        window.open(`/admin/orders/${lastCreatedOrderId.value}/receipt`, '_blank')
+        showSuccessDialog.value = false
+    }
+}
 
 const searchQuery = ref('')
 const categoryFilter = ref<string>('all')
@@ -116,6 +138,13 @@ const customerName = ref('')
 const customerPhone = ref('')
 const customerEmail = ref('')
 const notes = ref('')
+
+// Promo state
+const promoCodeInput = ref('')
+const activePromo = ref<{ code: string; type: string; value: number } | null>(null)
+const promoError = ref('')
+const promoLoading = ref(false)
+
 const discountAmount = ref<number | string>('')
 const showPaymentDialog = ref(false)
 const showFloorPlan = ref(false)
@@ -142,6 +171,108 @@ const payForm = ref({ payment_method: '', cash_received: '' })
 const payProcessing = ref(false)
 let pendingOrdersPollInterval: ReturnType<typeof setInterval> | null = null
 const sttError = ref<string | null>(null)
+
+// Shift state
+const activeShift = ref<any>(null)
+const showOpenShiftDialog = ref(false)
+
+const openShiftForm = useForm({
+    store_id: props.store.id,
+    opening_cash: '0',
+    scheduled_start: '',
+    scheduled_end: '',
+})
+
+async function fetchActiveShift() {
+    try {
+        const response = await fetch(`/admin/shifts/active?store=${props.store.id}`)
+        const data = await response.json()
+        activeShift.value = data.shift
+        if (!activeShift.value) {
+            showOpenShiftDialog.value = true
+        }
+    } catch (e) {
+        console.error('Failed to fetch active shift', e)
+    }
+}
+
+function openShift() {
+    openShiftForm.post('/admin/shifts/open', {
+        onBefore: () => {
+            showOpenShiftDialog.value = false
+        },
+        onSuccess: () => {
+            fetchActiveShift()
+        },
+        onError: (errors) => {
+            // Re-open on error
+            showOpenShiftDialog.value = true
+            alert(Object.values(errors).flat().join('\n'))
+        }
+    })
+}
+
+// Barcode scanner state
+let barcodeBuffer = ''
+let lastBarcodeKeyTime = 0
+const BARCODE_TIMEOUT_MS = 50 // USB scanners type faster than 50ms between keys
+const barcodeActive = ref(false)
+
+function handleBarcodeKeydown(e: KeyboardEvent) {
+    // Ignore if focused on an input/textarea
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return
+    }
+
+    const now = Date.now()
+    const timeDiff = now - lastBarcodeKeyTime
+
+    if (e.key === 'Enter' && barcodeBuffer.length >= 3) {
+        e.preventDefault()
+        const scannedCode = barcodeBuffer.trim()
+        barcodeBuffer = ''
+        barcodeActive.value = false
+        handleBarcodeScan(scannedCode)
+        return
+    }
+
+    // If too much time passed, reset buffer
+    if (timeDiff > BARCODE_TIMEOUT_MS && barcodeBuffer.length > 0) {
+        barcodeBuffer = ''
+    }
+
+    // Only accumulate printable single characters
+    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        barcodeBuffer += e.key
+        lastBarcodeKeyTime = now
+        if (barcodeBuffer.length >= 3) {
+            barcodeActive.value = true
+        }
+    }
+}
+
+function handleBarcodeScan(code: string) {
+    // Match against SKU first, then name
+    const product = props.products.find(
+        p => p.sku && p.sku.toLowerCase() === code.toLowerCase()
+    ) || props.products.find(
+        p => p.name.toLowerCase() === code.toLowerCase()
+    )
+
+    if (product) {
+        addToCart(product, 1)
+        // Visual feedback
+        barcodeScanResult.value = { success: true, name: product.name }
+    } else {
+        barcodeScanResult.value = { success: false, name: code }
+    }
+
+    // Clear feedback after 2s
+    setTimeout(() => { barcodeScanResult.value = null }, 2000)
+}
+
+const barcodeScanResult = ref<{ success: boolean; name: string } | null>(null)
 
 type SpeechRecognitionCtor = new () => {
     start: () => void
@@ -419,11 +550,14 @@ onMounted(() => {
     sessionStorage.setItem('cashier_pending_count', String(props.pending_orders_count ?? 0))
     void checkPendingOrders()
     pendingOrdersPollInterval = setInterval(checkPendingOrders, 15000)
+    document.addEventListener('keydown', handleBarcodeKeydown)
+    fetchActiveShift()
 })
 
 onBeforeUnmount(() => {
     stopListening()
     if (pendingOrdersPollInterval) clearInterval(pendingOrdersPollInterval)
+    document.removeEventListener('keydown', handleBarcodeKeydown)
 })
 
 const filteredProducts = computed(() => {
@@ -433,6 +567,7 @@ const filteredProducts = computed(() => {
         list = list.filter(
             (p) =>
                 p.name.toLowerCase().includes(q) ||
+                (p.sku?.toLowerCase().includes(q) ?? false) ||
                 (p.category_name?.toLowerCase().includes(q) ?? false),
         )
     }
@@ -449,6 +584,44 @@ const subtotal = computed(() =>
         return sum + (i.sell_price - discount) * i.quantity
     }, 0),
 )
+
+// Auto-recalculate promo if subtotal changes
+watch(subtotal, (newSubtotal) => {
+    if (activePromo.value && newSubtotal > 0) {
+        applyPromoCode()
+    } else if (newSubtotal === 0) {
+        removePromo()
+    }
+})
+
+async function applyPromoCode() {
+    if (!promoCodeInput.value) return
+    promoError.value = ''
+    promoLoading.value = true
+    try {
+        const res = await axios.post('/admin/cashier/check-promo', {
+            code: promoCodeInput.value,
+            subtotal: subtotal.value,
+            store: props.store.id
+        })
+        activePromo.value = res.data.promo
+        discountAmount.value = res.data.discount_amount
+        promoCodeInput.value = res.data.promo.code
+    } catch (e: any) {
+        activePromo.value = null
+        discountAmount.value = ''
+        promoError.value = e.response?.data?.error || 'Gagal menggunakan promo'
+    } finally {
+        promoLoading.value = false
+    }
+}
+
+function removePromo() {
+    activePromo.value = null
+    promoCodeInput.value = ''
+    discountAmount.value = ''
+    promoError.value = ''
+}
 
 const finalAmount = computed(() => {
     return Math.max(0, subtotal.value - (Number(discountAmount.value) || 0))
@@ -520,14 +693,18 @@ function submitOrder() {
         payment_method: paymentMethod.value,
         cash_received: requiresCashInput.value ? Number(cashReceived.value) || 0 : 0,
         discount_amount: Number(discountAmount.value) || 0,
+        promo_code: activePromo.value ? activePromo.value.code : undefined,
     }
-    router.post(route('admin.cashier.store'), { ...payload, store: props.store.id }, {
+    processing.value = true
+    showPaymentDialog.value = false // Close immediately
+    showMobileCart.value = false
+
+    router.post('/admin/cashier', { ...payload, store: props.store.id }, {
         preserveScroll: true,
-        onStart: () => { processing.value = true },
-        onFinish: () => { processing.value = false },
+        onError: () => {
+             showPaymentDialog.value = true // Re-open on error
+        },
         onSuccess: () => {
-            showPaymentDialog.value = false
-            showMobileCart.value = false
             cart.value = []
             notes.value = ''
             discountAmount.value = ''
@@ -535,12 +712,14 @@ function submitOrder() {
             customerName.value = ''
             customerPhone.value = ''
             customerEmail.value = ''
+            removePromo()
         },
+        onFinish: () => { processing.value = false },
     })
 }
 
 function changeStore(storeId: number) {
-    router.get(route('admin.cashier.index'), { store: storeId })
+    router.get('/admin/cashier', { store: storeId })
 }
 
 const orderTypeLabel = {
@@ -570,19 +749,26 @@ function submitPayOrder() {
     const order = selectedPendingOrder.value
     if (!order) return
     payProcessing.value = true
-    router.post(route('admin.orders.pay', order.id), {
+    
+    // Close immediately
+    const prevOrder = selectedPendingOrder.value
+    selectedPendingOrder.value = null
+
+    router.post(`/admin/orders/${order.id}/pay`, {
         payment_method: payForm.value.payment_method,
         cash_received: getRequiresCashInput() ? payForm.value.cash_received : null,
     }, {
         preserveScroll: true,
         onSuccess: () => {
-            closePayModal()
             void checkPendingOrders()
         },
         onError: (errors) => {
+            selectedPendingOrder.value = prevOrder
             alert(Object.values(errors).flat().join('\n'))
         },
-        onFinish: () => { payProcessing.value = false },
+        onFinish: () => { 
+            payProcessing.value = false 
+        },
     })
 }
 
@@ -620,6 +806,23 @@ const showQrOrAccount = computed(() => {
                     Pesanan baru: {{ newOrderNotification.order_code }} · Meja {{ newOrderNotification.table_name ?? '—' }}
                 </div>
             </Transition>
+            <!-- Barcode scan result toast -->
+            <Transition name="slide-down">
+                <div
+                    v-if="barcodeScanResult"
+                    class="fixed top-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg border px-4 py-2 text-sm font-medium shadow-lg"
+                    :class="barcodeScanResult.success
+                        ? 'border-blue-500 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100'
+                        : 'border-red-500 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'"
+                >
+                    <template v-if="barcodeScanResult.success">
+                        ✅ Barcode: <strong>{{ barcodeScanResult.name }}</strong> ditambahkan ke keranjang
+                    </template>
+                    <template v-else>
+                        ❌ Barcode <strong>{{ barcodeScanResult.name }}</strong> tidak ditemukan
+                    </template>
+                </div>
+            </Transition>
         </Teleport>
 
         <div class="flex flex-col lg:flex-row h-[calc(100vh-7rem)] gap-4 pb-[72px] lg:pb-0 lg:overflow-hidden relative">
@@ -654,6 +857,17 @@ const showQrOrAccount = computed(() => {
                     
                     <!-- Filters & Layout (Horizontal Scroll on Mobile) -->
                     <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="shrink-0 h-9 hidden md:flex"
+                            title="Proses Pengembalian / Refund"
+                            @click="router.visit('/admin/refunds')"
+                        >
+                            <RotateCcw class="h-4 w-4 md:mr-2" />
+                            <span class="hidden lg:inline text-xs">Refund</span>
+                        </Button>
+
                         <select
                             v-model="categoryFilter"
                             class="filter-select flex shrink-0 h-9 rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
@@ -699,15 +913,11 @@ const showQrOrAccount = computed(() => {
                             v-for="p in filteredProducts"
                             :key="p.id"
                             type="button"
-                            class="group relative flex flex-col items-stretch rounded-xl border bg-background p-2 md:p-3 text-left transition-all hover:bg-accent hover:border-primary/30"
+                            class="group relative flex flex-col items-stretch rounded-xl border p-2 md:p-3 text-left transition-all hover:bg-accent hover:border-primary/30"
+                            :style="{ backgroundColor: p.category_color ? p.category_color + '40' : undefined }"
                             :disabled="p.track_stock && p.current_stock <= 0"
                             @click="addToCart(p)"
                         >
-                            <div
-                                v-if="p.category_color"
-                                class="absolute top-0 left-0 h-1 w-full rounded-t-xl"
-                                :style="{ backgroundColor: p.category_color }"
-                            />
                             <div
                                 class="mb-2 aspect-square w-full overflow-hidden rounded-lg bg-muted"
                             >
@@ -725,6 +935,14 @@ const showQrOrAccount = computed(() => {
                                 </div>
                             </div>
                             <div class="min-w-0">
+                                <div v-if="p.category_name" class="mb-1">
+                                    <span 
+                                        class="inline-block rounded-sm px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider"
+                                        :style="{ backgroundColor: (p.category_color || '#e2e8f0') + '20', color: p.category_color || 'currentColor' }"
+                                    >
+                                        {{ p.category_name }}
+                                    </span>
+                                </div>
                                 <p class="truncate text-xs md:text-sm font-semibold leading-tight mb-1">{{ p.name }}</p>
                                 <p class="truncate text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
                                     <span v-if="p.discount_percent > 0" class="line-through text-muted-foreground/50 mr-1">{{ formatCurrency(p.sell_price) }}</span>
@@ -912,17 +1130,51 @@ const showQrOrAccount = computed(() => {
                                 <span class="text-muted-foreground">Subtotal</span>
                                 <span class="font-medium">{{ formatCurrency(subtotal) }}</span>
                             </div>
-                            <div class="mb-2 flex items-center justify-between text-sm">
-                                <span class="text-muted-foreground text-xs">Akan dipotong dari subtotal sebelum pajak/biaya</span>
+                            <div class="mb-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <Input
+                                        v-model="promoCodeInput"
+                                        placeholder="Kode Promo"
+                                        class="h-8 text-sm uppercase"
+                                        :disabled="activePromo !== null || promoLoading"
+                                        @keyup.enter="applyPromoCode"
+                                    />
+                                    <Button
+                                        v-if="!activePromo"
+                                        size="sm"
+                                        variant="secondary"
+                                        class="h-8"
+                                        :disabled="!promoCodeInput || promoLoading"
+                                        @click="applyPromoCode"
+                                    >
+                                        <Loader2 v-if="promoLoading" class="h-4 w-4 animate-spin mr-1" />
+                                        Terapkan
+                                    </Button>
+                                    <Button
+                                        v-else
+                                        size="sm"
+                                        variant="outline"
+                                        class="h-8 text-destructive border-destructive"
+                                        @click="removePromo"
+                                    >
+                                        Batal
+                                    </Button>
+                                </div>
+                                <p v-if="promoError" class="text-[10px] text-destructive">{{ promoError }}</p>
+                                <p v-if="activePromo" class="text-[10px] text-green-600 dark:text-green-400 font-medium">
+                                    Promo diterapkan: {{ activePromo.type === 'percentage' ? activePromo.value + '%' : 'Rp ' + activePromo.value }}
+                                </p>
                             </div>
+
                             <div class="mb-2 flex items-center justify-between text-sm font-medium">
-                                <span>Diskon Tambahan (Rp)</span>
+                                <span>Diskon Keseluruhan (Rp)</span>
                                 <Input
                                     v-model="discountAmount"
                                     type="number"
                                     class="h-8 w-28 text-right text-sm px-2 font-black tabular-nums border-orange-200 focus-visible:ring-orange-500"
                                     placeholder="0"
                                     min="0"
+                                    :disabled="activePromo !== null"
                                 />
                             </div>
                             <div class="mb-3 flex justify-between font-bold text-lg mt-3 pt-3 border-t">
@@ -1088,6 +1340,16 @@ const showQrOrAccount = computed(() => {
                                 {{ pm.name }}
                             </option>
                         </select>
+                        <Button
+                            v-if="activeShift"
+                            variant="outline"
+                            size="sm"
+                            class="shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
+                            @click="router.visit(`/admin/shifts/${activeShift.id}`)"
+                        >
+                            <Clock class="mr-2 h-4 w-4" />
+                            Tutup Shift
+                        </Button>
                     </div>
                     <div v-if="getRequiresCashInput()">
                         <Label for="pay_cash_received">Uang Diterima</Label>
@@ -1126,6 +1388,102 @@ const showQrOrAccount = computed(() => {
             :floor-plan="floor_plan ?? []"
             @update:open="showFloorPlan = $event"
         />
+
+        <!-- Mandatory Open Shift Dialog -->
+        <Dialog :open="showOpenShiftDialog" @update:open="activeShift ? (showOpenShiftDialog = $event) : null">
+            <DialogContent class="max-w-md" :hide-close="!activeShift">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <Clock class="h-5 w-5 text-primary" />
+                        Buka Shift Kasir
+                    </DialogTitle>
+                    <DialogDescription>
+                        Anda harus membuka shift sebelum dapat melayani pesanan di {{ store.name }}.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4 py-4">
+                    <div class="space-y-2">
+                        <Label for="opening_cash">Modal Awal (Kas di Laci)</Label>
+                        <Input
+                            id="opening_cash"
+                            v-model="openShiftForm.opening_cash"
+                            type="number"
+                            placeholder="0"
+                            :disabled="openShiftForm.processing"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            Masukkan jumlah uang tunai yang ada di laci kasir saat ini.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <Label for="sch_start">Jadwal Mulai</Label>
+                            <Input id="sch_start" v-model="openShiftForm.scheduled_start" type="time" :disabled="openShiftForm.processing" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="sch_end">Jadwal Selesai</Label>
+                            <Input id="sch_end" v-model="openShiftForm.scheduled_end" type="time" :disabled="openShiftForm.processing" />
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        class="w-full"
+                        size="lg"
+                        :disabled="!openShiftForm.opening_cash || Number(openShiftForm.opening_cash) < 0 || openShiftForm.processing"
+                        @click="openShift"
+                    >
+                        <Loader2 v-if="openShiftForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        {{ openShiftForm.processing ? 'Memproses...' : 'Buka Shift Sekarang' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Order Success Dialog -->
+        <Dialog :open="showSuccessDialog" @update:open="showSuccessDialog = $event">
+            <DialogContent class="max-w-xs sm:max-w-md text-center">
+                <DialogHeader>
+                    <div class="mx-auto my-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                        <ShoppingCart class="h-8 w-8 text-green-600" />
+                    </div>
+                    <DialogTitle class="text-2xl font-bold">Pesanan Berhasil!</DialogTitle>
+                    <DialogDescription>
+                        Transaksi telah berhasil diproses dan stok telah diperbarui.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="flex flex-col gap-3 py-4">
+                    <Button size="lg" class="w-full bg-green-600 hover:bg-green-700" @click="printLastOrder">
+                        <RotateCcw class="mr-2 h-4 w-4" />
+                        Cetak Struk (Receipt)
+                    </Button>
+                    <Button variant="outline" size="lg" class="w-full" @click="showSuccessDialog = false">
+                        Tutup & Pesanan Baru
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Barcode Scan Feedback Toast -->
+        <Transition name="slide-down">
+            <div 
+                v-if="barcodeScanResult" 
+                class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full shadow-lg flex items-center gap-2 border"
+                :class="barcodeScanResult.success ? 'bg-primary text-primary-foreground border-primary shadow-primary/20' : 'bg-destructive text-destructive-foreground border-destructive shadow-destructive/20'"
+            >
+                <div v-if="barcodeScanResult.success" class="flex items-center gap-2">
+                    <ShoppingCart class="h-4 w-4" />
+                    <span class="text-sm font-medium">Berhasil tambah: {{ barcodeScanResult.name }}</span>
+                </div>
+                <div v-else class="flex items-center gap-2">
+                    <X class="h-4 w-4" />
+                    <span class="text-sm font-medium">Produk tidak ditemukan: {{ barcodeScanResult.name }}</span>
+                </div>
+            </div>
+        </Transition>
     </AdminLayout>
 </template>
 

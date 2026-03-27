@@ -21,6 +21,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\Promo;
 
 class CashierController extends Controller
 {
@@ -89,7 +90,8 @@ class CashierController extends Controller
             'tables'          => $tables,
             'stores'          => $stores,
             'payment_methods' => $paymentMethods,
-            'floor_plan'      => $floorPlan,
+            'floor_plan'           => $floorPlan,
+            'last_order_id'        => session('last_order_id'),
         ]);
     }
 
@@ -121,6 +123,7 @@ class CashierController extends Controller
             'payment_method'   => ['required', Rule::in($validCodes)],
             'cash_received'    => ['nullable', 'numeric', 'min:0'],
             'discount_amount'  => ['nullable', 'numeric', 'min:0'],
+            'promo_code'       => ['nullable', 'string', 'max:255'],
         ]);
 
         if ($data['type'] === 'dine_in' && empty($data['table_id'])) {
@@ -128,6 +131,15 @@ class CashierController extends Controller
         }
 
         $order = DB::transaction(function () use ($store, $data, $user) {
+            $shift = \App\Models\CashierShift::where('store_id', $store->id)
+                ->where('user_id', $user->id)
+                ->where('status', 'open')
+                ->first();
+
+            if (! $shift) {
+                throw new \RuntimeException("Anda tidak memiliki shift yang sedang buka. Buka shift terlebih dahulu.");
+            }
+
             $orderCode = $this->generateOrderCode($store->id);
             $subtotal = 0;
             $itemsData = [];
@@ -175,6 +187,36 @@ class CashierController extends Controller
             }
 
             $discountAmount = (float) ($data['discount_amount'] ?? 0);
+            $promoId = null;
+
+            if (!empty($data['promo_code'])) {
+                $promo = Promo::where('brand_id', $store->brand_id)
+                    ->where('code', $data['promo_code'])
+                    ->first();
+                
+                if (!$promo || !$promo->isValid()) {
+                    throw new \RuntimeException("Kode promo tidak valid atau sudah kedaluwarsa.");
+                }
+                if ($subtotal < $promo->min_purchase) {
+                    throw new \RuntimeException("Total pesanan belum memenuhi minimum belanja promo.");
+                }
+
+                $calcDiskon = 0;
+                if ($promo->type === 'percentage') {
+                    $calcDiskon = round($subtotal * ($promo->value / 100));
+                    if ($promo->max_discount && $calcDiskon > $promo->max_discount) {
+                        $calcDiskon = $promo->max_discount;
+                    }
+                } else {
+                    $calcDiskon = $promo->value;
+                }
+
+                $discountAmount = min($calcDiskon, $subtotal);
+                $promoId = $promo->id;
+                
+                $promo->increment('used_count');
+            }
+
             $taxRate = 0;
             $taxAmount = 0;
             $finalAmount = max(0, $subtotal - $discountAmount) + $taxAmount;
@@ -195,9 +237,11 @@ class CashierController extends Controller
 
             $order = Order::create([
                 'store_id'        => $store->id,
+                'shift_id'        => $shift->id,
                 'table_id'        => $data['type'] === 'dine_in' ? $data['table_id'] : null,
                 'customer_id'     => $customerId,
                 'cashier_id'      => $user->id,
+                'promo_id'        => $promoId,
                 'order_code'      => $orderCode,
                 'type'            => $data['type'],
                 'status'          => 'done',
@@ -248,7 +292,8 @@ class CashierController extends Controller
 
         return redirect()
             ->route('admin.cashier.index', ['store' => $store->id])
-            ->with('success', "Pesanan {$order->order_code} berhasil dibuat.");
+            ->with('success', "Pesanan {$order->order_code} berhasil dibuat.")
+            ->with('last_order_id', $order->id);
     }
 
     private function resolveCustomer(int $brandId, array $data): ?int
@@ -340,6 +385,56 @@ class CashierController extends Controller
         ]);
     }
 
+    public function checkPromo(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = Auth::user();
+        $store = $this->resolveStore($user, $request);
+
+        if (! $store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $request->validate([
+            'code' => ['required', 'string'],
+            'subtotal' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $promo = Promo::where('brand_id', $store->brand_id)
+            ->where('code', strtoupper($request->code))
+            ->first();
+
+        if (!$promo) {
+            return response()->json(['error' => 'Kode promo tidak ditemukan.'], 404);
+        }
+
+        if (!$promo->isValid()) {
+            return response()->json(['error' => 'Kode promo sudah kedaluwarsa atau mencapai limit kuota.'], 400);
+        }
+
+        if ($request->subtotal < $promo->min_purchase) {
+            return response()->json(['error' => 'Belum memenuhi minimal belanja Rp ' . number_format($promo->min_purchase, 0, ',', '.')], 400);
+        }
+
+        $discount = 0;
+        if ($promo->type === 'percentage') {
+            $discount = round($request->subtotal * ($promo->value / 100));
+            if ($promo->max_discount && $discount > $promo->max_discount) {
+                $discount = $promo->max_discount;
+            }
+        } else {
+            $discount = $promo->value;
+        }
+
+        $discount = min($discount, $request->subtotal);
+
+        return response()->json([
+            'success' => true,
+            'promo' => $promo->only(['id', 'code', 'type', 'value', 'max_discount']),
+            'discount_amount' => $discount,
+            'message' => 'Promo berhasil digunakan.'
+        ]);
+    }
+
     private function resolveStore($user, Request $request): ?Store
     {
         $storeId = $request->query('store') ?? $request->input('store');
@@ -385,6 +480,7 @@ class CashierController extends Controller
                 return [
                     'id'             => $product->id,
                     'name'           => $product->name,
+                    'sku'            => $product->sku,
                     'category_id'    => $product->category_id,
                     'category_name'  => $product->category?->name,
                     'category_color' => $product->category?->color,

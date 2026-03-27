@@ -67,7 +67,7 @@ const deleteTarget = ref<CategoryItem | null>(null)
 function handleDelete() {
     if (!deleteTarget.value) return
     const id = deleteTarget.value.id
-    deleteTarget.value = null // Tutup modal dulu, responsif
+    deleteTarget.value = null 
     router.delete(`/admin/categories/${id}`, {
         preserveScroll: true,
         onError: (errors) => {
