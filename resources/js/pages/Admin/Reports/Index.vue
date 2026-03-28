@@ -89,6 +89,7 @@ interface StoreReport {
     expenses: number
     order_count: number
     gross_profit: number
+    net: number
     chart_sales: { labels: string[]; data: number[] }
     chart_expense_by_category: { labels: string[]; amounts: number[] }
     top_products: TopProduct[]
@@ -113,6 +114,15 @@ interface OverallReport {
     sales_by_type: SalesByType[]
     sales_by_payment: SalesByPayment[]
     expense_by_category_detail: ExpenseCategoryDetail[]
+    orders: Array<{
+        order_code: string
+        store_name: string
+        cashier_name: string
+        final_amount: number
+        type: string
+        payment_method: string
+        created_at: string
+    }>
 }
 
 const props = defineProps<{
@@ -160,14 +170,14 @@ const chartSalesOptions = {
         legend: { display: false },
         tooltip: {
             callbacks: {
-                label: (ctx: { raw: number }) => formatCurrency(ctx.raw),
+                label: (ctx: any) => formatCurrency(ctx.raw),
             },
         },
     },
     scales: {
         y: {
             beginAtZero: true,
-            ticks: { callback: (v: number) => formatCurrency(v) },
+            ticks: { callback: (v: any) => formatCurrency(v) },
         },
     },
 }
@@ -194,7 +204,7 @@ const chartExpenseOptions = {
         legend: { position: 'right' as const },
         tooltip: {
             callbacks: {
-                label: (ctx: { raw: number; label: string }) =>
+                label: (ctx: any) =>
                     `${ctx.label}: ${formatCurrency(ctx.raw)}`,
             },
         },
@@ -221,7 +231,7 @@ function applyFilters() {
 }
 
 function viewCashier(cashierId: number | null) {
-    if (cashierId) router.visit(route('admin.users.show', cashierId))
+    if (cashierId) router.visit(`/admin/users/${cashierId}`)
 }
 
 function toggleStore(storeId: number) {
@@ -270,24 +280,74 @@ function buildXlsx() {
     const XLSX = (window as any).XLSX
     const wb = XLSX.utils.book_new()
     
-    const ws1_data = [
-        ["Laporan Keseluruhan", "Pendapatan", "HPP", "Laba Kotor", "Pengeluaran", "Laba Bersih", "Total Transaksi"],
+    // 1. Ringkasan Keseluruhan & Per Toko
+    const ws1_data: any[][] = [
+        ["LAPORAN RINGKASAN CABANG", `Periode: ${props.date_from} s/d ${props.date_to}`],
+        [""],
+        ["Nama Toko", "Pendapatan", "HPP (Modal)", "Laba Kotor", "Pengeluaran", "Laba Bersih", "Total Transaksi"],
         ["Total Keseluruhan", props.overall.income, props.overall.hpp, props.overall.gross_profit, props.overall.expenses, props.overall.net, props.overall.order_count]
     ]
     props.per_store.forEach(s => ws1_data.push([s.name, s.income, s.hpp, s.gross_profit, s.expenses, s.net, s.order_count]))
     const ws1 = XLSX.utils.aoa_to_sheet(ws1_data)
-    XLSX.utils.book_append_sheet(wb, ws1, "Laporan Keuangan")
+    XLSX.utils.book_append_sheet(wb, ws1, "Ringkasan Toko")
 
-    const ws2_data = [["Produk Terlaris", "Terjual", "Omzet"]]
+    // 2. Penjualan Harian (Daily Sales)
+    const wsDaily_data: any[][] = [["Tanggal", "Total Penjualan"]]
+    props.overall.chart_sales.labels.forEach((label, i) => {
+        wsDaily_data.push([label, props.overall.chart_sales.data[i]])
+    })
+    const wsDaily = XLSX.utils.aoa_to_sheet(wsDaily_data)
+    XLSX.utils.book_append_sheet(wb, wsDaily, "Penjualan Harian")
+
+    // 3. Kinerja Produk (Top Products)
+    const ws2_data: any[][] = [["Nama Produk", "Terjual (Qty)", "Total Omzet"]]
     props.overall.top_products.forEach(p => ws2_data.push([p.product_name, p.total_qty, p.total_amount]))
     const ws2 = XLSX.utils.aoa_to_sheet(ws2_data)
     XLSX.utils.book_append_sheet(wb, ws2, "Kinerja Produk")
 
-    XLSX.writeFile(wb, `laporan-pos-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    // 4. Breakdown Tipe & Pembayaran
+    const wsBreakdown_data: any[][] = [
+        ["RINGKASAN TIPE ORDER"],
+        ["Tipe", "Total Transaksi", "Total Pendapatan"],
+    ]
+    props.overall.sales_by_type.forEach(t => wsBreakdown_data.push([t.label, t.count, t.total]))
+    wsBreakdown_data.push([""])
+    wsBreakdown_data.push(["RINGKASAN METODE PEMBAYARAN"])
+    wsBreakdown_data.push(["Metode", "Total Transaksi", "Total Pendapatan"])
+    props.overall.sales_by_payment.forEach(p => wsBreakdown_data.push([p.label, p.count, p.total]))
+    
+    const wsBreakdown = XLSX.utils.aoa_to_sheet(wsBreakdown_data)
+    XLSX.utils.book_append_sheet(wb, wsBreakdown, "Rincian Transaksi")
+
+    // 5. Daftar Transaksi (Itemized Orders with Date/Time)
+    const wsOrders_data: any[][] = [
+        ["DAFTAR TRANSAKSI DETAIL", `Periode: ${props.date_from} s/d ${props.date_to}`],
+        [""],
+        ["Kode Order", "Tanggal & Waktu", "Toko", "Kasir", "Tipe", "Metode", "Total"],
+    ]
+    props.overall.orders.forEach(o => {
+        wsOrders_data.push([
+            o.order_code,
+            o.created_at,
+            o.store_name,
+            o.cashier_name || '—',
+            o.type,
+            o.payment_method,
+            o.final_amount
+        ])
+    })
+    const wsOrders = XLSX.utils.aoa_to_sheet(wsOrders_data)
+    XLSX.utils.book_append_sheet(wb, wsOrders, "Daftar Transaksi")
+
+    XLSX.writeFile(wb, `laporan-pos-lengkap-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 
 function exportPdf() {
-    window.print();
+    const params = new URLSearchParams({
+        date_from: filterState.value.date_from || '',
+        date_to: filterState.value.date_to || ''
+    }).toString()
+    window.open(`/admin/reports/print?${params}`, '_blank')
 }
 </script>
 
@@ -320,6 +380,7 @@ function exportPdf() {
                                     <Input v-model="filterState.date_to" type="date" class="h-10 pl-9 font-medium" />
                                 </div>
                             </div>
+                        </div>
                         <div class="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
                             <Button class="h-10 font-bold px-4" @click="applyFilters">
                                 <Search class="mr-2 h-4 w-4" />
@@ -327,13 +388,13 @@ function exportPdf() {
                             </Button>
                             
                             <div class="flex items-center gap-2 border-l pl-2 ml-1" v-if="hasData">
-                                <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200" @click="exportXlsx" title="Export Excel">
+                                <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel">
                                     <FileSpreadsheet class="h-4 w-4 mr-2" /> XLSX
                                 </Button>
                                 <Button variant="outline" class="h-10 px-3 hover:bg-muted" @click="exportCsv" title="Export CSV">
                                     <FileText class="h-4 w-4 mr-2" /> CSV
                                 </Button>
-                                <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200" @click="exportPdf" title="Export PDF">
+                                <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">
                                     <Printer class="h-4 w-4 mr-2" /> PDF
                                 </Button>
                             </div>
@@ -361,7 +422,7 @@ function exportPdf() {
 
                     <!-- Overall Summary Cards -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <StatCard variant="success" class="border-none shadow-sm">
+                        <StatCard variant="primary" class="border-none shadow-sm">
                             <template #title>Penjualan</template>
                             <template #value>
                                 <p class="text-2xl md:text-3xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{{ formatCurrency(overall.income) }}</p>
@@ -369,7 +430,7 @@ function exportPdf() {
                             <template #subtitle>{{ overall.order_count }} Transaksi</template>
                             <template #icon><TrendingUp class="h-6 w-6" /></template>
                         </StatCard>
-                        <StatCard variant="outline" class="border-none shadow-sm">
+                        <StatCard variant="primary" class="border-none shadow-sm">
                             <template #title>Total HPP</template>
                             <template #value>
                                 <p class="text-2xl md:text-3xl font-black text-orange-600 dark:text-orange-400 tabular-nums">{{ formatCurrency(overall.hpp) }}</p>
@@ -403,7 +464,8 @@ function exportPdf() {
                             <template #subtitle>Profit Akhir Periode</template>
                             <template #icon><Wallet class="h-6 w-6" /></template>
                         </StatCard>
-                    </div>di                    <!-- Overall Charts -->
+                    </div>
+                    <!-- Overall Charts -->
                     <div class="grid gap-4 md:gap-6 lg:grid-cols-2">
                         <Card variant="elevated" class="overflow-hidden border-none shadow-sm">
                             <CardHeader class="p-4 md:p-6 pb-2">
@@ -479,7 +541,7 @@ function exportPdf() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </div>div>
+                    </div>
 
                     <!-- Overall Tables -->
                     <div class="grid gap-6 lg:grid-cols-2">

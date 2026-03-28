@@ -44,6 +44,8 @@ interface Product {
             id: number
             name: string
             price_extra: number
+            is_active?: boolean
+            is_available?: boolean
         }>
     }>
 }
@@ -101,7 +103,7 @@ const props = defineProps<{
     tables: Table[]
     stores: Store[]
     payment_methods: PaymentMethodItem[]
-    last_order_id?: number
+    last_order_id?: number | null
     floor_plan?: Array<{
         id: number
         name: string
@@ -128,16 +130,15 @@ const props = defineProps<{
             has_orders: boolean
         }>
     }>
-    last_order_id?: number | null
 }>()
 
 const showSuccessDialog = ref(false)
 const lastCreatedOrderId = ref<number | null>(null)
 
-import { watch } from 'vue'
 watch(() => props.last_order_id, (newVal) => {
     if (newVal) {
         lastCreatedOrderId.value = newVal
+        currentFeedbackOrderId.value = newVal
         showSuccessDialog.value = true
     }
 }, { immediate: true })
@@ -171,12 +172,6 @@ const showFloorPlan = ref(false)
 const showFeedbackModal = ref(false)
 const currentFeedbackOrderId = ref<number | null>(null)
 
-watch(() => props.last_order_id, (newVal) => {
-    if (newVal) {
-        currentFeedbackOrderId.value = newVal
-        showFeedbackModal.value = true
-    }
-}, { immediate: true })
 const showMobileCart = ref(false)
 const paymentMethod = ref<string>('')
 const cashReceived = ref('')

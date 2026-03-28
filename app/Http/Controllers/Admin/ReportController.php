@@ -27,6 +27,16 @@ class ReportController extends Controller
 
     public function index(Request $request): Response
     {
+        return Inertia::render('Admin/Reports/Index', $this->getReportData($request));
+    }
+
+    public function print(Request $request): Response
+    {
+        return Inertia::render('Admin/Reports/Print', $this->getReportData($request));
+    }
+
+    private function getReportData(Request $request): array
+    {
         $user = Auth::user();
         $storeIds = $this->getStoreIds($user);
 
@@ -69,13 +79,13 @@ class ReportController extends Controller
             ];
         }
 
-        return Inertia::render('Admin/Reports/Index', [
+        return [
             'stores'     => $stores->toArray(),
             'date_from'  => $dateFrom,
             'date_to'    => $dateTo,
             'overall'    => $overall,
             'per_store'  => $perStore,
-        ]);
+        ];
     }
 
     private function getStoreIds($user): Collection
@@ -124,6 +134,7 @@ class ReportController extends Controller
             'sales_by_type' => $this->buildSalesByTypeForStores($storeIds, $dateFrom, $dateTo),
             'sales_by_payment' => $this->buildSalesByPaymentForStores($storeIds, $dateFrom, $dateTo),
             'expense_by_category_detail' => $this->buildExpenseByCategoryDetail($storeIds, $dateFrom, $dateTo),
+            'orders' => $this->buildOrderList($storeIds, $dateFrom, $dateTo),
         ];
     }
 
@@ -145,6 +156,7 @@ class ReportController extends Controller
             'sales_by_type' => [],
             'sales_by_payment' => [],
             'expense_by_category_detail' => [],
+            'orders' => [],
         ];
     }
 
@@ -383,5 +395,25 @@ class ReportController extends Controller
             'count'  => (int) $r->count,
             'total'  => (float) $r->total,
         ])->values()->toArray();
+    }
+
+    private function buildOrderList(Collection $storeIds, string $dateFrom, string $dateTo): array
+    {
+        return Order::with(['store', 'cashier'])
+            ->whereIn('store_id', $storeIds)
+            ->where('payment_status', 'paid')
+            ->whereDate('created_at', '>=', $dateFrom)
+            ->whereDate('created_at', '<=', $dateTo)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($o) => [
+                'order_code' => $o->order_code,
+                'store_name' => $o->store?->name,
+                'cashier_name' => $o->cashier?->name,
+                'final_amount' => (float) $o->final_amount,
+                'type' => $o->type,
+                'payment_method' => $o->payment_method ?? 'cash',
+                'created_at' => $o->created_at->format('Y-m-d H:i:s'),
+            ])->toArray();
     }
 }

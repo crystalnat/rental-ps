@@ -5,12 +5,14 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'IDR'): string {
+export function formatCurrency(amount: any, currency = 'IDR'): string {
+    const val = Number(amount)
+    if (isNaN(val)) return 'Rp 0'
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency,
         minimumFractionDigits: 0,
-    }).format(amount)
+    }).format(val)
 }
 
 export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {

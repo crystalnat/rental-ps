@@ -91,6 +91,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     // Reports / Laporan (owner & admin)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin')->group(function () {
         Route::get('/reports', [ReportController::class, 'index'])->name('admin.reports.index');
+        Route::get('/reports/print', [ReportController::class, 'print'])->name('admin.reports.print');
     });
 
     // Categories (owner & admin)
