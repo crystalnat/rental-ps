@@ -10,7 +10,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import CashierFloorPlan from '@/components/CashierFloorPlan.vue'
 import {
@@ -586,6 +586,7 @@ async function checkPendingOrders() {
 }
 
 onMounted(() => {
+    console.log('Cashier Categories:', props.categories)
     sessionStorage.setItem('cashier_pending_count', String(props.pending_orders_count ?? 0))
     void checkPendingOrders()
     pendingOrdersPollInterval = setInterval(checkPendingOrders, 15000)
@@ -938,7 +939,7 @@ const showQrOrAccount = computed(() => {
             </Transition>
         </Teleport>
 
-        <div class="flex flex-col lg:flex-row h-[calc(100vh-7rem)] gap-4 pb-[72px] lg:pb-0 lg:overflow-hidden relative">
+        <div class="flex flex-col md:flex-row h-[calc(100vh-7rem)] gap-4 pb-[72px] md:pb-0 md:overflow-hidden relative">
             <!-- Product Grid -->
             <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card h-full lg:h-auto">
                 <div class="flex flex-col md:flex-row md:items-center gap-2 border-b p-3">
@@ -979,37 +980,14 @@ const showQrOrAccount = computed(() => {
                     </div>
                     
                     <p v-if="sttError" class="text-xs text-destructive">{{ sttError }}</p>
-                    
-                    <!-- Filters & Layout (Horizontal Scroll on Mobile) -->
+                         <!-- Filters & Layout (Horizontal Scroll on Mobile) -->
                     <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            class="shrink-0 h-9 hidden md:flex"
-                            title="Proses Pengembalian / Refund"
-                            @click="router.visit('/admin/refunds')"
-                        >
-                            <RotateCcw class="h-4 w-4 md:mr-2" />
-                            <span class="hidden lg:inline text-xs">Refund</span>
-                        </Button>
-
-                        <select
-                            v-model="categoryFilter"
-                            class="filter-select flex shrink-0 h-9 rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
-                        >
-                            <option value="all">Semua Kategori</option>
-                            <option
-                                v-for="c in categories"
-                                :key="c.id"
-                                :value="String(c.id)"
-                            >
-                                {{ c.name }}
-                            </option>
-                        </select>
+                        
+                        <!-- Select Toko -->
                         <select
                             v-if="stores.length > 1"
                             :value="store.id"
-                            class="filter-select flex shrink-0 h-9 rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
+                            class="filter-select flex shrink-0 h-9 rounded-md border border-input bg-background pl-3 pr-9 py-1 text-sm text-foreground"
                             @change="changeStore(Number(($event.target as HTMLSelectElement).value))"
                         >
                             <option
@@ -1020,6 +998,8 @@ const showQrOrAccount = computed(() => {
                                 {{ s.name }}
                             </option>
                         </select>
+
+                        <!-- Denah Meja -->
                         <Button
                             variant="outline"
                             size="sm"
@@ -1028,9 +1008,10 @@ const showQrOrAccount = computed(() => {
                             @click="showFloorPlan = true"
                         >
                             <LayoutGrid class="mr-2 h-4 w-4" />
-                            Denah Meja
+                            <span class="text-xs">Meja</span>
                         </Button>
 
+                        <!-- Tutup Shift -->
                         <Button
                             v-if="activeShift"
                             variant="outline"
@@ -1039,12 +1020,56 @@ const showQrOrAccount = computed(() => {
                             @click="router.visit(`/admin/shifts/${activeShift.id}`)"
                         >
                             <Clock class="mr-2 h-4 w-4" />
-                            Tutup Shift
+                            <span class="text-xs">Tutup Shift</span>
+                        </Button>
+
+                        <!-- Refund -->
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="shrink-0 h-9 hidden md:flex"
+                            title="Proses Pengembalian / Refund"
+                            @click="router.visit('/admin/refunds')"
+                        >
+                            <RotateCcw class="h-4 w-4 mr-2" />
+                            <span class="text-xs">Refund</span>
                         </Button>
                     </div>
                 </div>
+
+                <!-- Category Pills Bar -->
+                <div class="border-b bg-muted/40 px-3 py-2.5">
+                    <div class="flex items-center gap-2 overflow-x-auto pb-2 flex-nowrap scrollbar-thin">
+                        <button
+                            type="button"
+                            class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border shadow-sm uppercase tracking-wide"
+                            :class="categoryFilter === 'all' 
+                                ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
+                                : 'bg-white text-muted-foreground border-input hover:border-primary/50'"
+                            @click="categoryFilter = 'all'"
+                        >
+                            Semua
+                        </button>
+                        <button
+                            v-for="c in props.categories"
+                            :key="c.id"
+                            type="button"
+                            class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border shadow-sm whitespace-nowrap uppercase tracking-wide"
+                            :class="categoryFilter === String(c.id) 
+                                ? 'text-white border-transparent' 
+                                : 'bg-white text-muted-foreground border-input hover:border-primary/50'"
+                            :style="categoryFilter === String(c.id) 
+                                ? { backgroundColor: c.color || '#3b82f6' }
+                                : {}"
+                            @click="categoryFilter = String(c.id)"
+                        >
+                            {{ c.name }}
+                        </button>
+                    </div>
+                </div>
+
                 <div class="flex-1 overflow-y-auto p-3">
-                    <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                         <button
                             v-for="p in filteredProducts"
                             :key="p.id"
@@ -1095,21 +1120,19 @@ const showQrOrAccount = computed(() => {
                 </div>
             </div>
 
-            <!-- Dark Overlay for Mobile Cart -->
             <div
                 v-if="showMobileCart"
-                class="fixed inset-0 z-40 bg-black/50 lg:hidden"
+                class="fixed inset-0 z-40 bg-black/50 md:hidden"
                 @click="showMobileCart = false"
             />
 
-            <!-- Right: Pesanan Menunggu + Cart -->
             <div
                 :class="[
-                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-transform lg:static lg:z-auto lg:h-auto lg:w-[380px] lg:shrink-0 lg:translate-y-0 lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none min-h-0',
+                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-transform md:static md:z-auto md:h-auto md:w-[320px] lg:w-[380px] md:shrink-0 md:translate-y-0 md:rounded-lg md:border md:bg-card md:p-3 md:shadow-none min-h-0',
                     showMobileCart ? 'translate-y-0' : 'translate-y-full'
                 ]"
             >
-                <div class="mb-2 flex items-center justify-between lg:hidden">
+                <div class="mb-2 flex items-center justify-between md:hidden">
                     <h2 class="text-lg font-semibold">Keranjang</h2>
                     <Button variant="ghost" size="icon" @click="showMobileCart = false">
                         <X class="h-5 w-5" />
@@ -1365,7 +1388,7 @@ const showQrOrAccount = computed(() => {
         </div>
 
         <!-- Mobile Footer -->
-        <div class="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t bg-background p-3 shadow-[0_-4px_10px_-2px_rgba(0,0,0,0.1)] lg:hidden">
+        <div class="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t bg-background p-3 shadow-[0_-4px_10px_-2px_rgba(0,0,0,0.1)] md:hidden">
             <div class="flex flex-col">
                 <span class="text-xs font-medium text-muted-foreground">{{ cart.length }} Item</span>
                 <span class="text-base font-bold text-primary">{{ formatCurrency(finalAmount) }}</span>
@@ -1716,5 +1739,23 @@ const showQrOrAccount = computed(() => {
 
 :global(.theme-dark) .filter-select {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+}
+
+:global(.theme-dark) .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #334155;
 }
 </style>

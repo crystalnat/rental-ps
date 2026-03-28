@@ -50,9 +50,11 @@ class CashierController extends Controller
         $categories = Cache::remember("brand_categories_{$store->brand_id}", 3600, function() use ($store) {
             return Category::where('brand_id', $store->brand_id)
                 ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(['id', 'name', 'color']);
+                ->orderBy('sort_order', 'asc')
+                ->orderBy('name', 'asc')
+                ->get(['id', 'name', 'color'])
+                ->values()
+                ->toArray();
         });
 
         $tables = DiningTable::where('store_id', $store->id)
