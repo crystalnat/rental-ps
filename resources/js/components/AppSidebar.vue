@@ -5,7 +5,7 @@ import {
     LayoutDashboard, Store, Package, Tags, Users, Receipt,
     Settings, LogOut, ChevronDown, ShoppingCart,
     CreditCard, BarChart3, Wallet, UserCircle, LayoutGrid, BookOpen, Clock, RotateCcw,
-    Truck,
+    Truck, Globe,
 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import type { PageProps } from '@/types'
@@ -136,6 +136,7 @@ const navigationGroups = computed((): NavGroup[] => {
                 { label: 'Promo & Voucher', href: '/admin/promos', icon: Tags, roles: ['owner', 'admin'] },
                 { label: 'Karyawan', href: '/admin/users', icon: Users, roles: ['owner', 'admin'] },
                 { label: 'Cabang', href: '/admin/stores', icon: Store, roles: ['owner'] },
+                { label: 'Landing Page', href: '/admin/landing', icon: Globe, roles: ['owner', 'admin'] },
                 denahMejaItem,
             ],
         },

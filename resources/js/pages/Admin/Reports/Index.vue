@@ -244,26 +244,7 @@ const hasData = computed(() =>
     props.per_store.some(s => s.order_count > 0 || s.expenses > 0),
 )
 
-function exportCsv() {
-    let csv = "Laporan Laba Rugi POS\n\n"
-    csv += "Toko,Pendapatan,HPP,Laba Kotor,Pengeluaran,Laba Bersih,Total Transaksi\n"
-    csv += `Total Keseluruhan,${props.overall.income},${props.overall.hpp},${props.overall.gross_profit},${props.overall.expenses},${props.overall.net},${props.overall.order_count}\n`
-    
-    props.per_store.forEach(s => {
-        csv += `"${s.name}",${s.income},${s.hpp},${s.gross_profit},${s.expenses},${s.net},${s.order_count}\n`
-    })
 
-    csv += "\nProduk Terlaris\nNama Produk,Terjual,Omzet\n"
-    props.overall.top_products.forEach(p => {
-        csv += `"${p.product_name}",${p.total_qty},${p.total_amount}\n`
-    })
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `laporan-pos-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-}
 
 function exportXlsx() {
     if (!(window as any).XLSX) {
@@ -391,9 +372,7 @@ function exportPdf() {
                                 <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel">
                                     <FileSpreadsheet class="h-4 w-4 mr-2" /> XLSX
                                 </Button>
-                                <Button variant="outline" class="h-10 px-3 hover:bg-muted" @click="exportCsv" title="Export CSV">
-                                    <FileText class="h-4 w-4 mr-2" /> CSV
-                                </Button>
+
                                 <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">
                                     <Printer class="h-4 w-4 mr-2" /> PDF
                                 </Button>

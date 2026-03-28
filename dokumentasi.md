@@ -1,145 +1,98 @@
-# 📘 Dokumentasi Pengembangan Fitur POS App
+# 📘 Dokumentasi Pengembangan Fitur POS App (Sesi Maret 2026)
 
-Dokumentasi ini mencakup fitur-fitur utama yang telah diimplementasikan: **Export Laporan**, **Purchase Order (PO)**, dan **Product Varian (Modifiers)**.
-
----
-
-## 1. Export Laporan (CSV, XLSX, PDF)
-Fitur ini memungkinkan Admin untuk mengunduh data laporan dalam berbagai format untuk keperluan audit dan arsip.
-
-### 🔄 Alur Kerja (Flow):
-1.  **Pemicu (Trigger)**: Admin memilih rentang waktu di halaman Laporan dan mengklik tombol "Export".
-2.  **Pemetaan Data**: Frontend (`Reports/Index.vue`) mengambil data yang sedang ditampilkan (state `reportData`).
-3.  **Proses Export (Client-Side)**:
-    *   **CSV**: Menggunakan Blob URL untuk membuat file teks sederhana.
-    *   **XLSX**: Menggunakan library `ExcelJS` untuk membuat spreadsheet dengan styling (bold header, currency format).
-    *   **PDF**: Menggunakan `jsPDF` dan `jspdf-autotable` untuk merender tabel laporan ke dalam dokumen PDF.
-4.  **Unduh**: File diunduh langsung ke perangkat user tanpa membebani server (Server-less generation).
+Dokumentasi ini mencatat pembaruan sistem POS yang dilakukan pada sesi pengembangan terbaru, meliputi implementasi **Landing Page CMS** dan **Optimasi Laporan**.
 
 ---
 
-## 2. Purchase Order (PO)
-Fitur manajemen stok masuk yang terintegrasi dengan data Supplier untuk memastikan akurasi data inventori.
+## 1. Optimasi Export Laporan
+Sesuai dengan standarisasi laporan profesional, sistem kini berfokus pada format dokumen yang memiliki struktur kaya data (Rich Data).
 
-### 🔄 Alur Kerja (Flow):
-
-```mermaid
-graph LR
-    A[Buat PO Draft] -->|Status: pending| B(Audit Vendor)
-    B --> C{Barang Tiba?}
-    C -->|Ya| D[Receive Items]
-    D -->|Status: received| E[Update Stok & Mutasi]
-    E --> F[Audit Trail Tercatat]
-```
-
-1.  **Pembuatan PO**: Admin memilih Supplier, memilih produk yang ingin dipesan, dan menentukan jumlah serta harga beli. Status awal: `pending`.
-2.  **Penyimpanan**: PO disimpan di tabel `purchase_orders` dan itemnya di `purchase_order_items`.
-3.  **Penerimaan Barang**: Saat barang fisik tiba, Admin mengklik "Receive Items".
-4.  **Update Sistem**:
-    *   **Stok**: Menambah `current_stock` di tabel `store_inventories` secara otomatis.
-    *   **Audit Trail**: Setiap kenaikan stok **wajib** mencatat `reference_id` yang mengarah ke ID Purchase Order. Hal ini memastikan setiap barang masuk dapat dilacak ke supplier mana dan PO nomor berapa saat audit stok opname dilakukan.
-    *   **Status**: PO berubah menjadi `received` dan mencatat waktu penerimaan (`received_at`).
+### Perubahan Utama:
+- **Penghapusan Format CSV**: Fitur export ke CSV telah dihapus dari halaman Laporan Analitas untuk menyeragamkan output data.
+- **Fokus XLSX & PDF**: Sistem kini hanya menyediakan format **XLSX** (untuk pengolahan data spreadsheet lanjut) dan **PDF** (untuk dokumen siap cetak/audit).
+- **Keamanan Data**: Proses export tetap dilakukan secara *client-side* untuk menjaga performa server tetap stabil saat menangani data transaksi besar.
 
 ---
 
-## 3. Product Varian (Modifiers)
-Fitur untuk menangani variasi produk (Size, Toppings, Level Gula, dll) yang memiliki harga tambahan.
+## 2. Optimasi Data: Bit Packing
+Sistem CMS kini mengadopsi teknik **Bit Packing** untuk menyimpan berbagai pengaturan (flags/toggles) dalam satu kolom integer tunggal.
 
-### 🔄 Alur Kerja (Flow):
-1.  **Konfigurasi**:
-    *   Admin membuat **Modifier Group** (misal: "Ukuran Gelas") pada form produk.
-    *   Admin menambahkan **Modifier Options** (misal: "Small", "Large" +Rp 5.000).
-2.  **Pemilihan di Kasir**: 
-    *   Saat produk yang memiliki varian diklik, muncul **Modifier Selector Dialog**.
-    *   User harus memilih sesuai aturan `min_select` dan `max_select`.
-3.  **Perhitungan Harga**: 
-    *   `Harga Item = (Base Price + Σ Price Extra Modifiers - Diskon Produk)`.
-4.  **Penyimpanan Transaksi**:
-    *   Pilihan varian disimpan di tabel `order_item_modifiers` agar struk belanja tetap menampilkan detail varian meskipun di masa depan konfigurasi produk berubah (Snapshot data).
-5.  **Validasi & Stok**:
-    *   **Client-Side**: Tombol konfirmasi di kasir akan *disabled* jika syarat `min_select` tidak terpenuhi.
-    *   **Out of Stock Management**: Setiap opsi varian memiliki status `is_available`. Jika dinonaktifkan di admin, opsi tersebut akan muncul *greyed-out* (tidak bisa diklik) di kasir tanpa mengganggu penjualan produk utamanya.
+### Mengapa Bit Packing?
+Teknik ini mengompresi beberapa data Boolean atau Enum (yang biasanya memakan 1 byte/lebih di memori DB) menjadi hanya **1-bit** per data. Dengan menggabungkan hingga 32 flag dalam satu kolom `unsigned integer`, kita menghemat penggunaan storage dan memori server hingga **75-90%** untuk kolom pengaturan.
 
----
+### Implementasi pada CMS:
+- **`landing_settings`**: Menyimpan status `Published`, `Sticky Header`, `Show Social Header`, dll dalam bitmask 32-bit.
+- **`landing_sections`**: Menyimpan status `Visible`, `Full Width`, `Dark Background`, dan `Reverse Grid` dalam bitmask 32-bit.
 
-## 4. Visualisasi Struk & Faktur
-Untuk memudahkan pelanggan membaca detail varian, sistem menerapkan standarisasi tampilan:
-- **Indentasi**: Daftar varian dicetak menjorok ke dalam (indented) di bawah nama produk utama.
-- **Struk Thermal**: Menggunakan font mono dengan tanda `+` di depan setiap varian.
-- **Faktur Formal (PDF)**: Menggunakan teks miring (*italic*) dengan perataan atas agar layout tetap rapi jika varian sangat banyak.
+### Contoh Teknis:
+Jika kita memiliki 4 pengaturan aktif: `Visible (1)`, `Full Width (2)`, `Dark BG (4)`, `Reverse (8)`.
+- **Dulu**: Menggunakan 4 kolom `boolean` (4 Byte).
+- **Sekarang**: Disimpan dalam satu nilai integer `15` (`00001111` bin) -> Hanya **1 Byte** untuk menyimpan 4 data sekaligus.
+- **Operasi Bitwise**: Pencarian dan filter dilakukan langsung di level database menggunakan `whereRaw` dengan operator bitwise `&`, sehingga sangat cepat dan efisien.### Kamus Bit (Bitmask Reference)
+Untuk memudahkan pengembang lain dalam memodifikasi atau menambah fitur, berikut adalah referensi bitmask yang digunakan:
 
----
+#### 1. `landing_settings` (settings_bitmask)
+| Bit | Value | Variable | Deskripsi |
+|---|---|---|---|
+| 0 | 1 | `FLAG_PUBLISHED` | Status tayang landing page secara publik. |
+| 1 | 2 | `FLAG_SHOW_HEADER_LOGO` | Menampilkan/sembunyikan logo di navigasi atas. |
+| 2 | 4 | `FLAG_SHOW_FOOTER_SOCIAL` | Menampilkan/sembunyikan ikon sosial di footer. |
+| 3 | 8 | `FLAG_STICKY_HEADER` | Mengaktifkan posisi header tetap saat scroll. |
 
-## 📊 Urutan Kalkulasi Akhir (Presedensi)
-Sistem menggunakan logika **"Discount on Base"** untuk menjaga margin varian. Berikut urutan kalkulasinya:
-
-1.  **Base Price** produk (Harga dasar katalog).
-2.  **Extra Price** dari semua modifier yang dipilih (Ditambahkan ke total item).
-3.  **Diskon Produk (Statis %)**: Dihitung **hanya dari Base Price** (dibulatkan). 
-    *   *Catatan: Harga tambahan varian (Extra) tidak terkena potongan diskon produk agar integritas margin varian tetap terjaga.*
-4.  **Subtotal Item** = `(Base + Extra - Diskon) * Quantity`.
-5.  **Promo / Diskon Global** dipotong dari total akumulasi seluruh Subtotal (Semua item + varian).
-6.  **Final Amount**: Nominal bersih yang harus dibayar pelanggan (Integer/Round).
+#### 2. `landing_sections` (section_bitmask)
+| Bit | Value | Variable | Deskripsi |
+|---|---|---|---|
+| 0 | 1 | `FLAG_VISIBLE` | Menyembunyikan atau menampilkan section ini. |
+| 1 | 2 | `FLAG_FULL_WIDTH` | Mengabaikan container max-width (layout full). |
+| 2 | 4 | `FLAG_DARK_BG` | Mengaktifkan warna background gelap untuk section. |
+| 3 | 8 | `FLAG_REVERSE_GRID` | Menukar posisi gambar dan teks (kiri vs kanan). |
 
 ---
 
-## 5. Sistem Notifikasi Internal (Alerts)
-Sistem memiliki modul notifikasi berbasis database (Laravel Notifications) untuk memantau aktivitas kritis secara real-time.
+## 8. Landing Page CMS (Company Profile)
+Fitur ini memungkinkan setiap brand memiliki halaman Company Profile publik yang dapat dikustomisasi sepenuhnya dari Admin Panel tanpa menyentuh kode.
 
-### A. Jenis Triger & Icon
-| Triger | Ikon | Deskripsi |
-|---|---|---|
-| **Stok Menipis** | `Package` | Muncul saat stok produk turun ke/di bawah `min_stock` setelah transaksi kasir. |
-| **Pesanan Baru** | `ShoppingCart` | Muncul saat setiap order baru dibuat di kasir (Takeaway/Dine-In). |
-| **Target Tercapai** | `Target` | Muncul saat omzet harian toko mencapai/melampaui `Daily Sales Target`. |
+### A. Arsitektur Data
+Sistem menggunakan dua tabel utama:
+- **`landing_settings`**: Menyimpan konfigurasi global per Brand (nama situs, tagline, warna tema, font, link sosial media, SEO meta, dan status publish).
+- **`landing_sections`**: Menyimpan konten per section (hero, about, services, gallery, testimonials, contact) dengan kolom `items` (JSON) untuk data dinamis dan `config` (JSON) untuk pengaturan layout.
 
-### B. Mekanisme Real-Time
-1.  **Frontend Polling**: Aplikasi Vue.js melakukan hit API ke `/admin/notifications` setiap 60 detik untuk mendeteksi pesan baru tanpa refresh.
-2.  **Notification Drawer**: Panel notifikasi dapat dibuka lewat ikon Lonceng di Header.
-3.  **Mark as Read**: Notifikasi yang sudah dibaca/dikonfirmasi akan hilang dari daftar unread (tersimpan di database).
+### B. Section yang Tersedia
+| Section | Konten yang Bisa Diedit |
+|---|---|
+| **Hero Banner** | Judul, subjudul, deskripsi, gambar background, layout (tengah/kiri), overlay opacity |
+| **Tentang Kami** | Judul, deskripsi, gambar, layout gambar (kiri/kanan/full) |
+| **Layanan** | Judul, daftar kartu layanan (judul, deskripsi, ikon) -- bisa ditambah/hapus |
+| **Galeri** | Upload gambar dengan caption -- bisa ditambah/hapus |
+| **Testimoni** | Daftar ulasan (nama, jabatan, isi, rating bintang) -- bisa ditambah/hapus |
+| **Kontak** | Alamat, telepon, email, WhatsApp, Google Maps embed |
 
-### C. Pengaturan Target Penjualan
-Penyetelan target dilakukan per cabang (Store) di menu **Edit Toko**. Target ini bersifat harian dan akan mereset status penembusannya setiap hari baru.
+### C. Theming & Branding
+Admin dapat mengatur:
+- **5 Warna Tema**: Primary, Secondary, Accent, Background, Text -- semua dengan color picker.
+- **2 Font**: Heading dan Body -- dipilih dari Google Fonts (Inter, Poppins, Outfit, dll).
+- **Logo & Favicon**: Upload langsung dari CMS.
+- **Social Links**: Instagram, Facebook, WhatsApp, TikTok.
+- **SEO**: Meta Title dan Meta Description untuk optimasi mesin pencari.
 
----
+### D. Alur Kerja CMS
+1.  **Admin Panel**: Akses via menu **Manajemen > Landing Page** (`/admin/landing`).
+2.  **Edit Section**: Klik section yang ingin diedit, ubah konten, lalu klik **Simpan Section**.
+3.  **Atur Tema**: Pindah ke tab **Pengaturan & Tema** untuk mengubah warna, font, dan branding.
+4.  **Publish/Unpublish**: Toggle status publish. Halaman publik hanya bisa diakses jika status **Published**.
+5.  **URL Publik**: Halaman dapat diakses di `/p/{brand-slug}` (contoh: `/p/kopi-nusantara`).
 
-## 6. Feedback Pelanggan (Post-Transaction)
-Fitur ini memungkinkan kasir untuk menangkap sentimen pelanggan tepat setelah transaksi selesai.
-
-### A. Alur Kerja Modal Feedback
-1.  **Trigger Otomatis**: Setelah pembayaran berhasil, aplikasi akan menampilkan popup "Terima Kasih" yang meminta masukan.
-2.  **Star Rating**: Pelanggan memberikan rating 1 hingga 5 bintang.
-3.  **Komentar Opsional**: Terdapat kolom teks untuk mencatat kritik/saran manual.
-4.  **Tindakan Pelanggan**:
-    *   **Kirim Feedback**: Mengunci ulasan ke database untuk keperluan laporan analitik.
-    *   **Mungkin Nanti**: Menutup dialog tanpa menyimpan data (feedback bersifat opsional).
-
-### B. Penyimpanan Data
-Data feedback disimpan di tabel `order_feedbacks` dan terhubung secara relasi *one-to-one* dengan tabel `orders`. Sistem juga mencatat `source` (asal transaksi) untuk membedakan feedback dari Kasir atau pesanan QR di masa depan.
-
----
-
-## 7. Optimasi Performa & Keamanan
-Aplikasi telah dioptimasi untuk menangani kunjungan tinggi dan menjaga integritas data.
-
-### A. API Caching (Response Accelerations)
-Untuk mempercepat waktu muat (loading time) kasir, sistem menerapkan **Caching Layer** (TTL 1 jam):
-- **Store Products**: Daftar produk per toko disimpan di cache `store_products_{id}`.
-- **Categories**: Daftar kategori brand disimpan di cache `brand_categories_{id}`.
-- **Benefit**: Mengurangi SQL query hingga 80% saat kasir membuka katalog produk.
-
-### B. Middleware Security
-Seluruh rute admin dan kasir dilindungi oleh:
-- `auth:sanctum`: Menjamin hanya user terdaftar yang bisa mengakses data.
-- `EnsureAuthenticated`: Middleware custom untuk membatasi akses berdasarkan **Role** (Owner, Admin, atau Cashier) sesuai dengan cakupan fiturnya.
+### E. Keunggulan untuk Pemasaran
+- Setiap klien (Brand) mendapat landing page sendiri yang 100% berbeda konten dan tampilannya.
+- Tidak perlu developer untuk mengubah konten -- semua bisa dilakukan dari Admin Panel.
+- SEO-ready dengan meta title, meta description, dan semantic HTML.
 
 ---
 
-## 8. Persiapan Deployment (Checklist)
+## 9. Persiapan Deployment (Checklist)
 
-*   **Database**: Jalankan `php artisan migrate` untuk mengaktifkan tabel feedback, notifikasi, dan kolom target penjualan.
+*   **Database**: Jalankan `php artisan migrate` untuk mengaktifkan tabel feedback, notifikasi, landing page, dan kolom target penjualan.
 *   **Optimization**: Jalankan `php artisan config:cache` dan `php artisan route:cache` di production.
+*   **Storage Link (PENTING)**: Jalankan `php artisan storage:link`. Tanpa perintah ini, gambar Hero Banner, Gallery, dan Logo yang di-upload via CMS akan menghasilkan error 404 karena file fisik tidak terhubung secara publik.
 *   **Backup**: Sangat disarankan menginstal package `spatie/laravel-backup` dan menjadwalkan backup database harian (00:00) ke cloud storage (Google Drive/S3).
 *   **Environment**: Pastikan `CACHE_DRIVER` dikonfigurasi (default: `file`, disarankan: `redis` jika tersedia di server Hostinger) untuk kestabilan polling notifikasi.
-
-

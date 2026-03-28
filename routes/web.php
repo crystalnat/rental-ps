@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\StoreProductController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\LandingPageController;
 use App\Http\Middleware\EnsureAuthenticated;
 use Illuminate\Support\Facades\Route;
 
@@ -223,7 +224,18 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     Route::get('/notifications', [\App\Http\Controllers\Admin\NotificationController::class, 'index'])->name('admin.notifications.index');
     Route::post('/notifications/mark-read', [\App\Http\Controllers\Admin\NotificationController::class, 'markAsRead'])->name('admin.notifications.mark-read');
     Route::post('/notifications/mark-all-read', [\App\Http\Controllers\Admin\NotificationController::class, 'markAllAsRead'])->name('admin.notifications.mark-all-read');
+
+    // Landing Page CMS (owner, admin)
+    Route::middleware(EnsureAuthenticated::class . ':owner,admin')->group(function () {
+        Route::get('/landing', [\App\Http\Controllers\Admin\LandingSettingsController::class, 'index'])->name('admin.landing.index');
+        Route::put('/landing/settings', [\App\Http\Controllers\Admin\LandingSettingsController::class, 'updateSettings'])->name('admin.landing.settings.update');
+        Route::put('/landing/sections/{section}', [\App\Http\Controllers\Admin\LandingSettingsController::class, 'updateSection'])->name('admin.landing.sections.update');
+        Route::post('/landing/upload', [\App\Http\Controllers\Admin\LandingSettingsController::class, 'uploadSectionImage'])->name('admin.landing.upload');
+    });
 });
+
+// Public landing page per brand
+Route::get('/p/{brandSlug}', [LandingPageController::class, 'show'])->name('landing.show');
 
 // Redirect root to dashboard or login
 Route::get('/', fn () => redirect('/admin/dashboard'));

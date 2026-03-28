@@ -42,6 +42,16 @@ class Brand extends Model
         return $this->hasMany(Customer::class);
     }
 
+    public function landingSetting(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LandingSetting::class);
+    }
+
+    public function landingSections(): HasMany
+    {
+        return $this->hasMany(LandingSection::class)->orderBy('sort_order');
+    }
+
     protected function casts(): array
     {
         return [
