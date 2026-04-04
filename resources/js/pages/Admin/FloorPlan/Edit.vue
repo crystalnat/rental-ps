@@ -17,6 +17,7 @@ import {
     ArrowLeft, Save, Plus, LayoutGrid, Box, ArrowDownToLine, CreditCard,
     DoorOpen, Square, MoreHorizontal, Trash2, QrCode, Copy, Pencil,
     ZoomIn, ZoomOut, Maximize2, RotateCw, RotateCcw, Printer,
+    Gamepad2, Gamepad,
 } from 'lucide-vue-next'
 
 const BASE_PIXELS_PER_METER = 80
@@ -36,6 +37,8 @@ interface Table {
     length_meters: number
     rotation_deg: number
     shape: string
+    tuya_device_id: string | null
+    rental_price_per_hour: number
 }
 
 interface Element {
@@ -238,7 +241,7 @@ watch(showAddTable, (open) => {
     }
 })
 const addElementForm = ref({ type: 'pillar' as string, name: '', width_meters: 0.5, length_meters: 0.5 })
-const editTableForm = ref({ width_meters: 0.8, length_meters: 1.2 })
+const editTableForm = ref({ width_meters: 0.8, length_meters: 1.2, tuya_device_id: '', rental_price_per_hour: 0 })
 
 const elementIcons: Record<string, unknown> = {
     pillar: Box,
@@ -446,7 +449,12 @@ function submitAddElement() {
 
 function openEditTable(t: Table) {
     editTableTarget.value = t
-    editTableForm.value = { width_meters: t.width_meters, length_meters: t.length_meters }
+    editTableForm.value = {
+        width_meters: t.width_meters,
+        length_meters: t.length_meters,
+        tuya_device_id: t.tuya_device_id || '',
+        rental_price_per_hour: t.rental_price_per_hour || 0,
+    }
     showEditTable.value = true
 }
 
@@ -457,7 +465,19 @@ function submitEditTable() {
     if (idx >= 0) {
         tables.value[idx].width_meters = editTableForm.value.width_meters
         tables.value[idx].length_meters = editTableForm.value.length_meters
-        saveLayout()
+        tables.value[idx].tuya_device_id = editTableForm.value.tuya_device_id
+        tables.value[idx].rental_price_per_hour = editTableForm.value.rental_price_per_hour
+
+        // We need to send these extra fields to the backend too
+        router.post(`/admin/stores/${props.store.id}/floor-plan/${props.floor.id}/tables/${t.id}/update-meta`, {
+            tuya_device_id: editTableForm.value.tuya_device_id,
+            rental_price_per_hour: editTableForm.value.rental_price_per_hour,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                saveLayout()
+            }
+        })
     }
     showEditTable.value = false
     editTableTarget.value = null
@@ -620,8 +640,8 @@ function qrImageUrl(url: string) {
             <span class="text-xs text-muted-foreground">(snap ke grid & align)</span>
             <div class="mx-2 h-4 w-px bg-border" />
             <Button variant="outline" size="sm" @click="showAddTable = true">
-                <LayoutGrid class="h-4 w-4" />
-                Tambah Meja
+                <Gamepad2 class="h-4 w-4" />
+                Tambah Unit PS
             </Button>
             <Button variant="outline" size="sm" @click="showAddElement = true">
                 <Plus class="h-4 w-4" />
@@ -772,7 +792,7 @@ function qrImageUrl(url: string) {
                         }"
                     >
                         <span class="font-semibold text-amber-900">{{ t.name }}</span>
-                        <span class="text-xs text-amber-700">{{ t.capacity }} kursi</span>
+                        <span class="text-xs text-amber-700">Unit PS</span>
                         <div class="mt-1 flex gap-0.5">
                             <button
                                 class="rounded bg-amber-200/80 p-1 text-amber-900 hover:bg-amber-300"
@@ -806,7 +826,7 @@ function qrImageUrl(url: string) {
         <div class="mt-4 flex flex-wrap items-center gap-6 rounded-lg border bg-muted/20 p-4 text-sm">
             <div class="flex items-center gap-2">
                 <div class="h-6 w-6 rounded border-2 border-amber-400 bg-amber-50" />
-                <span>Meja: drag pindah, klik kanan → Edit, QR, Salin, Hapus</span>
+                <span>Unit PS: drag pindah, klik kanan → Edit, QR, Salin, Hapus</span>
             </div>
             <div class="flex items-center gap-2">
                 <div class="h-6 w-6 rounded border-2 border-amber-400 bg-amber-50" />
@@ -821,13 +841,13 @@ function qrImageUrl(url: string) {
         <Dialog :open="showAddTable" @update:open="showAddTable = $event">
             <DialogContent class="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Tambah Meja</DialogTitle>
-                    <DialogDescription>Meja punya QR untuk order. Ukuran bisa diatur setelah dibuat.</DialogDescription>
+                    <DialogTitle>Tambah Unit PS</DialogTitle>
+                    <DialogDescription>Unit PS akan muncul di denah. Atur Tuya ID & Harga nanti.</DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4">
                     <div>
-                        <Label>Nama Meja</Label>
-                        <Input v-model="addTableForm.name" placeholder="1" class="mt-1.5" />
+                        <Label>Nama Unit PS</Label>
+                        <Input v-model="addTableForm.name" placeholder="PS-01" class="mt-1.5" />
                     </div>
                     <div>
                         <Label>Kapasitas (kursi)</Label>
@@ -841,21 +861,32 @@ function qrImageUrl(url: string) {
             </DialogContent>
         </Dialog>
 
-        <!-- Edit Table Size Dialog -->
+        <!-- Edit PS Unit Dialog -->
         <Dialog :open="showEditTable" @update:open="showEditTable = $event">
             <DialogContent class="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Edit Ukuran Meja — {{ editTableTarget?.name }}</DialogTitle>
-                    <DialogDescription>Atur lebar dan panjang meja dalam meter.</DialogDescription>
+                    <DialogTitle>Edit Unit PS — {{ editTableTarget?.name }}</DialogTitle>
+                    <DialogDescription>Atur detail unit PS dan integrasi Tuya.</DialogDescription>
                 </DialogHeader>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <Label>Lebar (m)</Label>
-                        <Input v-model.number="editTableForm.width_meters" type="number" min="0.3" step="0.1" class="mt-1.5" />
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <Label>Lebar (m)</Label>
+                            <Input v-model.number="editTableForm.width_meters" type="number" min="0.3" step="0.1" class="mt-1.5" />
+                        </div>
+                        <div>
+                            <Label>Panjang (m)</Label>
+                            <Input v-model.number="editTableForm.length_meters" type="number" min="0.3" step="0.1" class="mt-1.5" />
+                        </div>
                     </div>
                     <div>
-                        <Label>Panjang (m)</Label>
-                        <Input v-model.number="editTableForm.length_meters" type="number" min="0.3" step="0.1" class="mt-1.5" />
+                        <Label>Tuya Device ID</Label>
+                        <Input v-model="editTableForm.tuya_device_id" placeholder="Contoh: bf1234567890abcdef" class="mt-1.5" />
+                        <p class="mt-1 text-[10px] text-muted-foreground">ID dari Aplikasi Tuya IoT untuk menyalakan/mematikan PS.</p>
+                    </div>
+                    <div>
+                        <Label>Harga Rental per Jam</Label>
+                        <Input v-model.number="editTableForm.rental_price_per_hour" type="number" min="0" step="500" class="mt-1.5" />
                     </div>
                 </div>
                 <DialogFooter>

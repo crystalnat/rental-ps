@@ -18,10 +18,15 @@ class SalesController extends Controller
         $user = Auth::user();
         $store = $this->resolveStore($user, $request);
 
-        $stores = Store::where('brand_id', $user->brand_id)
+        $storesQuery = Store::where('brand_id', $user->brand_id)
             ->whereNull('deleted_at')
-            ->where('is_active', true)
-            ->orderBy('name')
+            ->where('is_active', true);
+
+        if ($user->role !== 'owner' && $user->role !== 'admin') {
+            $storesQuery->where('id', $user->store_id);
+        }
+
+        $stores = $storesQuery->orderBy('name')
             ->get(['id', 'name', 'slug'])
             ->toArray();
 
@@ -82,6 +87,7 @@ class SalesController extends Controller
 
         $topProductsQuery = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
             ->where('orders.store_id', $store->id)
             ->where('orders.payment_status', 'paid');
         if ($request->filled('date_from')) {
@@ -93,17 +99,39 @@ class SalesController extends Controller
         if ($request->filled('type') && $request->type !== 'all') {
             $topProductsQuery->where('orders.type', $request->type);
         }
-        $topProducts = $topProductsQuery
-            ->selectRaw('order_items.product_name, SUM(order_items.quantity) as total_qty, SUM(order_items.subtotal) as total_amount')
-            ->groupBy('order_items.product_name')
-            ->orderByDesc('total_qty')
-            ->limit(15)
-            ->get()
-            ->map(fn ($r) => [
-                'product_name' => $r->product_name,
-                'total_qty'    => (float) $r->total_qty,
-                'total_amount' => (float) $r->total_amount,
+        $topProductRows = $topProductsQuery
+            ->select([
+                'order_items.product_id',
+                'order_items.product_name',
+                'order_items.quantity',
+                'order_items.subtotal',
+                'products.is_rental_package',
+                'products.included_items_json',
             ])
+            ->get();
+
+        $agg = [];
+        foreach ($topProductRows as $row) {
+            $name = $row->product_name;
+            if (!isset($agg[$name])) $agg[$name] = ['total_qty' => 0, 'total_amount' => 0];
+            $agg[$name]['total_qty']    += $row->quantity;
+            $agg[$name]['total_amount'] += $row->subtotal;
+            if ($row->is_rental_package && $row->included_items_json) {
+                $included = is_array($row->included_items_json)
+                    ? $row->included_items_json
+                    : json_decode($row->included_items_json, true) ?? [];
+                foreach ($included as $inc) {
+                    $incName = $inc['product_name'] ?? null;
+                    if (!$incName) continue;
+                    if (!isset($agg[$incName])) $agg[$incName] = ['total_qty' => 0, 'total_amount' => 0];
+                    $agg[$incName]['total_qty'] += ($inc['qty'] ?? 1) * $row->quantity;
+                }
+            }
+        }
+        $topProducts = collect($agg)
+            ->map(fn ($v, $k) => ['product_name' => $k, 'total_qty' => (float) $v['total_qty'], 'total_amount' => (float) $v['total_amount']])
+            ->sortByDesc('total_qty')
+            ->take(15)
             ->values()
             ->toArray();
 
@@ -149,6 +177,11 @@ class SalesController extends Controller
     private function resolveStore($user, Request $request): ?Store
     {
         $storeId = $request->query('store') ?? $request->input('store');
+
+        // Strictly enforce assigned store for non-owners/admins
+        if ($user->role !== 'owner' && $user->role !== 'admin') {
+            return $user->store_id ? Store::find($user->store_id) : null;
+        }
 
         if ($storeId) {
             $store = Store::where('id', $storeId)

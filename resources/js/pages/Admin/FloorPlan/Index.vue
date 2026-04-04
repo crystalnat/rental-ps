@@ -91,7 +91,7 @@ function deleteFloor(floor: Floor) {
 </script>
 
 <template>
-    <AdminLayout :title="`Denah Meja — ${store.name}`">
+    <AdminLayout :title="`Rental PS — ${store.name}`">
         <template #headerActions>
             <Link :href="`/admin/stores`">
                 <Button variant="outline" size="sm">
@@ -104,9 +104,9 @@ function deleteFloor(floor: Floor) {
         <!-- Header -->
         <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
-                <h2 class="text-lg font-semibold">Lantai & Denah</h2>
+                <h2 class="text-lg font-semibold">Lantai & Area PS</h2>
                 <p class="text-sm text-muted-foreground">
-                    Atur dimensi lantai (meter), lalu tambahkan meja, kasir, tangga, tiang, dan elemen lain dengan skala yang pas.
+                    Atur area rental PS, lalu tambahkan unit PS, kasir, dan elemen lainnya.
                 </p>
             </div>
             <Button @click="showAddDialog = true">
@@ -158,13 +158,13 @@ function deleteFloor(floor: Floor) {
                 </div>
 
                 <div class="mt-4 flex gap-4 text-xs text-muted-foreground">
-                    <span>{{ floor.tables_count }} meja</span>
+                    <span>{{ floor.tables_count }} unit PS</span>
                     <span>{{ floor.elements_count }} elemen</span>
                 </div>
 
                 <div class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed py-2.5 text-sm font-medium transition-colors group-hover:border-primary/50 group-hover:bg-muted/50">
                     <LayoutGrid class="h-4 w-4" />
-                    Buka Editor Denah
+                    Buka Area Rental PS
                 </div>
             </Link>
             </div>
@@ -200,7 +200,7 @@ function deleteFloor(floor: Floor) {
                 <DialogHeader>
                     <DialogTitle>Tambah Lantai</DialogTitle>
                     <DialogDescription>
-                        Masukkan nama dan dimensi lantai dalam meter. Skala 1m = 100px di editor.
+                        Masukkan nama dan dimensi area dalam meter. Skala 1m = 80px di editor.
                     </DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4">

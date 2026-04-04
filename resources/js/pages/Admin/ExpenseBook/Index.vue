@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StatCard from '@/components/StatCard.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +33,7 @@ interface ExpenseItem {
     expense_date: string
     created_at: string
     creator_name: string | null
+    can_edit: boolean
 }
 
 interface CategoryOption {
@@ -72,11 +73,14 @@ const categoryLabels: Record<string, string> = {
     other: 'Lainnya',
 }
 
+const userRole = computed(() => (usePage().props.auth as any).user.role)
+const isCashier = computed(() => userRole.value === 'cashier')
+
 const form = ref({
     category: 'other' as string,
     description: '',
     amount: '',
-    expense_date: props.selected_date ?? new Date().toISOString().slice(0, 10),
+    expense_date: isCashier.value ? new Date().toISOString().slice(0, 10) : (props.selected_date ?? new Date().toISOString().slice(0, 10)),
 })
 
 const filterState = ref({
@@ -143,7 +147,9 @@ watch(() => [props.selected_date, props.category_filter, props.search], ([sd, cf
     filterState.value.selected_date = (sd as string) ?? ''
     filterState.value.category = (cf as string) ?? 'all'
     filterState.value.search = (s as string) ?? ''
-    form.value.expense_date = (sd as string) || form.value.expense_date
+    if (!isCashier.value) {
+        form.value.expense_date = (sd as string) || form.value.expense_date
+    }
 })
 
 function queryParams(extra: Record<string, string | number | undefined> = {}) {
@@ -200,7 +206,9 @@ function submitForm() {
     })
 }
 
+
 function openEdit(expense: ExpenseItem) {
+    if (!expense.can_edit) return
     editTarget.value = expense
     editForm.value = {
         category: expense.category,
@@ -419,8 +427,10 @@ function onDateInputChange() {
                                             v-model="form.expense_date"
                                             type="date"
                                             class="h-10 font-medium"
+                                            :disabled="isCashier"
                                             required
                                         />
+                                        <p v-if="isCashier" class="text-[10px] text-muted-foreground italic">Kasir hanya bisa mencatat hari ini.</p>
                                     </div>
                                 </div>
                                 <Button type="submit" class="w-full h-11 font-black uppercase tracking-widest shadow-lg shadow-primary/20" :disabled="processing">
@@ -488,7 +498,7 @@ function onDateInputChange() {
                                                 <span class="text-xs text-muted-foreground font-medium">{{ e.creator_name ?? '—' }}</span>
                                             </td>
                                             <td class="px-4 md:px-6 py-4 text-right">
-                                                <div class="flex items-center justify-end gap-1">
+                                                <div v-if="e.can_edit" class="flex items-center justify-end gap-1">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -505,6 +515,9 @@ function onDateInputChange() {
                                                     >
                                                         <Trash2 class="h-4 w-4" />
                                                     </Button>
+                                                </div>
+                                                <div v-else class="flex items-center justify-end">
+                                                    <span class="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter opacity-70">Read Only</span>
                                                 </div>
                                             </td>
                                         </tr>

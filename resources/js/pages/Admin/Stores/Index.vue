@@ -71,8 +71,10 @@ function handleToggleActive(store: StoreItem) {
 
 function handleDelete() {
     if (!deleteTarget.value) return
-    router.delete(`/admin/stores/${deleteTarget.value.id}`, {
-        onFinish: () => { deleteTarget.value = null },
+    const id = deleteTarget.value.id
+    deleteTarget.value = null // Tutup modal segera agar UI responsif
+    router.delete(`/admin/stores/${id}`, {
+        preserveScroll: true,
     })
 }
 </script>

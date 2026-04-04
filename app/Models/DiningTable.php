@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-#[Fillable(['store_id', 'floor_id', 'name', 'qr_code', 'capacity', 'floor', 'status', 'is_active', 'x_meters', 'y_meters', 'width_meters', 'length_meters', 'rotation_deg', 'shape'])]
+#[Fillable(['store_id', 'floor_id', 'name', 'qr_code', 'capacity', 'floor', 'status', 'is_active', 'x_meters', 'y_meters', 'width_meters', 'length_meters', 'rotation_deg', 'shape', 'tuya_device_id', 'tuya_status', 'rental_price_per_hour'])]
 class DiningTable extends Model
 {
     public function store(): BelongsTo

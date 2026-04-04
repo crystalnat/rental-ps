@@ -5,7 +5,7 @@ import {
     LayoutDashboard, Store, Package, Tags, Users, Receipt,
     Settings, LogOut, ChevronDown, ShoppingCart,
     CreditCard, BarChart3, Wallet, UserCircle, LayoutGrid, BookOpen, Clock, RotateCcw,
-    Truck, Globe,
+    Truck, Globe, Gamepad2,
 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import type { PageProps } from '@/types'
@@ -59,29 +59,29 @@ const navigationGroups = computed((): NavGroup[] => {
             }
 
     const denahMejaItem: NavItem =
-        user.value?.role === 'owner' && stores.value.length > 0
+        (user.value?.role === 'owner' || user.value?.role === 'admin') && stores.value.length > 0
             ? stores.value.length > 1
                 ? {
-                    label: 'Denah Meja',
+                    label: 'Denah Unit PS',
                     href: `/admin/stores/${stores.value[0].id}/floor-plan`,
-                    icon: LayoutGrid,
-                    roles: ['owner'],
+                    icon: Gamepad2,
+                    roles: ['owner', 'admin'],
                     children: stores.value.map((s) => ({
                         label: s.name,
                         href: `/admin/stores/${s.id}/floor-plan`,
                     })),
                 }
                 : {
-                    label: 'Denah Meja',
+                    label: 'Denah Unit PS',
                     href: `/admin/stores/${stores.value[0].id}/floor-plan`,
-                    icon: LayoutGrid,
-                    roles: ['owner'],
+                    icon: Gamepad2,
+                    roles: ['owner', 'admin'],
                 }
             : {
-                label: 'Denah Meja',
+                label: 'Denah Unit PS',
                 href: '/admin/stores',
-                icon: LayoutGrid,
-                roles: ['owner'],
+                icon: Gamepad2,
+                roles: ['owner', 'admin'],
             }
 
     return [
@@ -110,19 +110,16 @@ const navigationGroups = computed((): NavGroup[] => {
         },
         {
             key: 'produk',
-            label: 'Produk & Inventori',
+            label: 'Produk & Toko',
             items: [
                 produkItem,
                 { label: 'Kategori', href: '/admin/categories', icon: Tags, roles: ['owner', 'admin'] },
-                { label: 'Inventaris', href: '/admin/inventory', icon: Store, roles: ['owner', 'admin'] },
-                { label: 'Purchase Order', href: '/admin/purchase-orders', icon: Receipt, roles: ['owner', 'admin'] },
             ],
         },
         {
             key: 'keuangan',
             label: 'Keuangan',
             items: [
-                { label: 'Cashflow', href: '/admin/cashflow', icon: Wallet, roles: ['owner', 'admin', 'cashier'] },
                 { label: 'Pembukuan Harian', href: '/admin/expense-book', icon: BookOpen, roles: ['owner', 'admin', 'cashier'] },
                 { label: 'Laporan', href: '/admin/reports', icon: BarChart3, roles: ['owner', 'admin'] },
             ],
@@ -132,11 +129,9 @@ const navigationGroups = computed((): NavGroup[] => {
             label: 'Manajemen',
             items: [
                 { label: 'Pelanggan', href: '/admin/customers', icon: UserCircle, roles: ['owner', 'admin'] },
-                { label: 'Supplier', href: '/admin/suppliers', icon: Truck, roles: ['owner', 'admin'] },
                 { label: 'Promo & Voucher', href: '/admin/promos', icon: Tags, roles: ['owner', 'admin'] },
                 { label: 'Karyawan', href: '/admin/users', icon: Users, roles: ['owner', 'admin'] },
                 { label: 'Cabang', href: '/admin/stores', icon: Store, roles: ['owner'] },
-                { label: 'Landing Page', href: '/admin/landing', icon: Globe, roles: ['owner', 'admin'] },
                 denahMejaItem,
             ],
         },

@@ -19,8 +19,7 @@ class StoreController extends Controller
     {
         $brand = Auth::user()->brand;
 
-        $stores = Store::withTrashed()
-            ->where('brand_id', $brand->id)
+        $stores = Store::where('brand_id', $brand->id)
             ->withCount(['orders', 'users', 'diningTables'])
             ->with(['orders' => function ($q) {
                 $q->where('payment_status', 'paid')

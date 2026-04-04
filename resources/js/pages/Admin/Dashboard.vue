@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { toRef, computed } from 'vue'
-import { router } from '@inertiajs/vue3'
-import { Link } from '@inertiajs/vue3'
+import { router, Link, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { useTableFeatures } from '@/composables/useTableFeatures'
 import StatCard from '@/components/StatCard.vue'
@@ -41,6 +40,7 @@ import {
     Receipt,
     BarChart3,
     CreditCard,
+    Gamepad2,
 } from 'lucide-vue-next'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
@@ -64,6 +64,8 @@ interface Stats {
     total_customers: number
     total_employees: number
     low_stock_count: number
+    total_units: number
+    active_units: number
 }
 
 interface TopProduct {
@@ -102,6 +104,12 @@ interface RecentOrder {
     created_at: string
 }
 
+interface TopUnit {
+    unit_name: string
+    total_revenue: number
+    sessions_count: number
+}
+
 const props = defineProps<{
     store: StoreItem | null
     stores: StoreItem[]
@@ -112,6 +120,7 @@ const props = defineProps<{
     low_stock_alerts: LowStockAlert[]
     per_store_summary: PerStoreSummary[]
     recent_orders: RecentOrder[]
+    top_units_by_sales: TopUnit[]
 }>()
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
@@ -207,6 +216,8 @@ const chartOptions = {
         },
     },
 }
+
+const isCashier = computed(() => usePage().props.auth.user.role === 'cashier')
 </script>
 
 <template>
@@ -237,13 +248,13 @@ const chartOptions = {
                     Pesanan
                 </Link>
             </Button>
-            <Button variant="outline" size="sm" as-child>
+            <Button v-if="!isCashier" variant="outline" size="sm" as-child>
                 <Link :href="route('admin.reports.index')">
                     <BarChart3 class="mr-2 h-4 w-4" />
                     Laporan
                 </Link>
             </Button>
-            <Button variant="outline" size="sm" as-child>
+            <Button v-if="!isCashier" variant="outline" size="sm" as-child>
                 <Link :href="route('admin.customers.index')">
                     <Users class="mr-2 h-4 w-4" />
                     Pelanggan
@@ -254,47 +265,76 @@ const chartOptions = {
 
         <!-- Stat Cards: Ringkasan Hari Ini -->
         <section class="mb-6">
-            <h2 class="mb-3 text-sm font-medium text-muted-foreground">Ringkasan Hari Ini</h2>
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground">{{ isCashier ? 'Informasi Kasir' : 'Ringkasan Hari Ini' }}</h2>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard variant="success">
-                    <template #title>Pendapatan</template>
+                    <template #title>Pendapatan Hari Ini</template>
                     <template #value>
                         <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(stats.today_revenue) }}</p>
                     </template>
-                    <template #subtitle>{{ stats.today_orders }} transaksi selesai</template>
+                    <template #subtitle>{{ stats.today_orders }} sesi/item terjual</template>
                     <template #icon><TrendingUp class="h-5 w-5" /></template>
                 </StatCard>
-                <StatCard :variant="stats.today_net >= 0 ? 'primary' : 'destructive'">
-                    <template #title>Net Profit</template>
+                
+                <StatCard v-if="isCashier" variant="destructive">
+                    <template #title>Pengeluaran Harian</template>
                     <template #value>
-                        <p class="text-2xl font-bold" :class="stats.today_net >= 0 ? 'text-primary' : 'text-destructive'">
-                            {{ formatCurrency(stats.today_net) }}
+                        <p class="text-2xl font-bold text-destructive">{{ formatCurrency(stats.today_expenses) }}</p>
+                    </template>
+                    <template #icon><TrendingDown class="h-5 w-5" /></template>
+                </StatCard>
+                <StatCard v-if="isCashier" variant="muted">
+                    <template #title>Produk</template>
+                    <template #value>
+                        <p class="text-2xl font-bold">{{ stats.total_products }}</p>
+                    </template>
+                    <template #subtitle>Total produk aktif</template>
+                    <template #icon><Package class="h-5 w-5" /></template>
+                </StatCard>
+                <StatCard v-if="isCashier" :variant="stats.low_stock_count > 0 ? 'warning' : 'muted'">
+                    <template #title>Stok Rendah</template>
+                    <template #value>
+                        <p class="text-2xl font-bold" :class="stats.low_stock_count > 0 ? 'text-amber-600 dark:text-amber-400' : ''">
+                            {{ stats.low_stock_count }}
                         </p>
                     </template>
-                    <template #subtitle>Pengeluaran: {{ formatCurrency(stats.today_expenses) }}</template>
-                    <template #icon><Wallet class="h-5 w-5" /></template>
+                    <template #subtitle>Produk perlu restock</template>
+                    <template #icon><AlertTriangle class="h-5 w-5" /></template>
                 </StatCard>
-                <StatCard variant="warning">
-                    <template #title>Pesanan Masuk</template>
-                    <template #value>
-                        <p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ stats.pending_orders }}</p>
-                    </template>
-                    <template #subtitle>Menunggu diproses</template>
-                    <template #icon><Clock class="h-5 w-5" /></template>
-                </StatCard>
-                <StatCard variant="default">
-                    <template #title>Total Transaksi</template>
-                    <template #value>
-                        <p class="text-2xl font-bold">{{ stats.today_orders }}</p>
-                    </template>
-                    <template #subtitle>Hari ini</template>
-                    <template #icon><ShoppingCart class="h-5 w-5" /></template>
-                </StatCard>
+
+                <template v-if="!isCashier">
+                    <StatCard :variant="stats.today_net >= 0 ? 'primary' : 'destructive'">
+                        <template #title>Net Profit</template>
+                        <template #value>
+                            <p class="text-2xl font-bold" :class="stats.today_net >= 0 ? 'text-primary' : 'text-destructive'">
+                                {{ formatCurrency(stats.today_net) }}
+                            </p>
+                        </template>
+                        <template #subtitle>Biaya Listrik/Lain: {{ formatCurrency(stats.today_expenses) }}</template>
+                        <template #icon><Wallet class="h-5 w-5" /></template>
+                    </StatCard>
+                    <StatCard :variant="stats.active_units > 0 ? 'success' : 'muted'">
+                        <template #title>Unit PS Aktif</template>
+                        <template #value>
+                            <p class="text-2xl font-bold" :class="stats.active_units > 0 ? 'text-emerald-600' : ''">{{ stats.active_units }} / {{ stats.total_units }}</p>
+                        </template>
+                        <template #subtitle>Unit sedang disewa/on</template>
+                        <template #icon><Gamepad2 class="h-5 w-5" /></template>
+                    </StatCard>
+                    <StatCard variant="default">
+                        <template #title>Total Transaksi</template>
+                        <template #value>
+                            <p class="text-2xl font-bold">{{ stats.today_orders }}</p>
+                        </template>
+                        <template #subtitle>Sesi rental & jajan hari ini</template>
+                        <template #icon><ShoppingCart class="h-5 w-5" /></template>
+                    </StatCard>
+                </template>
             </div>
         </section>
 
-        <!-- Stat Cards: Lainnya -->
-        <section class="mb-6">
+        <!-- Stat Cards: Lainnya (Hidden for Cashier) -->
+        <section v-if="!isCashier" class="mb-6">
             <h2 class="mb-3 text-sm font-medium text-muted-foreground">Detail & Master Data</h2>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard variant="destructive">
@@ -312,12 +352,12 @@ const chartOptions = {
                     <template #icon><CalendarDays class="h-5 w-5" /></template>
                 </StatCard>
                 <StatCard variant="default">
-                    <template #title>Pesanan Bulan Ini</template>
+                    <template #title>Total Sesi & Transaksi</template>
                     <template #value>
                         <p class="text-2xl font-bold">{{ stats.month_orders ?? 0 }}</p>
                     </template>
-                    <template #subtitle>Transaksi terbayar</template>
-                    <template #icon><Receipt class="h-5 w-5" /></template>
+                    <template #subtitle>Akumulasi bulan ini</template>
+                    <template #icon><Gamepad2 class="h-5 w-5" /></template>
                 </StatCard>
                 <StatCard variant="destructive">
                     <template #title>Pengeluaran Bulan Ini</template>
@@ -347,7 +387,7 @@ const chartOptions = {
                     <template #value>
                         <p class="text-2xl font-bold">{{ stats.total_employees }}</p>
                     </template>
-                    <template #subtitle>Karyawan aktif</template>
+                    <template #subtitle>Operator aktif</template>
                     <template #icon><UserCog class="h-5 w-5" /></template>
                 </StatCard>
                 <StatCard :variant="stats.low_stock_count > 0 ? 'warning' : 'muted'">
@@ -363,8 +403,8 @@ const chartOptions = {
             </div>
         </section>
 
-        <!-- Charts -->
-        <section class="mb-6">
+        <!-- Charts (Hidden for Cashier) -->
+        <section v-if="!isCashier" class="mb-6">
             <h2 class="mb-3 text-sm font-medium text-muted-foreground">Grafik 7 Hari Terakhir</h2>
             <div class="grid gap-6 lg:grid-cols-2">
                 <Card variant="elevated">
@@ -417,13 +457,13 @@ const chartOptions = {
             </CardContent>
         </Card>
 
-        <!-- Top Products & Low Stock -->
-        <section class="mb-6">
+        <!-- Top Products & Low Stock (Hidden for Cashier, replaced by individual stat cards) -->
+        <section v-if="!isCashier" class="mb-6">
             <div class="grid gap-6 lg:grid-cols-2">
             <Card variant="elevated">
                 <CardHeader>
                     <CardTitle>Produk Terlaris Hari Ini</CardTitle>
-                    <CardDescription>Top 5 berdasarkan jumlah terjual</CardDescription>
+                    <CardDescription>Jajanan & Voucher terlaris</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ul v-if="top_products.length > 0" class="space-y-3">
@@ -433,9 +473,10 @@ const chartOptions = {
                             class="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0"
                         >
                             <span class="font-medium">{{ p.product_name }}</span>
-                            <span class="text-sm text-muted-foreground">
-                                {{ p.total_qty }} × {{ formatCurrency(p.total_amount) }}
-                            </span>
+                            <div class="text-right">
+                                <p class="text-xs text-muted-foreground">{{ p.total_qty }} terjual</p>
+                                <p class="text-sm font-semibold">{{ formatCurrency(p.total_amount) }}</p>
+                            </div>
                         </li>
                     </ul>
                     <p v-else class="py-4 text-center text-sm text-muted-foreground">
@@ -443,6 +484,40 @@ const chartOptions = {
                     </p>
                 </CardContent>
             </Card>
+            <Card variant="elevated">
+                <CardHeader>
+                    <CardTitle>Unit PS Teraktif (Bulan Ini)</CardTitle>
+                    <CardDescription>Berdasarkan total omzet & jumlah sesi</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ul v-if="top_units_by_sales.length > 0" class="space-y-3">
+                        <li
+                            v-for="(u, i) in top_units_by_sales"
+                            :key="i"
+                            class="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0"
+                        >
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
+                                    {{ i + 1 }}
+                                </div>
+                                <span class="font-medium">{{ u.unit_name }}</span>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-muted-foreground">{{ u.sessions_count }} sesi</p>
+                                <p class="text-sm font-semibold">{{ formatCurrency(u.total_revenue) }}</p>
+                            </div>
+                        </li>
+                    </ul>
+                    <p v-else class="py-4 text-center text-sm text-muted-foreground">
+                        Belum ada riwayat sesi bulan ini
+                    </p>
+                </CardContent>
+            </Card>
+            </div>
+        </section>
+
+        <!-- Alerts -->
+        <section v-if="!isCashier" class="mb-6">
             <Card variant="elevated" :class="low_stock_alerts.length > 0 ? 'border-amber-500/40' : ''">
                 <CardHeader>
                     <CardTitle class="flex items-center gap-2">
@@ -474,20 +549,19 @@ const chartOptions = {
                     </p>
                 </CardContent>
             </Card>
-            </div>
         </section>
 
         <!-- Recent Orders -->
         <Card variant="elevated">
             <CardHeader>
-                <CardTitle>Pesanan Terbaru</CardTitle>
-                <CardDescription>15 transaksi terakhir</CardDescription>
+                <CardTitle>Rental & Pesanan Terbaru</CardTitle>
+                <CardDescription>15 transaksi terakhir di dashboard</CardDescription>
             </CardHeader>
             <CardContent class="p-0">
                 <TableToolbar
                     v-if="recent_orders.length > 0"
                     v-model="searchQuery"
-                    search-placeholder="Cari kode, customer, meja, toko..."
+                    search-placeholder="Cari kode, customer, unit, toko..."
                     :has-active-filters="hasActiveFilters"
                     @clear="clearFilters"
                 >
@@ -517,7 +591,7 @@ const chartOptions = {
                                     :sort-dir="sortDir"
                                     @sort="setSort"
                                 />
-                                <th class="px-6 py-3">Meja</th>
+                                <th class="px-6 py-3">Unit PS</th>
                                 <th v-if="per_store_summary.length > 1" class="px-6 py-3">Toko</th>
                                 <TableHeadSortable
                                     label="Status"

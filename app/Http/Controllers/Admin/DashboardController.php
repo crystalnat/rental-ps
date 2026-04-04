@@ -24,10 +24,15 @@ class DashboardController extends Controller
         $user = Auth::user();
         $storeIds = $this->getStoreIds($user, $request);
 
-        $stores = Store::where('brand_id', $user->brand_id)
+        $storesQuery = Store::where('brand_id', $user->brand_id)
             ->whereNull('deleted_at')
-            ->where('is_active', true)
-            ->orderBy('name')
+            ->where('is_active', true);
+
+        if (!$user->isOwner() && !$user->isAdmin()) {
+            $storesQuery->where('id', $user->store_id);
+        }
+
+        $stores = $storesQuery->orderBy('name')
             ->get(['id', 'name', 'slug'])
             ->toArray();
 
@@ -59,12 +64,18 @@ class DashboardController extends Controller
             'low_stock_alerts' => $lowStockAlerts,
             'per_store_summary' => $perStoreSummary,
             'recent_orders' => $recentOrders,
+            'top_units_by_sales' => $this->buildTopUnitsBySales($storeIds, $today),
         ]);
     }
 
     private function getStoreIds($user, Request $request): Collection
     {
         $storeId = $request->query('store') ?? $request->input('store');
+
+        // If not owner/admin, strictly use only their assigned store_id
+        if (!$user->isOwner() && !$user->isAdmin()) {
+            return $user->store_id ? collect([$user->store_id]) : collect();
+        }
 
         if ($storeId) {
             $store = Store::where('id', $storeId)
@@ -141,6 +152,10 @@ class DashboardController extends Controller
         $totalCustomers = Customer::where('brand_id', $brandId)->count();
         $totalEmployees = User::where('brand_id', $brandId)->where('role', '!=', 'owner')->where('is_active', true)->count();
 
+        // PS specific
+        $totalUnits = \App\Models\DiningTable::whereIn('store_id', $storeIds)->count();
+        $activeUnits = \App\Models\DiningTable::whereIn('store_id', $storeIds)->where('tuya_status', true)->count();
+
         return [
             'today_revenue'   => $todayRevenue,
             'today_orders'    => $todayOrders,
@@ -153,6 +168,8 @@ class DashboardController extends Controller
             'total_products'  => $totalProducts,
             'total_customers' => $totalCustomers,
             'total_employees' => $totalEmployees,
+            'total_units'     => $totalUnits,
+            'active_units'    => $activeUnits,
         ];
     }
 
@@ -218,21 +235,60 @@ class DashboardController extends Controller
 
     private function buildTopProducts(Collection $storeIds, string $today, int $limit): array
     {
-        return OrderItem::query()
+        $rows = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
             ->whereIn('orders.store_id', $storeIds)
             ->where('orders.payment_status', 'paid')
             ->whereDate('orders.created_at', $today)
-            ->selectRaw('order_items.product_name, SUM(order_items.quantity) as total_qty, SUM(order_items.subtotal) as total_amount')
-            ->groupBy('order_items.product_name')
-            ->orderByDesc('total_qty')
-            ->limit($limit)
-            ->get()
-            ->map(fn ($r) => [
-                'product_name' => $r->product_name,
-                'total_qty'    => (float) $r->total_qty,
-                'total_amount' => (float) $r->total_amount,
+            ->select([
+                'order_items.product_id',
+                'order_items.product_name',
+                'order_items.quantity',
+                'order_items.subtotal',
+                'products.is_rental_package',
+                'products.included_items_json',
             ])
+            ->get();
+
+        // Aggregate: product_name => [total_qty, total_amount]
+        $agg = [];
+
+        foreach ($rows as $row) {
+            $name = $row->product_name;
+            if (!isset($agg[$name])) {
+                $agg[$name] = ['total_qty' => 0, 'total_amount' => 0];
+            }
+            $agg[$name]['total_qty']    += $row->quantity;
+            $agg[$name]['total_amount'] += $row->subtotal;
+
+            // Expand included items dari rental package
+            if ($row->is_rental_package && $row->included_items_json) {
+                $included = is_array($row->included_items_json)
+                    ? $row->included_items_json
+                    : json_decode($row->included_items_json, true) ?? [];
+
+                foreach ($included as $inc) {
+                    $incName = $inc['product_name'] ?? null;
+                    $incQty  = ($inc['qty'] ?? 1) * $row->quantity;
+                    if (!$incName) continue;
+                    if (!isset($agg[$incName])) {
+                        $agg[$incName] = ['total_qty' => 0, 'total_amount' => 0];
+                    }
+                    $agg[$incName]['total_qty'] += $incQty;
+                    // amount = 0 karena sudah termasuk harga paket
+                }
+            }
+        }
+
+        return collect($agg)
+            ->map(fn ($v, $k) => [
+                'product_name' => $k,
+                'total_qty'    => (float) $v['total_qty'],
+                'total_amount' => (float) $v['total_amount'],
+            ])
+            ->sortByDesc('total_qty')
+            ->take($limit)
             ->values()
             ->toArray();
     }
@@ -309,6 +365,23 @@ class DashboardController extends Controller
                 'store_name'     => $o->store?->name,
                 'created_at'     => $o->created_at->format('Y-m-d H:i:s'),
             ])
+            ->toArray();
+    }
+
+    private function buildTopUnitsBySales(Collection $storeIds, string $today): array
+    {
+        return \App\Models\Order::query()
+            ->join('dining_tables', 'orders.table_id', '=', 'dining_tables.id')
+            ->whereIn('orders.store_id', $storeIds)
+            ->where('orders.payment_status', 'paid')
+            // Optionally filter for today or all time. User said 'tracking', I'll show top for the month.
+            ->whereMonth('orders.created_at', now()->month)
+            ->whereYear('orders.created_at', now()->year)
+            ->selectRaw('dining_tables.name as unit_name, SUM(orders.final_amount) as total_revenue, COUNT(orders.id) as sessions_count')
+            ->groupBy('dining_tables.id', 'dining_tables.name')
+            ->orderByDesc('total_revenue')
+            ->limit(5)
+            ->get()
             ->toArray();
     }
 }

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'subtotal', 'discount_amount', 'tax_rate', 'tax_amount', 'final_amount',
     'payment_method', 'payment_status', 'cash_received', 'change_amount', 'paid_at',
     'created_at', 'completed_at', 'cancelled_at', 'cancellation_reason',
+    'is_rental', 'rental_started_at', 'rental_duration_minutes', 'rental_end_at',
 ])]
 class Order extends Model
 {
@@ -78,6 +79,10 @@ class Order extends Model
             'paid_at'             => 'datetime',
             'completed_at'        => 'datetime',
             'cancelled_at'        => 'datetime',
+            'is_rental'           => 'boolean',
+            'rental_started_at'   => 'datetime',
+            'rental_end_at'       => 'datetime',
+            'rental_duration_minutes' => 'integer',
         ];
     }
 }

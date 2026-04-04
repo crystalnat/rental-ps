@@ -12,11 +12,11 @@ import {
 } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
-import CashierFloorPlan from '@/components/CashierFloorPlan.vue'
+import RentalPanel from '@/components/RentalPanel.vue'
 import {
     Search, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone,
-    ShoppingBag, Mic, MicOff, LayoutGrid, X, Clock, Loader2, RotateCcw, ShoppingCart,
-    TicketPercent, Receipt
+    ShoppingBag, Mic, MicOff, X, Clock, Loader2, RotateCcw, ShoppingCart,
+    TicketPercent, Receipt, Gamepad2, Package,
 } from 'lucide-vue-next'
 import axios from 'axios'
 import FeedbackModal from '@/components/FeedbackModal.vue'
@@ -34,6 +34,9 @@ interface Product {
     sell_price: number
     discount_percent: number
     image_url: string | null
+    is_rental_package: boolean
+    rental_duration_minutes: number | null
+    included_items_json: any[]
     modifier_groups?: Array<{
         id: number
         name: string
@@ -119,6 +122,9 @@ const props = defineProps<{
             length_meters: number
             rotation_deg: number
             shape: string
+            tuya_device_id: string | null
+            tuya_status: boolean
+            rental_price_per_hour: number
             active_orders: Array<{
                 id: number
                 order_code: string
@@ -126,6 +132,10 @@ const props = defineProps<{
                 final_amount: number
                 items_count: number
                 created_at: string
+                is_rental: boolean
+                rental_started_at: string | null
+                rental_end_at: string | null
+                rental_duration_minutes: number | null
             }>
             has_orders: boolean
         }>
@@ -173,6 +183,7 @@ const showFeedbackModal = ref(false)
 const currentFeedbackOrderId = ref<number | null>(null)
 
 const showMobileCart = ref(false)
+const activeTab = ref<'rental' | 'produk'>('rental')
 const paymentMethod = ref<string>('')
 const cashReceived = ref('')
 const processing = ref(false)
@@ -348,6 +359,34 @@ const BETWEEN_WORD_QTY_AND_NEXT = new RegExp(
     'giu',
 )
 
+/** Suffixes to strip from end of words (Indonesian focus) */
+const SUFFIX_REGEX = /(nya|kan|i|an)$/i
+const DELETE_KEYWORDS = /^(hapus|kurang|buang|delete|remove|cancel)\s+/i
+
+/** Simple Levenshtein distance for fuzzy matching */
+function getLevenshteinDistance(a: string, b: string): number {
+    const tmp = []
+    for (let i = 0; i <= a.length; i++) tmp[i] = [i]
+    for (let j = 0; j <= b.length; j++) tmp[0][j] = j
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            tmp[i][j] = Math.min(
+                tmp[i - 1][j] + 1,
+                tmp[i][j - 1] + 1,
+                tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+            )
+        }
+    }
+    return tmp[a.length][b.length]
+}
+
+function getSimilarity(s1: string, s2: string): number {
+    const longer = s1.length > s2.length ? s1 : s2
+    const shorter = s1.length > s2.length ? s2 : s1
+    if (longer.length === 0) return 1.0
+    return (longer.length - getLevenshteinDistance(longer, shorter)) / longer.length
+}
+
 function splitChainedDigitSegments(t: string): string[] {
     const segments: string[] = []
     let start = 0
@@ -380,9 +419,9 @@ function expandChainedSegments(part: string): string[] {
     return segs
 }
 
-function parseSpeechToItems(text: string): { productName: string; qty: number }[] {
+function parseSpeechToItems(text: string): { productName: string; qty: number; isDelete: boolean }[] {
     const parts = text.split(SPLIT_BY).filter((p) => p && !/^(dan|sama|lagi|,)$/i.test(p))
-    const items: { productName: string; qty: number }[] = []
+    const items: { productName: string; qty: number; isDelete: boolean }[] = []
 
     for (let part of parts) {
         part = part.replace(FILLER_START, '').replace(FILLER_END, '').trim()
@@ -390,8 +429,13 @@ function parseSpeechToItems(text: string): { productName: string; qty: number }[
 
         const subparts = expandChainedSegments(part)
         for (const raw of subparts) {
-            const segment = raw.trim()
+            let segment = raw.trim()
             if (!segment) continue
+
+            const isDelete = DELETE_KEYWORDS.test(segment)
+            if (isDelete) {
+                segment = segment.replace(DELETE_KEYWORDS, '').trim()
+            }
 
             const numEnd = segment.match(/\s+(\d+)\s*$/)
             const numStart = segment.match(/^(\d+)\s+(.+)$/)
@@ -413,7 +457,7 @@ function parseSpeechToItems(text: string): { productName: string; qty: number }[
             }
 
             if (productName && qty > 0) {
-                items.push({ productName: productName.toLowerCase(), qty })
+                items.push({ productName: productName.toLowerCase(), qty, isDelete })
             }
         }
     }
@@ -426,63 +470,96 @@ function compactLower(s: string): string {
 }
 
 function findBestProductMatch(productName: string, products: Product[]): Product | null {
-    const words = productName.split(/\s+/).filter((w) => w.length > 0)
+    // Strip suffixes like "-nya", "-kan" from each word in input
+    const words = productName.split(/\s+/)
+        .filter((w) => w.length > 0)
+        .map(w => w.replace(SUFFIX_REGEX, ''))
+
     if (words.length === 0) return null
+    const cleanPN = words.join(' ')
+    const cq = compactLower(cleanPN)
 
     let best: { product: Product; score: number } | null = null
 
     for (const p of products) {
         const name = p.name.toLowerCase()
-        const cat = (p.category_name ?? '').toLowerCase()
-        const searchText = `${name} ${cat}`
-        const cq = compactLower(productName)
         const cn = compactLower(name)
+        const cat = (p.category_name ?? '').toLowerCase()
+        const fullName = `${name} ${cat}`
+        
+        let score = 0
 
-        if (name.includes(productName)) {
-            const score = 1000 + productName.length
-            if (!best || score > best.score) best = { product: p, score }
-        } else if (productName.includes(name)) {
-            const score = 500 + name.length
-            if (!best || score > best.score) best = { product: p, score }
-        } else if (cq.length > 0 && cn.length > 0 && (cq === cn || cn.includes(cq) || cq.includes(cn))) {
-            const score = 520 + cq.length
-            if (!best || score > best.score) best = { product: p, score }
-        } else {
-            const matchCount = words.filter((w) => searchText.includes(w)).length
-            if (matchCount === words.length) {
-                const score = 100 + matchCount * 10 - name.length / 100
-                if (!best || score > best.score) best = { product: p, score }
-            } else if (matchCount > 0) {
-                const score = matchCount - name.length / 1000
-                if (!best || score > best.score) best = { product: p, score }
+        // 1. Exact or include matches (High weight)
+        if (cn === cq) score = 5000
+        else if (cn.includes(cq)) score = 2000 + cq.length
+        else if (cq.includes(cn)) score = 1500 + cn.length
+        
+        // 2. Word overlap
+        const nameWords = name.split(/\s+/).map(w => w.replace(SUFFIX_REGEX, ''))
+        const overlapCount = words.filter(w => nameWords.some(nw => nw.includes(w) || w.includes(nw))).length
+        if (overlapCount === words.length) score += 1000
+        else if (overlapCount > 0) score += (overlapCount * 200)
+
+        // 3. Fuzzy similarity (Levenshtein based)
+        const similarity = getSimilarity(cn, cq)
+        if (similarity > 0.8) score += (similarity * 800)
+        
+        // Bonus for SKU match if input looks like a code
+        if (p.sku && p.sku.toLowerCase() === cleanPN) score += 6000
+
+        if (score > 0) {
+            if (!best || score > best.score) {
+                best = { product: p, score }
             }
         }
     }
 
-    return best?.product ?? null
+    // Threshold check
+    return (best && best.score > 300) ? best.product : null
 }
 
 function processSpeechResult(transcript: string) {
     const items = parseSpeechToItems(transcript)
-    const added: string[] = []
+    const activeActions: string[] = []
     const notFound: string[] = []
 
-    for (const { productName, qty } of items) {
+    for (const { productName, qty, isDelete } of items) {
         const product = findBestProductMatch(productName, props.products)
         if (product) {
-            addToCart(product, qty)
-            added.push(`${product.name} × ${qty}`)
+            if (isDelete) {
+                removeFromCartCompletely(product, qty)
+                activeActions.push(`Hapus: ${product.name} × ${qty}`)
+            } else {
+                addToCart(product, qty)
+                activeActions.push(`Tambah: ${product.name} × ${qty}`)
+            }
         } else {
             notFound.push(productName)
         }
     }
 
-    if (added.length > 0) {
+    if (activeActions.length > 0) {
         sttError.value = null
     }
     if (notFound.length > 0) {
         sttError.value = `Tidak ditemukan: ${notFound.join(', ')}`
         setTimeout(() => { sttError.value = null }, 4000)
+    }
+}
+
+function removeFromCartCompletely(product: Product, qty: number) {
+    // Cari item terakhir dengan product_id yang sama
+    for (let i = 0; i < qty; i++) {
+        const idx = [...cart.value].reverse().findIndex(item => item.product_id === product.id)
+        if (idx !== -1) {
+            const actualIdx = cart.value.length - 1 - idx
+            const item = cart.value[actualIdx]
+            if (item.quantity > 1) {
+                item.quantity -= 1
+            } else {
+                cart.value.splice(actualIdx, 1)
+            }
+        }
     }
 }
 
@@ -658,6 +735,14 @@ async function applyPromoCode() {
     }
 }
 
+function addProductFromRental({ product, tableId }: { product: any; tableId: number | null }) {
+    if (tableId) {
+        orderType.value = 'dine_in'
+        selectedTableId.value = tableId
+    }
+    addToCart(product as Product)
+}
+
 function removePromo() {
     activePromo.value = null
     promoCodeInput.value = ''
@@ -673,6 +758,15 @@ const canCheckout = computed(() => cart.value.length > 0)
 
 function addToCart(product: Product, qty = 1) {
     if (product.track_stock && product.current_stock < qty) return
+
+    // Special handling for PS Rental Packages
+    if (product.is_rental_package) {
+        if (!selectedTableId.value) {
+            showFloorPlan.value = true
+            alert(`Pilih Unit PS terlebih dahulu untuk memulai paket "${product.name}".`)
+            return
+        }
+    }
 
     // If product has modifiers, show dialog instead of direct add
     if (product.modifier_groups && product.modifier_groups.length > 0) {
@@ -939,136 +1033,120 @@ const showQrOrAccount = computed(() => {
             </Transition>
         </Teleport>
 
+        <!-- 2-Tab Layout -->
         <div class="flex flex-col md:flex-row h-[calc(100vh-7rem)] gap-4 pb-[72px] md:pb-0 md:overflow-hidden relative">
-            <!-- Product Grid -->
-            <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card h-full lg:h-auto">
-                <div class="flex flex-col md:flex-row md:items-center gap-2 border-b p-3">
+            <!-- Tab switcher + main content area -->
+            <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card h-full">
+                <!-- Tab buttons -->
+                <div class="flex shrink-0 items-center gap-1 border-b bg-muted/30 px-3 py-2">
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+                        :class="activeTab === 'rental' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                        @click="activeTab = 'rental'"
+                    >
+                        <Gamepad2 class="h-4 w-4" />
+                        Rental PS
+                    </button>
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+                        :class="activeTab === 'produk' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                        @click="activeTab = 'produk'"
+                    >
+                        <Package class="h-4 w-4" />
+                        Produk
+                    </button>
+
+                    <!-- Shift & store info in tab bar -->
+                    <div class="ml-auto flex items-center gap-2">
+                        <div v-if="activeShift" class="hidden md:flex items-center gap-1.5 rounded-full bg-muted/50 border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                            <Clock class="h-3 w-3 text-primary" />
+                            <span>Shift #{{ activeShift.id }}</span>
+                        </div>
+                        <select
+                            v-if="stores.length > 1"
+                            :value="store.id"
+                            class="filter-select flex h-8 rounded-md border border-input bg-background pl-3 pr-8 py-1 text-xs text-foreground"
+                            @change="changeStore(Number(($event.target as HTMLSelectElement).value))"
+                        >
+                            <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
+                        <Button
+                            v-if="activeShift"
+                            variant="outline"
+                            size="sm"
+                            class="h-8 text-destructive border-destructive/20 hover:bg-destructive/10"
+                            @click="router.visit(`/admin/shifts/${activeShift.id}`)"
+                        >
+                            <Clock class="mr-1.5 h-3.5 w-3.5" />
+                            <span class="text-xs hidden sm:inline">Tutup Shift</span>
+                        </Button>
+                    </div>
+                </div>
+
+                <!-- TAB: RENTAL -->
+                <div v-show="activeTab === 'rental'" class="flex-1 min-h-0 overflow-hidden p-3">
+                    <RentalPanel
+                        :store="store"
+                        :floor-plan="floor_plan ?? []"
+                        :products="products"
+                        :cart="cart"
+                        @add-to-cart="addProductFromRental"
+                    />
+                </div>
+
+                <!-- TAB: PRODUK -->
+                <div v-show="activeTab === 'produk'" class="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <!-- Search & Mic -->
-                    <div class="flex flex-1 items-center gap-2 min-w-0">
+                    <div class="flex items-center gap-2 border-b px-3 py-2">
                         <div class="relative flex-1">
                             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                v-model="searchQuery"
-                                placeholder="Cari produk..."
-                                class="pl-9 w-full"
-                            />
+                            <Input v-model="searchQuery" placeholder="Cari produk..." class="pl-9 w-full" />
                         </div>
                         <Button
-                            v-if="orderType === 'walk_in'"
                             :variant="isListening ? 'default' : 'outline'"
                             size="icon"
                             class="shrink-0"
-                            :title="sttSupported ? 'Ucapkan nama produk (Speech-to-Text)' : 'Speech-to-Text tidak didukung'"
                             :disabled="!sttSupported"
                             @click="toggleSpeechToText"
                         >
                             <Mic v-if="!isListening" class="h-4 w-4" />
                             <MicOff v-else class="h-4 w-4 animate-pulse" />
                         </Button>
-                    </div>
-
-                    <div v-if="activeShift" class="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/50 border text-[11px] font-medium text-muted-foreground">
-                        <div class="flex items-center gap-1.5">
-                            <Clock class="h-3 w-3 text-primary" />
-                            <span>Shift: #{{ activeShift.id }}</span>
-                        </div>
-                        <div class="w-px h-3 bg-border" />
-                        <div class="flex items-center gap-1.5">
-                            <Banknote class="h-3 w-3 text-emerald-500" />
-                            <span>Modal: {{ formatCurrency(activeShift.opening_cash) }}</span>
-                        </div>
-                    </div>
-                    
-                    <p v-if="sttError" class="text-xs text-destructive">{{ sttError }}</p>
-                         <!-- Filters & Layout (Horizontal Scroll on Mobile) -->
-                    <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                        
-                        <!-- Select Toko -->
-                        <select
-                            v-if="stores.length > 1"
-                            :value="store.id"
-                            class="filter-select flex shrink-0 h-9 rounded-md border border-input bg-background pl-3 pr-9 py-1 text-sm text-foreground"
-                            @change="changeStore(Number(($event.target as HTMLSelectElement).value))"
-                        >
-                            <option
-                                v-for="s in stores"
-                                :key="s.id"
-                                :value="s.id"
-                            >
-                                {{ s.name }}
-                            </option>
-                        </select>
-
-                        <!-- Denah Meja -->
                         <Button
                             variant="outline"
                             size="sm"
-                            class="shrink-0 h-9"
-                            title="Lihat denah meja & pesanan"
-                            @click="showFloorPlan = true"
-                        >
-                            <LayoutGrid class="mr-2 h-4 w-4" />
-                            <span class="text-xs">Meja</span>
-                        </Button>
-
-                        <!-- Tutup Shift -->
-                        <Button
-                            v-if="activeShift"
-                            variant="outline"
-                            size="sm"
-                            class="shrink-0 h-9 text-destructive border-destructive/20 hover:bg-destructive/10"
-                            @click="router.visit(`/admin/shifts/${activeShift.id}`)"
-                        >
-                            <Clock class="mr-2 h-4 w-4" />
-                            <span class="text-xs">Tutup Shift</span>
-                        </Button>
-
-                        <!-- Refund -->
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            class="shrink-0 h-9 hidden md:flex"
-                            title="Proses Pengembalian / Refund"
+                            class="shrink-0 hidden md:flex h-9"
                             @click="router.visit('/admin/refunds')"
                         >
-                            <RotateCcw class="h-4 w-4 mr-2" />
+                            <RotateCcw class="h-4 w-4 mr-1.5" />
                             <span class="text-xs">Refund</span>
                         </Button>
+                        <p v-if="sttError" class="text-xs text-destructive">{{ sttError }}</p>
                     </div>
-                </div>
-
-                <!-- Category Pills Bar -->
-                <div class="border-b bg-muted/40 px-3 py-2.5">
-                    <div class="flex items-center gap-2 overflow-x-auto pb-2 flex-nowrap scrollbar-thin">
-                        <button
-                            type="button"
-                            class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border shadow-sm uppercase tracking-wide"
-                            :class="categoryFilter === 'all' 
-                                ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
-                                : 'bg-white text-muted-foreground border-input hover:border-primary/50'"
-                            @click="categoryFilter = 'all'"
-                        >
-                            Semua
-                        </button>
-                        <button
-                            v-for="c in props.categories"
-                            :key="c.id"
-                            type="button"
-                            class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border shadow-sm whitespace-nowrap uppercase tracking-wide"
-                            :class="categoryFilter === String(c.id) 
-                                ? 'text-white border-transparent' 
-                                : 'bg-white text-muted-foreground border-input hover:border-primary/50'"
-                            :style="categoryFilter === String(c.id) 
-                                ? { backgroundColor: c.color || '#3b82f6' }
-                                : {}"
-                            @click="categoryFilter = String(c.id)"
-                        >
-                            {{ c.name }}
-                        </button>
+                    <!-- Category Pills -->
+                    <div class="border-b bg-muted/40 px-3 py-2.5">
+                        <div class="flex items-center gap-2 overflow-x-auto pb-2 flex-nowrap scrollbar-thin">
+                            <button
+                                type="button"
+                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border shadow-sm uppercase tracking-wide"
+                                :class="categoryFilter === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-white text-muted-foreground border-input hover:border-primary/50'"
+                                @click="categoryFilter = 'all'"
+                            >Semua</button>
+                            <button
+                                v-for="c in props.categories"
+                                :key="c.id"
+                                type="button"
+                                class="shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border shadow-sm whitespace-nowrap uppercase tracking-wide"
+                                :class="categoryFilter === String(c.id) ? 'text-white border-transparent' : 'bg-white text-muted-foreground border-input hover:border-primary/50'"
+                                :style="categoryFilter === String(c.id) ? { backgroundColor: c.color || '#3b82f6' } : {}"
+                                @click="categoryFilter = String(c.id)"
+                            >{{ c.name }}</button>
+                        </div>
                     </div>
-                </div>
-
-                <div class="flex-1 overflow-y-auto p-3">
+                    <!-- Products grid -->
+                    <div class="flex-1 overflow-y-auto p-3">
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                         <button
                             v-for="p in filteredProducts"
@@ -1118,7 +1196,9 @@ const showQrOrAccount = computed(() => {
                         </button>
                     </div>
                 </div>
-            </div>
+                </div>
+                <!-- end TAB: PRODUK -->
+                </div>
 
             <div
                 v-if="showMobileCart"
@@ -1400,7 +1480,7 @@ const showQrOrAccount = computed(() => {
 
         <!-- Payment Dialog -->
         <Dialog v-model:open="showPaymentDialog">
-            <DialogContent class="max-w-md">
+            <DialogContent class="w-[95vw] max-w-md rounded-xl">
                 <DialogHeader>
                     <DialogTitle>Pembayaran</DialogTitle>
                     <DialogDescription>
@@ -1567,7 +1647,7 @@ const showQrOrAccount = computed(() => {
 
         <!-- Mandatory Open Shift Dialog -->
         <Dialog :open="showOpenShiftDialog" @update:open="activeShift ? (showOpenShiftDialog = $event) : null">
-            <DialogContent class="max-w-md" :hide-close="!activeShift">
+            <DialogContent class="w-[95vw] max-w-md rounded-xl" :hide-close="!activeShift">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
                         <Clock class="h-5 w-5 text-primary" />
@@ -1621,7 +1701,7 @@ const showQrOrAccount = computed(() => {
 
         <!-- Modifier Selection Dialog -->
         <Dialog v-model:open="showModifierDialog">
-            <DialogContent class="max-w-md" v-if="selectedProductForModifiers">
+            <DialogContent class="w-[95vw] max-w-md rounded-xl" v-if="selectedProductForModifiers">
                 <DialogHeader>
                     <DialogTitle>Pilih Varian & Topping</DialogTitle>
                     <DialogDescription>

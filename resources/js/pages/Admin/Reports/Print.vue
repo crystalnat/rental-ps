@@ -98,7 +98,7 @@ onMounted(() => { setTimeout(() => { ready.value = true; setTimeout(() => window
                     <div style="text-align:right">
                         <div class="cover-badge">PERIODE LAPORAN</div>
                         <p class="cover-dt">{{ date_from }} — {{ date_to }}</p>
-                        <p class="cover-m">Dicetak: {{ new Date().toLocaleString('id-ID') }} · {{ per_store.length }} Cabang</p>
+                        <p class="cover-m">Dicetak: {{ new Date().toLocaleString('id-ID') }}</p>
                     </div>
                 </div>
 
@@ -161,32 +161,11 @@ onMounted(() => { setTimeout(() => { ready.value = true; setTimeout(() => window
             </td></tr></tfoot>
             <tbody><tr><td class="sec-body-cell">
 
-                <div class="badge">GRAFIK &amp; PERBANDINGAN CABANG</div>
+                <div class="badge">GRAFIK</div>
 
                 <div class="g2 mb20">
                     <div class="cht"><div class="cht-t">Tren Penjualan Harian</div><div class="cht-a"><Bar v-if="ready" :data="barData(overall.chart_sales.labels, overall.chart_sales.data)" :options="chartOpt" /></div></div>
                     <div class="cht"><div class="cht-t">Distribusi Pengeluaran</div><div class="cht-a"><Doughnut v-if="ready" :data="pieData(overall.chart_expense_by_category.labels, overall.chart_expense_by_category.amounts)" :options="pieOpt" /></div></div>
-                </div>
-
-                <div class="sh">Perbandingan Kinerja Cabang</div>
-                <table class="tb mb16">
-                    <thead><tr><th class="tal">Nama Cabang</th><th>Penjualan</th><th>HPP</th><th>Biaya</th><th>Laba Bersih</th><th>Tx</th></tr></thead>
-                    <tbody>
-                        <tr v-for="s in per_store" :key="s.id">
-                            <td class="tal bld up">{{ s.name }}</td>
-                            <td class="cv-accent">{{ fmt(s.income) }}</td>
-                            <td style="color:#9ca3af;font-style:italic">{{ fmt(s.hpp) }}</td>
-                            <td class="cv-dark">{{ fmt(s.expenses) }}</td>
-                            <td class="bld" :class="s.net >= 0 ? 'cv-green' : 'cv-accent'">{{ fmt(s.net) }}</td>
-                            <td style="text-align:center">{{ s.order_count }}</td>
-                        </tr>
-                        <tr class="tb-total"><td class="tal">TOTAL</td><td>{{ fmt(overall.income) }}</td><td style="opacity:.5">{{ fmt(overall.hpp) }}</td><td>{{ fmt(overall.expenses) }}</td><td>{{ fmt(overall.net) }}</td><td style="text-align:center">{{ overall.order_count }}</td></tr>
-                    </tbody>
-                </table>
-
-                <div class="g2">
-                    <div class="cht"><div class="cht-t">Omzet per Cabang</div><div class="cht-a-s"><Bar v-if="ready" :data="barData(overall.chart_sales_by_store.labels, overall.chart_sales_by_store.data)" :options="chartOpt" /></div></div>
-                    <div class="cht"><div class="cht-t">Biaya per Cabang</div><div class="cht-a-s"><Bar v-if="ready" :data="barData(overall.chart_expense_by_store.labels, overall.chart_expense_by_store.data, '#6b7280')" :options="chartOpt" /></div></div>
                 </div>
 
             </td></tr></tbody>
@@ -292,84 +271,6 @@ onMounted(() => { setTimeout(() => { ready.value = true; setTimeout(() => window
                             <td class="bld">{{ fmt(o.final_amount) }}</td>
                         </tr>
                         <tr v-if="!overall.orders?.length"><td colspan="6" class="empty">Tidak ada transaksi.</td></tr>
-                    </tbody>
-                </table>
-
-            </td></tr></tbody>
-        </table>
-
-        <!-- ==================== PER STORE SECTIONS ==================== -->
-        <table class="sec sec-break" v-for="store in per_store" :key="'sd-'+store.id">
-            <thead><tr><td class="sec-hdr-cell">
-                <div class="sec-hdr">
-                    <span class="sec-hdr-l">LAMPIRAN CABANG</span>
-                    <span class="sec-hdr-r">{{ store.name }} — {{ date_from }} s/d {{ date_to }}</span>
-                </div>
-            </td></tr></thead>
-            <tfoot><tr><td class="sec-ftr-cell">
-                <div class="sec-ftr">Dokumen Internal — Dicetak: {{ new Date().toLocaleDateString('id-ID') }}</div>
-            </td></tr></tfoot>
-            <tbody><tr><td class="sec-body-cell">
-
-                <div class="store-hd">
-                    <div><p class="store-pre">Lampiran Cabang</p><h2 class="store-nm">{{ store.name }}</h2></div>
-                    <div class="store-id">Unit #{{ store.id }}</div>
-                </div>
-
-                <div class="g3 mb20">
-                    <div class="kpi kpi-accent"><div class="kpi-l">Omzet</div><div class="kpi-v cv-accent">{{ fmt(store.income) }}</div><div class="kpi-n">{{ store.order_count }} Tx</div></div>
-                    <div class="kpi kpi-dark"><div class="kpi-l">Biaya</div><div class="kpi-v cv-dark">{{ fmt(store.expenses) }}</div></div>
-                    <div class="kpi" :class="store.net >= 0 ? 'kpi-result' : 'kpi-accent'"><div class="kpi-l">Profit</div><div class="kpi-v" :class="store.net >= 0 ? 'cv-green' : 'cv-accent'">{{ fmt(store.net) }}</div></div>
-                </div>
-
-                <div class="g2 mb20">
-                    <div class="cht"><div class="cht-t">Tren Penjualan</div><div class="cht-a-s"><Bar v-if="ready" :data="barData(store.chart_sales.labels, store.chart_sales.data)" :options="chartOpt" /></div></div>
-                    <div class="cht"><div class="cht-t">Pengeluaran</div><div class="cht-a-s"><Doughnut v-if="ready" :data="pieData(store.chart_expense_by_category.labels, store.chart_expense_by_category.amounts)" :options="pieOpt" /></div></div>
-                </div>
-
-                <div class="g2 mb20" style="align-items:start">
-                    <div>
-                        <div class="sh">Top Produk Cabang</div>
-                        <table class="tb tbs">
-                            <thead><tr><th class="tal">Produk</th><th style="text-align:center">Qty</th><th>Total</th></tr></thead>
-                            <tbody>
-                                <tr v-for="(p,i) in store.top_products.slice(0,10)" :key="'stp-'+i">
-                                    <td class="tal bld">{{ p.product_name }}</td>
-                                    <td style="text-align:center;font-weight:800;color:#dc2626">{{ p.total_qty }}</td>
-                                    <td>{{ fmt(p.total_amount) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div>
-                        <div class="sh">Pembayaran Cabang</div>
-                        <table class="tb tbs">
-                            <thead><tr><th class="tal">Metode</th><th style="text-align:center">Freq</th><th>Total</th></tr></thead>
-                            <tbody>
-                                <tr v-for="(pm,i) in store.sales_by_payment" :key="'spm-'+i">
-                                    <td class="tal bld up">{{ pm.label }}</td>
-                                    <td style="text-align:center">{{ pm.count }}x</td>
-                                    <td class="cv-green bld">{{ fmt(pm.total) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="sh" style="border-left:5px solid #dc2626;padding-left:10px">Daftar Transaksi — {{ store.name }}</div>
-                <table class="tb tbs">
-                    <thead><tr>
-                        <th class="tal">Waktu</th><th class="tal">Kode Order</th><th class="tal">Kasir</th><th class="tal">Metode</th><th>Total</th>
-                    </tr></thead>
-                    <tbody>
-                        <tr v-for="(o,i) in ordersByStore(store.name)" :key="'sto-'+store.id+'-'+i">
-                            <td class="tal mono faded">{{ o.created_at }}</td>
-                            <td class="tal bld cv-accent up" style="letter-spacing:-0.3px">{{ o.order_code }}</td>
-                            <td class="tal">{{ o.cashier_name || '—' }}</td>
-                            <td class="tal up faded" style="font-size:7px">{{ o.payment_method }}</td>
-                            <td class="bld">{{ fmt(o.final_amount) }}</td>
-                        </tr>
-                        <tr v-if="ordersByStore(store.name).length === 0"><td colspan="5" class="empty">Belum ada transaksi.</td></tr>
                     </tbody>
                 </table>
 

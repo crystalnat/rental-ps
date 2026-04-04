@@ -14,6 +14,7 @@ use App\Models\PriceLog;
 use App\Models\Product;
 use App\Models\Store;
 use App\Models\StoreInventory;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -172,6 +173,12 @@ class CashierController extends Controller
                 $discountPercent = (float) $product->discount_percent;
                 $discount = $discountPercent > 0 ? round($unitPrice * ($discountPercent / 100)) : 0;
                 
+                // Track if this order has a rental package
+                if ($product->is_rental_package && $product->rental_duration_minutes > 0) {
+                    $hasRentalPackage = true;
+                    $rentalDuration = $product->rental_duration_minutes;
+                }
+
                 $modifierPriceExtra = 0;
                 $selectedModifiers = [];
                 if (!empty($item['modifiers'])) {
@@ -269,7 +276,7 @@ class CashierController extends Controller
             $order = Order::create([
                 'store_id'        => $store->id,
                 'shift_id'        => $shift->id,
-                'table_id'        => $data['type'] === 'dine_in' ? $data['table_id'] : null,
+                'table_id'        => ($data['type'] === 'dine_in' || $data['type'] === 'walk_in') ? $data['table_id'] : null,
                 'customer_id'     => $customerId,
                 'cashier_id'      => $user->id,
                 'promo_id'        => $promoId,
@@ -288,7 +295,24 @@ class CashierController extends Controller
                 'change_amount'   => $changeAmount > 0 ? $changeAmount : null,
                 'paid_at'         => now(),
                 'completed_at'    => now(),
+
+                // Rental fields
+                'is_rental'       => $hasRentalPackage ?? false,
+                'rental_started_at' => ($hasRentalPackage ?? false) ? now() : null,
+                'rental_duration_minutes' => $rentalDuration ?? null,
+                'rental_end_at'   => ($hasRentalPackage ?? false) ? now()->addMinutes($rentalDuration ?? 0) : null,
             ]);
+
+            // If rental package, turn on PS
+            if (($hasRentalPackage ?? false) && $order->table_id) {
+                $table = DiningTable::find($order->table_id);
+                if ($table) {
+                    $table->update(['tuya_status' => true]);
+                    if ($table->tuya_device_id) {
+                        app(\App\Services\TuyaService::class)->sendCommand($table->tuya_device_id, 'switch_1', true);
+                    }
+                }
+            }
 
             foreach ($itemsData as $item) {
                 $orderItem = OrderItem::create([
@@ -545,7 +569,10 @@ class CashierController extends Controller
                             'is_active' => (bool) $o->is_active,
                             'is_available' => (bool) $o->is_available,
                         ])
-                    ])
+                    ]),
+                    'is_rental_package' => (bool) $product->is_rental_package,
+                    'rental_duration_minutes' => (int) $product->rental_duration_minutes,
+                    'included_items_json' => $product->included_items_json,
                 ];
             })
             ->filter()
@@ -596,6 +623,10 @@ class CashierController extends Controller
                             'final_amount'=> (float) $o->final_amount,
                             'items_count' => $o->items()->count(),
                             'created_at'  => $o->created_at->format('H:i'),
+                            'is_rental'   => (bool) $o->is_rental,
+                            'rental_started_at' => $o->rental_started_at?->toIso8601String(),
+                            'rental_end_at' => $o->rental_end_at?->toIso8601String(),
+                            'rental_duration_minutes' => $o->rental_duration_minutes,
                         ])
                         ->values()
                         ->toArray();
@@ -610,6 +641,9 @@ class CashierController extends Controller
                         'length_meters' => (float) ($t->length_meters ?? 1.2),
                         'rotation_deg'  => (int) ($t->rotation_deg ?? 0),
                         'shape'         => $t->shape ?? 'rectangle',
+                        'tuya_device_id' => $t->tuya_device_id,
+                        'tuya_status'   => (bool) $t->tuya_status,
+                        'rental_price_per_hour' => (float) ($t->rental_price_per_hour ?? 0),
                         'active_orders' => $orders,
                         'has_orders'    => count($orders) > 0,
                     ];

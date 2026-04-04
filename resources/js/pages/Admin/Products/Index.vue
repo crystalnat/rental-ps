@@ -84,14 +84,6 @@ function handleDelete() {
 
 <template>
     <AdminLayout title="Produk">
-        <template #headerActions>
-            <Link href="/admin/products/create">
-                <Button size="sm">
-                    <Plus class="h-4 w-4" />
-                    Tambah Produk
-                </Button>
-            </Link>
-        </template>
 
         <!-- Summary Cards -->
         <div class="mb-6 grid gap-4 sm:grid-cols-3">
@@ -173,6 +165,13 @@ function handleDelete() {
                         {{ cat.name }} ({{ products.filter(p => p.category_id === cat.id).length }})
                     </Button>
                 </div>
+                <!-- Tambah button moved here -->
+                <Link href="/admin/products/create" class="ml-auto shrink-0">
+                    <Button size="sm" class="gap-2">
+                        <Plus class="h-4 w-4" />
+                        Tambah Produk
+                    </Button>
+                </Link>
             </CardContent>
         </Card>
 

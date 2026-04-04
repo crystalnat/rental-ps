@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { Link } from '@inertiajs/vue3'
 import {
@@ -8,7 +8,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
-import { LayoutGrid, ZoomIn, ZoomOut, Maximize2, Receipt, Loader2 } from 'lucide-vue-next'
+import { LayoutGrid, ZoomIn, ZoomOut, Maximize2, Receipt, Loader2, Power, Play, Square, Clock, Gamepad2 } from 'lucide-vue-next'
+import { Label } from '@/components/ui/label'
+import { router } from '@inertiajs/vue3'
 
 const BASE_PIXELS_PER_METER = 80
 
@@ -19,6 +21,10 @@ interface TableOrder {
     final_amount: number
     items_count: number
     created_at: string
+    is_rental: boolean
+    rental_started_at: string | null
+    rental_end_at: string | null
+    rental_duration_minutes: number | null
 }
 
 interface FloorTable {
@@ -33,6 +39,9 @@ interface FloorTable {
     shape: string
     active_orders: TableOrder[]
     has_orders: boolean
+    tuya_device_id: string | null
+    tuya_status: boolean
+    rental_price_per_hour: number
 }
 
 interface FloorData {
@@ -108,10 +117,77 @@ function selectTable(table: FloorTable) {
     selectedTable.value = selectedTable.value?.id === table.id ? null : table
 }
 
+function toggleTuya(table: FloorTable) {
+    if (!currentFloor.value) return
+    router.post(`/admin/stores/${props.store.id}/floor-plan/${currentFloor.value.id}/tables/${table.id}/toggle-tuya`, {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+             // Status will be updated via props reload
+        }
+    })
+}
+
+function stopRental(table: FloorTable) {
+    if (!currentFloor.value) return
+    router.post(`/admin/stores/${props.store.id}/floor-plan/${currentFloor.value.id}/tables/${table.id}/stop-rental`, {}, {
+        preserveScroll: true,
+    })
+}
+
+const showStartRentalDialog = ref(false)
+const startRentalForm = ref({ duration: 60 })
+
+function openStartRental(table: FloorTable) {
+    selectedTable.value = table
+    showStartRentalDialog.value = true
+}
+
+function submitStartRental() {
+    if (!selectedTable.value || !currentFloor.value) return
+    router.post(`/admin/stores/${props.store.id}/floor-plan/${currentFloor.value.id}/tables/${selectedTable.value.id}/start-rental`, {
+        duration_minutes: startRentalForm.value.duration
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showStartRentalDialog.value = false
+        }
+    })
+}
+
 function close() {
     emit('update:open', false)
     selectedTable.value = null
     selectedOrderDetail.value = null
+}
+
+const now = ref(new Date())
+let timerInterval: any = null
+
+onMounted(() => {
+    timerInterval = setInterval(() => {
+        now.value = new Date()
+    }, 1000)
+})
+
+onBeforeUnmount(() => {
+    if (timerInterval) clearInterval(timerInterval)
+})
+
+function getRemainingTime(endTimeStr: string) {
+    const end = new Date(endTimeStr)
+    const diff = end.getTime() - now.value.getTime()
+    if (diff <= 0) return 'Habis'
+    
+    const minutes = Math.floor(diff / 60000)
+    const seconds = Math.floor((diff % 60000) / 1000)
+    
+    if (minutes > 60) {
+        const hours = Math.floor(minutes / 60)
+        const minsRemaining = minutes % 60
+        return `${hours}j ${minsRemaining}m`
+    }
+    
+    return `${minutes}m ${seconds}s`
 }
 
 interface OrderDetailItem {
@@ -148,7 +224,7 @@ async function openOrderDetail(orderId: number) {
     selectedOrderDetail.value = null
     orderDetailLoadingId.value = orderId
     try {
-        const res = await fetch(route('admin.orders.detail', orderId), {
+        const res = await fetch((window as any).route('admin.orders.detail', orderId), {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         })
@@ -176,22 +252,22 @@ const statusLabels: Record<string, string> = {
         <DialogContent class="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
             <DialogHeader class="shrink-0">
                 <DialogTitle class="flex items-center gap-2">
-                    <LayoutGrid class="h-5 w-5" />
-                    Denah Meja — {{ store.name }}
+                    <Gamepad2 class="h-5 w-5" />
+                    Panel Kontrol PS — {{ store.name }}
                 </DialogTitle>
                 <DialogDescription>
-                    Meja dengan pesanan aktif ditandai warna kuning. Klik untuk melihat detail pesanan.
+                    Klik unit PS untuk menyalakan/mematikan atau memulai rental.
                 </DialogDescription>
             </DialogHeader>
 
             <div class="min-h-0 flex-1 overflow-y-auto">
             <div v-if="!floorPlan || floorPlan.length === 0" class="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-                <LayoutGrid class="mb-3 h-12 w-12 opacity-50" />
-                <p class="font-medium">Belum ada denah meja</p>
-                <p class="mt-1 text-sm">Atur denah meja di menu Denah Meja untuk melihat posisi meja dan pesanan.</p>
+                <Gamepad2 class="mb-3 h-12 w-12 opacity-50" />
+                <p class="font-medium">Belum ada area rental PS</p>
+                <p class="mt-1 text-sm">Atur area rental PS di menu Rental PS untuk melihat posisi unit PS.</p>
                 <Link :href="`/admin/stores/${store.id}/floor-plan`" class="mt-4">
                     <Button variant="outline" size="sm">
-                        Ke Denah Meja
+                        Ke Pengaturan Rental PS
                     </Button>
                 </Link>
             </div>
@@ -287,7 +363,7 @@ const statusLabels: Record<string, string> = {
                             class="absolute cursor-pointer select-none rounded-lg border-2 text-center shadow-sm transition-all hover:scale-105"
                             :class="t.has_orders
                                 ? 'border-amber-400 bg-amber-400/90 text-amber-950'
-                                : 'border-amber-400/60 bg-amber-50/80 text-amber-900'"
+                                : (t.tuya_status ? 'border-green-500 bg-green-500/20 text-green-900 dark:text-green-100' : 'border-amber-400/60 bg-amber-50/80 text-amber-900')"
                             :style="{
                                 left: toPx(t.x_meters) + 'px',
                                 top: toPx(t.y_meters) + 'px',
@@ -297,9 +373,12 @@ const statusLabels: Record<string, string> = {
                             @click="selectTable(t)"
                         >
                             <div class="flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 py-1">
-                                <span class="font-semibold text-sm">{{ t.name }}</span>
-                                <span v-if="t.has_orders" class="rounded bg-amber-200/80 px-1.5 py-0.5 text-xs font-medium">
-                                    {{ t.active_orders.length }} pesanan
+                                <span class="font-semibold text-xs">{{ t.name }}</span>
+                                <div v-if="t.tuya_device_id" class="flex gap-1">
+                                    <div :class="['h-2 w-2 rounded-full', t.tuya_status ? 'bg-green-500 animate-pulse' : 'bg-red-500']"></div>
+                                </div>
+                                <span v-if="t.has_orders" class="rounded bg-amber-200/80 px-1 py-0.5 text-[8px] font-bold">
+                                    RENTAL AKTIF
                                 </span>
                             </div>
                         </div>
@@ -309,36 +388,86 @@ const statusLabels: Record<string, string> = {
 
                 <!-- Order detail panel -->
                 <div
-                    v-if="selectedTable && selectedTable.has_orders"
-                    class="mt-3 max-h-[200px] overflow-y-auto rounded-lg border bg-muted/30 p-4"
+                    v-if="selectedTable"
+                    class="mt-3 overflow-hidden rounded-lg border bg-muted/30"
                 >
-                    <p class="mb-2 shrink-0 font-medium">Meja {{ selectedTable.name }} — Pesanan Aktif</p>
-                    <div class="space-y-2">
-                        <div
-                            v-for="ord in selectedTable.active_orders"
-                            :key="ord.id"
-                            class="flex items-center justify-between rounded-lg border bg-background p-3"
-                        >
-                            <div>
-                                <p class="font-mono text-sm font-medium">{{ ord.order_code }}</p>
-                                <p class="text-xs text-muted-foreground">
-                                    {{ ord.items_count }} item · {{ formatCurrency(ord.final_amount) }} · {{ ord.created_at }}
-                                </p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                                    {{ (statusLabels ?? {})[ord.status] ?? ord.status }}
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    :disabled="orderDetailLoadingId === ord.id"
-                                    @click="openOrderDetail(ord.id)"
-                                >
-                                    <Loader2 v-if="orderDetailLoadingId === ord.id" class="mr-1 h-3 w-3 animate-spin" />
-                                    <Receipt v-else class="mr-1 h-3 w-3" />
-                                    Lihat
+                    <div class="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
+                        <p class="font-medium">Unit PS {{ selectedTable.name }}</p>
+                        <div class="flex items-center gap-2">
+                            <span v-if="selectedTable.tuya_device_id" :class="['text-[10px] font-medium uppercase', selectedTable.tuya_status ? 'text-green-600' : 'text-red-500']">
+                                {{ selectedTable.tuya_status ? 'Nyala' : 'Mati' }}
+                            </span>
+                            <Button
+                                v-if="selectedTable.tuya_device_id"
+                                @click="toggleTuya(selectedTable)"
+                            >
+                                <Power class="h-3.5 w-3.5" :class="selectedTable.tuya_status ? 'text-green-600' : 'text-red-500'" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div class="p-4">
+                        <div v-if="!selectedTable.has_orders" class="flex flex-col items-center gap-3 py-2">
+                            <p class="text-sm text-muted-foreground">Tidak ada rental aktif pada unit ini.</p>
+                            <div class="flex gap-2">
+                                <Button size="sm" @click="openStartRental(selectedTable)">
+                                    <Play class="mr-1.5 h-3.5 w-3.5" />
+                                    Mulai Rental
                                 </Button>
+                            </div>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div
+                                v-for="ord in selectedTable.active_orders"
+                                :key="ord.id"
+                                class="rounded-lg border bg-background p-3"
+                            >
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <p class="font-mono text-sm font-semibold">{{ ord.order_code }}</p>
+                                            <span v-if="ord.is_rental" class="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">RENTAL</span>
+                                        </div>
+                                        <div class="mt-1 flex items-center gap-2">
+                                            <p class="text-xs text-muted-foreground">
+                                                {{ ord.items_count }} item · {{ formatCurrency(ord.final_amount) }}
+                                            </p>
+                                            <span :class="['rounded px-1.5 py-0.5 text-[10px] font-bold uppercase', 
+                                                ord.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground']">
+                                                {{ (statusLabels ?? {})[ord.status] ?? ord.status }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            :disabled="orderDetailLoadingId === ord.id"
+                                            @click="openOrderDetail(ord.id)"
+                                        >
+                                            <Receipt class="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                            v-if="ord.is_rental && ord.status !== 'ready'"
+                                            variant="destructive"
+                                            size="sm"
+                                            @click="stopRental(selectedTable)"
+                                        >
+                                            <Square class="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                
+                                <div v-if="ord.is_rental && ord.rental_end_at" class="mt-3 flex items-center gap-2 rounded-md bg-blue-50 p-2 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                                    <Clock class="h-4 w-4" />
+                                    <div class="flex-1 text-xs">
+                                        <div class="flex items-center justify-between">
+                                            <p class="font-medium">Sisa Waktu: <span class="font-bold text-blue-600 dark:text-blue-400">{{ getRemainingTime(ord.rental_end_at) }}</span></p>
+                                            <p class="opacity-60">{{ ord.rental_duration_minutes }}m</p>
+                                        </div>
+                                        <p class="opacity-80">Berakhir pada: {{ new Date(ord.rental_end_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -348,11 +477,15 @@ const statusLabels: Record<string, string> = {
                 <div class="mt-3 flex flex-wrap items-center gap-4 border-t pt-3 text-sm">
                     <div class="flex items-center gap-2">
                         <div class="h-5 w-5 rounded border-2 border-amber-400 bg-amber-400/90" />
-                        <span>Meja dengan pesanan</span>
+                        <span>Rental Aktif</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="h-5 w-5 rounded border-2 border-green-500 bg-green-500/20" />
+                        <span>PS Nyala (Kosong)</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="h-5 w-5 rounded border-2 border-amber-400/60 bg-amber-50/80" />
-                        <span>Meja kosong</span>
+                        <span>PS Mati</span>
                     </div>
                 </div>
             </template>
@@ -375,7 +508,7 @@ const statusLabels: Record<string, string> = {
                     {{ selectedOrderDetail.order_code }}
                 </DialogTitle>
                 <DialogDescription>
-                    {{ selectedOrderDetail.table_name ? `Meja ${selectedOrderDetail.table_name}` : '—' }} · {{ selectedOrderDetail.created_at }}
+                    {{ selectedOrderDetail.table_name ? `Unit PS ${selectedOrderDetail.table_name}` : '—' }} · {{ selectedOrderDetail.created_at }}
                 </DialogDescription>
             </DialogHeader>
             <div class="min-h-0 flex-1 space-y-4 overflow-y-auto">
@@ -419,6 +552,44 @@ const statusLabels: Record<string, string> = {
             <div class="shrink-0 flex justify-end border-t pt-3">
                 <Button variant="outline" @click="selectedOrderDetail = null">Tutup</Button>
             </div>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Modal Start Rental -->
+    <Dialog :open="showStartRentalDialog" @update:open="showStartRentalDialog = $event">
+        <DialogContent class="max-w-sm">
+            <DialogHeader>
+                <DialogTitle>Mulai Rental — {{ selectedTable?.name }}</DialogTitle>
+                <DialogDescription>
+                    Pilih durasi rental untuk unit PS ini.
+                </DialogDescription>
+            </DialogHeader>
+            <div class="space-y-4 py-2">
+                <div>
+                    <Label>Durasi (Menit)</Label>
+                    <select v-model="startRentalForm.duration" class="mt-1.5 w-full rounded-md border px-3 py-2 text-sm">
+                        <option :value="30">30 Menit</option>
+                        <option :value="60">1 Jam</option>
+                        <option :value="120">2 Jam</option>
+                        <option :value="180">3 Jam</option>
+                        <option :value="300">5 Jam</option>
+                    </select>
+                </div>
+                <div v-if="selectedTable" class="rounded-lg bg-muted/50 p-3 text-sm">
+                    <div class="flex justify-between">
+                        <span>Harga per Jam:</span>
+                        <span class="font-semibold">{{ formatCurrency(selectedTable.rental_price_per_hour) }}</span>
+                    </div>
+                    <div class="mt-1 flex justify-between text-primary">
+                        <span>Estimasi Total:</span>
+                        <span class="font-bold border-t border-primary/20">{{ formatCurrency((selectedTable.rental_price_per_hour / 60) * startRentalForm.duration) }}</span>
+                    </div>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" @click="showStartRentalDialog = false">Batal</Button>
+                <Button @click="submitStartRental">Mulai Sekarang</Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>

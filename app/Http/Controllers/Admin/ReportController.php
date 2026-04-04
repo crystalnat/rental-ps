@@ -299,22 +299,64 @@ class ReportController extends Controller
 
     private function buildTopProductsForStores(Collection $storeIds, string $dateFrom, string $dateTo, int $limit = 20): array
     {
-        return OrderItem::query()
+        $rows = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
             ->whereIn('orders.store_id', $storeIds)
             ->where('orders.payment_status', 'paid')
             ->whereDate('orders.created_at', '>=', $dateFrom)
             ->whereDate('orders.created_at', '<=', $dateTo)
-            ->selectRaw('order_items.product_name, SUM(order_items.quantity) as total_qty, SUM(order_items.subtotal) as total_amount')
-            ->groupBy('order_items.product_name')
-            ->orderByDesc('total_qty')
-            ->limit($limit)
-            ->get()
-            ->map(fn ($r) => [
-                'product_name' => $r->product_name,
-                'total_qty'    => (float) $r->total_qty,
-                'total_amount' => (float) $r->total_amount,
+            ->select([
+                'order_items.product_id',
+                'order_items.product_name',
+                'order_items.quantity',
+                'order_items.subtotal',
+                'products.is_rental_package',
+                'products.included_items_json',
             ])
+            ->get();
+
+        return $this->aggregateTopProducts($rows, $limit);
+    }
+
+    private function aggregateTopProducts($rows, int $limit): array
+    {
+        $agg = [];
+
+        foreach ($rows as $row) {
+            $name = $row->product_name;
+            if (!isset($agg[$name])) {
+                $agg[$name] = ['total_qty' => 0, 'total_amount' => 0];
+            }
+            $agg[$name]['total_qty']    += $row->quantity;
+            $agg[$name]['total_amount'] += $row->subtotal;
+
+            if ($row->is_rental_package && $row->included_items_json) {
+                $included = is_array($row->included_items_json)
+                    ? $row->included_items_json
+                    : json_decode($row->included_items_json, true) ?? [];
+
+                foreach ($included as $inc) {
+                    $incName = $inc['product_name'] ?? null;
+                    $incQty  = ($inc['qty'] ?? 1) * $row->quantity;
+                    if (!$incName) continue;
+                    if (!isset($agg[$incName])) {
+                        $agg[$incName] = ['total_qty' => 0, 'total_amount' => 0];
+                    }
+                    $agg[$incName]['total_qty'] += $incQty;
+                    // amount = 0, sudah termasuk harga paket
+                }
+            }
+        }
+
+        return collect($agg)
+            ->map(fn ($v, $k) => [
+                'product_name' => $k,
+                'total_qty'    => (float) $v['total_qty'],
+                'total_amount' => (float) $v['total_amount'],
+            ])
+            ->sortByDesc('total_qty')
+            ->take($limit)
             ->values()
             ->toArray();
     }

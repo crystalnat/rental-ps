@@ -20,10 +20,15 @@ class OrderController extends Controller
         $user = Auth::user();
         $store = $this->resolveStore($user, $request);
 
-        $stores = Store::where('brand_id', $user->brand_id)
+        $storesQuery = Store::where('brand_id', $user->brand_id)
             ->whereNull('deleted_at')
-            ->where('is_active', true)
-            ->orderBy('name')
+            ->where('is_active', true);
+
+        if ($user->role !== 'owner' && $user->role !== 'admin') {
+            $storesQuery->where('id', $user->store_id);
+        }
+
+        $stores = $storesQuery->orderBy('name')
             ->get(['id', 'name', 'slug'])
             ->toArray();
 
@@ -461,6 +466,11 @@ class OrderController extends Controller
     private function resolveStore($user, Request $request): ?Store
     {
         $storeId = $request->query('store') ?? $request->input('store');
+
+        // Strictly enforce assigned store for non-owners/admins
+        if ($user->role !== 'owner' && $user->role !== 'admin') {
+            return $user->store_id ? Store::find($user->store_id) : null;
+        }
 
         if ($storeId) {
             $store = Store::where('id', $storeId)

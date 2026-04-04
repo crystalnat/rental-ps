@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+class LandingSetting extends Model
+{
     // Bit Mask Flags
     public const FLAG_PUBLISHED           = 1 << 0; // 1
     public const FLAG_SHOW_HEADER_LOGO    = 1 << 1; // 2

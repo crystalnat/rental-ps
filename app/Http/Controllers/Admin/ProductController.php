@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -65,15 +66,25 @@ class ProductController extends Controller
 
     public function create(): Response
     {
-        $categories = Category::where('brand_id', Auth::user()->brand_id)
+        $brandId = Auth::user()->brand_id;
+
+        $categories = Category::where('brand_id', $brandId)
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $allProducts = Product::where('brand_id', $brandId)
+            ->where('is_active', true)
+            ->where('is_rental_package', false) // only non-rental products can be included
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit'])
+            ->toArray();
+
         return Inertia::render('Admin/Products/Form', [
-            'product'    => null,
-            'categories' => $categories,
+            'product'     => null,
+            'categories'  => $categories,
+            'allProducts' => $allProducts,
         ]);
     }
 
@@ -100,9 +111,18 @@ class ProductController extends Controller
             'modifiers.*.options' => ['required', 'array', 'min:1'],
             'modifiers.*.options.*.name' => ['required', 'string', 'max:100'],
             'modifiers.*.options.*.price_extra' => ['required', 'numeric', 'min:0'],
+            'is_rental_package' => ['boolean'],
+            'rental_duration_minutes' => ['nullable', 'integer', 'min:1'],
+            'included_items_json' => ['nullable', 'array'],
+            'image' => ['nullable', 'image', 'max:2048'],
         ]);
 
-        $product = DB::transaction(function () use ($data, $brandId) {
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('products', 'public');
+        }
+
+        $product = DB::transaction(function () use ($data, $brandId, $imagePath) {
             $slug = $this->generateUniqueSlug($data['name']);
 
             $product = Product::create([
@@ -116,6 +136,10 @@ class ProductController extends Controller
                 'track_stock'  => $data['track_stock'] ?? true,
                 'is_available' => $data['is_available'] ?? true,
                 'discount_percent' => $data['discount_percent'] ?? 0,
+                'is_rental_package' => $data['is_rental_package'] ?? false,
+                'rental_duration_minutes' => $data['rental_duration_minutes'] ?? null,
+                'included_items_json' => $data['included_items_json'] ?? [],
+                'image' => $imagePath,
                 'is_active'    => true,
             ]);
 
@@ -173,6 +197,14 @@ class ProductController extends Controller
             ->latest('started_at')
             ->first();
 
+        $allProducts = Product::where('brand_id', Auth::user()->brand_id)
+            ->where('is_active', true)
+            ->where('is_rental_package', false)
+            ->where('id', '!=', $product->id) // exclude self
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit'])
+            ->toArray();
+
         return Inertia::render('Admin/Products/Form', [
             'product' => [
                 'id'           => $product->id,
@@ -188,6 +220,9 @@ class ProductController extends Controller
                 'is_active'    => $product->is_active,
                 'buy_price'    => $globalPrice?->buy_price ?? 0,
                 'sell_price'   => $globalPrice?->sell_price ?? 0,
+                'is_rental_package' => (bool) $product->is_rental_package,
+                'rental_duration_minutes' => $product->rental_duration_minutes,
+                'included_items_json' => $product->included_items_json ?? [],
                 'modifiers'    => $product->modifierGroups->map(function($group) {
                     return [
                         'id' => $group->id,
@@ -205,7 +240,8 @@ class ProductController extends Controller
                     ];
                 }),
             ],
-            'categories' => $categories,
+            'categories'  => $categories,
+            'allProducts' => $allProducts,
         ]);
     }
 
@@ -234,9 +270,21 @@ class ProductController extends Controller
             'modifiers.*.options.*.id'   => ['nullable'],
             'modifiers.*.options.*.name' => ['required', 'string', 'max:100'],
             'modifiers.*.options.*.price_extra' => ['required', 'numeric', 'min:0'],
+            'is_rental_package' => ['boolean'],
+            'rental_duration_minutes' => ['nullable', 'integer', 'min:1'],
+            'included_items_json' => ['nullable', 'array'],
+            'image' => ['nullable', 'image', 'max:2048'],
         ]);
 
-        DB::transaction(function () use ($data, $product) {
+        $imagePath = $product->image;
+        if ($request->hasFile('image')) {
+            if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+            $imagePath = $request->file('image')->store('products', 'public');
+        }
+
+        DB::transaction(function () use ($data, $product, $imagePath) {
             if ($data['name'] !== $product->name) {
                 $data['slug'] = $this->generateUniqueSlug($data['name'], $product->id);
             }
@@ -251,6 +299,10 @@ class ProductController extends Controller
                 'track_stock'  => $data['track_stock'] ?? true,
                 'is_available' => $data['is_available'] ?? true,
                 'discount_percent' => $data['discount_percent'] ?? 0,
+                'is_rental_package' => $data['is_rental_package'] ?? false,
+                'rental_duration_minutes' => $data['rental_duration_minutes'] ?? null,
+                'included_items_json' => $data['included_items_json'] ?? [],
+                'image' => $imagePath,
             ]);
 
             $currentPrice = PriceLog::where('product_id', $product->id)

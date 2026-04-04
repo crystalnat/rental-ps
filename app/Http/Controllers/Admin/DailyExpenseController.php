@@ -83,6 +83,7 @@ class DailyExpenseController extends Controller
             'expense_date' => $e->expense_date->format('Y-m-d'),
             'created_at'   => $e->created_at->format('H:i'),
             'creator_name' => $e->creator?->name,
+            'can_edit'     => ($user->role === 'owner' || $user->role === 'admin' || (int) $e->created_by === (int) $user->id),
         ])->values()->all();
 
         return Inertia::render('Admin/ExpenseBook/Index', [
@@ -127,6 +128,14 @@ class DailyExpenseController extends Controller
             'expense_date' => ['required', 'date'],
         ]);
 
+        // Restrict cashier to today only
+        if ($user->role === 'cashier') {
+            $date = \Carbon\Carbon::parse($validated['expense_date'])->toDateString();
+            if ($date !== now()->toDateString()) {
+                return back()->with('error', 'Kasir hanya boleh mencatat pengeluaran untuk hari ini.');
+            }
+        }
+
         DailyExpense::create([
             'store_id'     => $store->id,
             'created_by'   => $user->id,
@@ -144,12 +153,24 @@ class DailyExpenseController extends Controller
         $user = Auth::user();
         $this->authorizeStore($user, $dailyExpense->store_id);
 
+        if ($user->role === 'cashier' && $dailyExpense->created_by !== $user->id) {
+            return back()->with('error', 'Anda hanya dapat mengubah pengeluaran yang Anda buat sendiri.');
+        }
+
         $validated = $request->validate([
             'category'     => ['required', 'string', 'in:purchase,supplies,utilities,maintenance,salary,other'],
             'description'  => ['required', 'string', 'max:500'],
             'amount'       => ['required', 'numeric', 'min:0'],
             'expense_date' => ['required', 'date'],
         ]);
+
+        // Restrict cashier to today only
+        if ($user->role === 'cashier') {
+            $date = \Carbon\Carbon::parse($validated['expense_date'])->toDateString();
+            if ($date !== now()->toDateString()) {
+                return back()->with('error', 'Kasir hanya boleh mengubah pengeluaran ke tanggal hari ini.');
+            }
+        }
 
         $dailyExpense->update($validated);
 
@@ -160,6 +181,10 @@ class DailyExpenseController extends Controller
     {
         $user = Auth::user();
         $this->authorizeStore($user, $dailyExpense->store_id);
+
+        if ($user->role === 'cashier' && $dailyExpense->created_by !== $user->id) {
+            return back()->with('error', 'Anda hanya dapat menghapus pengeluaran yang Anda buat sendiri.');
+        }
 
         $dailyExpense->delete();
 

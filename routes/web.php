@@ -184,7 +184,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     });
 
     // Stores (owner only)
-    Route::middleware(EnsureAuthenticated::class . ':owner')
+    Route::middleware(EnsureAuthenticated::class . ':owner,admin')
         ->group(function () {
             Route::get('/stores', [StoreController::class, 'index'])->name('admin.stores.index');
             Route::get('/stores/create', [StoreController::class, 'create'])->name('admin.stores.create');
@@ -217,6 +217,11 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
             Route::delete('/stores/{store}/floor-plan/{floor}/tables/{table}', [FloorPlanController::class, 'removeTable'])->name('admin.stores.floor-plan.remove-table');
             Route::delete('/stores/{store}/floor-plan/{floor}/elements/{element}', [FloorPlanController::class, 'removeElement'])->name('admin.stores.floor-plan.remove-element');
             Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/copy', [FloorPlanController::class, 'copyTable'])->name('admin.stores.floor-plan.copy-table');
+            Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/update-meta', [FloorPlanController::class, 'updateMeta'])->name('admin.stores.floor-plan.update-meta');
+            Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/toggle-tuya', [FloorPlanController::class, 'toggleTuya'])->name('admin.stores.floor-plan.toggle-tuya');
+            Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/start-rental', [FloorPlanController::class, 'startRental'])->name('admin.stores.floor-plan.start-rental');
+            Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/stop-rental', [FloorPlanController::class, 'stopRental'])->name('admin.stores.floor-plan.stop-rental');
+            Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/add-duration', [FloorPlanController::class, 'addDuration'])->name('admin.stores.floor-plan.add-duration');
             Route::post('/stores/{store}/floor-plan/{floor}/elements/{element}/copy', [FloorPlanController::class, 'copyElement'])->name('admin.stores.floor-plan.copy-element');
         });
 
