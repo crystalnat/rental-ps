@@ -48,6 +48,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
         Route::get('/cashier', [CashierController::class, 'index'])->name('admin.cashier.index');
         Route::post('/cashier', [CashierController::class, 'store'])->name('admin.cashier.store');
+        Route::post('/cashier/add-to-rental', [CashierController::class, 'addToRental'])->name('admin.cashier.add-to-rental');
         Route::post('/cashier/check-promo', [CashierController::class, 'checkPromo'])->name('admin.cashier.check-promo');
         Route::get('/cashier/pending-orders', [CashierController::class, 'pendingOrders'])->name('admin.cashier.pending-orders');
 
@@ -186,13 +187,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     // Stores (owner only)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin')
         ->group(function () {
-            Route::get('/stores', [StoreController::class, 'index'])->name('admin.stores.index');
-            Route::get('/stores/create', [StoreController::class, 'create'])->name('admin.stores.create');
-            Route::post('/stores', [StoreController::class, 'store'])->name('admin.stores.store');
-            Route::get('/stores/{store}/edit', [StoreController::class, 'edit'])->name('admin.stores.edit');
-            Route::put('/stores/{store}', [StoreController::class, 'update'])->name('admin.stores.update');
-            Route::post('/stores/{store}/toggle-active', [StoreController::class, 'toggleActive'])->name('admin.stores.toggle');
-            Route::delete('/stores/{store}', [StoreController::class, 'destroy'])->name('admin.stores.destroy');
+            // Store CRUD routes removed because there's only 1 store
 
             // Store Products
             Route::get('/stores/{store}/products', [StoreProductController::class, 'index'])->name('admin.stores.products');

@@ -419,7 +419,7 @@ class FloorPlanController extends Controller
         abort_unless($floor->store_id === $store->id && $table->floor_id === $floor->id, 403);
 
         $data = $request->validate([
-            'duration_minutes' => ['required', 'integer', 'min:1'],
+            'duration_minutes' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $orderId = DB::transaction(function () use ($store, $table, $data) {
@@ -431,6 +431,9 @@ class FloorPlanController extends Controller
             $seq = ($last ? (int) substr($last->order_code, -4) + 1 : 1);
             $code = $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
 
+            $duration = $data['duration_minutes'] ?? null;
+            $subtotal = $duration ? round(($table->rental_price_per_hour / 60) * $duration) : 0;
+
             $order = Order::create([
                 'store_id'      => $store->id,
                 'table_id'      => $table->id,
@@ -439,16 +442,21 @@ class FloorPlanController extends Controller
                 'is_rental'     => true,
                 'status'        => 'confirmed', // Assuming it's active immediately
                 'rental_started_at' => now(),
-                'rental_duration_minutes' => $data['duration_minutes'],
-                'rental_end_at' => now()->addMinutes($data['duration_minutes']),
-                'subtotal'      => round(($table->rental_price_per_hour / 60) * $data['duration_minutes']),
-                'final_amount'  => round(($table->rental_price_per_hour / 60) * $data['duration_minutes']),
+                'rental_duration_minutes' => $duration ?? 0,
+                'rental_end_at' => $duration ? now()->addMinutes($duration) : null,
+                'subtotal'      => $subtotal,
+                'final_amount'  => $subtotal,
                 'payment_status'=> 'pending',
                 'cashier_id'    => auth()->id(),
             ]);
 
             return $order->id;
         });
+
+        $table->update(['tuya_status' => true]);
+        if ($table->tuya_device_id) {
+            app(\App\Services\TuyaService::class)->sendCommand($table->tuya_device_id, 'switch_1', true);
+        }
 
         return back()->with('success', "Rental PS {$table->name} dimulai.");
     }
@@ -465,10 +473,31 @@ class FloorPlanController extends Controller
             ->first();
 
         if ($order) {
-            $order->update([
-                'status' => 'done',
-                'rental_end_at' => now(),
-            ]);
+            $now = now();
+            if (is_null($order->rental_end_at)) {
+                $started = \Carbon\Carbon::parse($order->rental_started_at);
+                $elapsedSeconds = $started->diffInSeconds($now);
+                if ($elapsedSeconds < 0) $elapsedSeconds = 0;
+                
+                $elapsedMinutes = (int) ceil($elapsedSeconds / 60);
+                if ($elapsedMinutes < 1 && $elapsedSeconds > 0) $elapsedMinutes = 1;
+
+                $costPerSec = $table->rental_price_per_hour / 3600;
+                $cost = (int) floor($costPerSec * $elapsedSeconds);
+
+                $order->update([
+                    'status' => 'ready',
+                    'rental_end_at' => $now,
+                    'rental_duration_minutes' => $elapsedMinutes,
+                    'subtotal' => $order->subtotal + $cost,
+                    'final_amount' => $order->final_amount + $cost,
+                ]);
+            } else {
+                $order->update([
+                    'status' => 'ready',
+                    'rental_end_at' => $now,
+                ]);
+            }
         }
 
         // Turn off PS via Tuya
@@ -477,7 +506,10 @@ class FloorPlanController extends Controller
             app(\App\Services\TuyaService::class)->sendCommand($table->tuya_device_id, 'switch_1', false);
         }
 
-        return back()->with('success', "Rental PS {$table->name} dihentikan.");
+        return back()
+            ->with('success', "Rental PS {$table->name} dihentikan.")
+            ->with('last_stopped_order_id', $order?->id)
+            ->with('last_stopped_order_time', now()->timestamp);
     }
 
     public function addDuration(Store $store, Floor $floor, DiningTable $table, Request $request): RedirectResponse

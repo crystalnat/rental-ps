@@ -412,7 +412,7 @@ class CashierController extends Controller
             return response()->json(['count' => 0, 'latest' => null]);
         }
 
-        $pending = Order::with(['table', 'customer'])
+        $pending = Order::with(['table', 'customer', 'items.product'])
             ->where('store_id', $store->id)
             ->whereNull('cashier_id')
             ->whereIn('status', ['pending', 'confirmed', 'processing', 'ready'])
@@ -433,6 +433,12 @@ class CashierController extends Controller
                 'notes'           => $o->notes,
                 'final_amount'    => (float) $o->final_amount,
                 'created_at'      => $o->created_at->format('H:i'),
+                'items'           => $o->items->map(fn($i) => [
+                    'product_name' => $i->product_name,
+                    'quantity'     => (float) $i->quantity,
+                    'unit'         => $i->unit,
+                    'subtotal'     => (float) $i->subtotal,
+                ])->values()->toArray()
             ])->values()->toArray(),
             'latest' => $latest ? [
                 'order_code'      => $latest->order_code,
@@ -497,6 +503,119 @@ class CashierController extends Controller
         ]);
     }
 
+    public function addToRental(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+        $store = $this->resolveStore($user, $request);
+
+        if (!$store) {
+            return back()->with('error', 'Pilih toko terlebih dahulu.');
+        }
+
+        $data = $request->validate([
+            'table_id'         => ['required', 'exists:dining_tables,id'],
+            'items'            => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity'   => ['required', 'numeric', 'min:0.001'],
+            'items.*.notes'      => ['nullable', 'string', 'max:500'],
+            'items.*.modifiers'  => ['nullable', 'array'],
+            'items.*.modifiers.*.option_id' => ['required', 'exists:product_modifier_options,id'],
+            'notes'            => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $order = Order::where('table_id', $data['table_id'])
+            ->where('is_rental', true)
+            ->whereNotIn('status', ['done', 'cancelled', 'completed'])
+            ->where('store_id', $store->id)
+            ->first();
+
+        if (!$order) {
+            return back()->with('error', 'Tidak ada rental aktif di meja ini.');
+        }
+
+        DB::transaction(function () use ($store, $data, $order) {
+            $subtotalIncrease = 0;
+
+            foreach ($data['items'] as $item) {
+                $product = Product::where('id', $item['product_id'])
+                    ->where('brand_id', $store->brand_id)
+                    ->firstOrFail();
+
+                $priceLog = PriceLog::where('product_id', $product->id)
+                    ->where(fn($q) => $q->where('store_id', $store->id)->orWhereNull('store_id'))
+                    ->whereNull('ended_at')
+                    ->latest('started_at')
+                    ->firstOrFail();
+
+                $qty = (float) $item['quantity'];
+                $unitPrice = (float) $priceLog->sell_price;
+                $buyPrice = (float) $priceLog->buy_price;
+                $discountPercent = (float) $product->discount_percent;
+                $discount = $discountPercent > 0 ? round($unitPrice * ($discountPercent / 100)) : 0;
+
+                $modifierPriceExtra = 0;
+                $selectedModifiers = [];
+                if (!empty($item['modifiers'])) {
+                    foreach ($item['modifiers'] as $mSelection) {
+                        $opt = \App\Models\ProductModifierOption::with('group')->findOrFail($mSelection['option_id']);
+                        $modifierPriceExtra += (float) $opt->price_extra;
+                        $selectedModifiers[] = [
+                            'modifier_option_id' => $opt->id,
+                            'modifier_group_name' => $opt->group->name,
+                            'modifier_option_name' => $opt->name,
+                            'price_extra' => (float) $opt->price_extra,
+                        ];
+                    }
+                }
+
+                $itemSubtotal = ($unitPrice + $modifierPriceExtra - $discount) * $qty;
+                $subtotalIncrease += $itemSubtotal;
+
+                // Check stock
+                if ($product->track_stock) {
+                    $inventory = StoreInventory::where('store_id', $store->id)
+                        ->where('product_id', $product->id)
+                        ->first();
+                    if (($inventory?->current_stock ?? 0) < $qty) {
+                        throw new \RuntimeException("Stok {$product->name} tidak mencukupi.");
+                    }
+                    $inventory->decrement('current_stock', $qty);
+                }
+
+                $orderItem = OrderItem::create([
+                    'order_id'       => $order->id,
+                    'product_id'     => $product->id,
+                    'price_log_id'   => $priceLog->id,
+                    'product_name'   => $product->name,
+                    'quantity'       => $qty,
+                    'unit'           => $product->unit,
+                    'unit_price'     => $unitPrice,
+                    'buy_price'      => $buyPrice,
+                    'discount_amount'=> $discount,
+                    'subtotal'       => $itemSubtotal,
+                    'notes'          => $item['notes'] ?? null,
+                ]);
+
+                foreach ($selectedModifiers as $m) {
+                    $orderItem->modifiers()->create($m);
+                }
+            }
+
+            // Append order notes if provided
+            if (!empty($data['notes'])) {
+                $existingNotes = $order->notes ? $order->notes . "\n" : "";
+                $order->notes = $existingNotes . "[Baru] " . $data['notes'];
+            }
+
+            // Update order totals
+            $order->subtotal += $subtotalIncrease;
+            $order->final_amount += $subtotalIncrease;
+            $order->save();
+        });
+
+        return back()->with('success', 'Item berhasil ditambahkan ke billing rental.');
+    }
+
     private function resolveStore($user, Request $request): ?Store
     {
         $storeId = $request->query('store') ?? $request->input('store');
@@ -515,7 +634,10 @@ class CashierController extends Controller
             return Store::find($user->store_id);
         }
 
-        return null;
+        return Store::where('brand_id', $user->brand_id)
+            ->whereNull('deleted_at')
+            ->where('is_active', true)
+            ->first();
     }
 
     private function getProductsForStore(Store $store): array
@@ -603,30 +725,38 @@ class CashierController extends Controller
             ->orderBy('sort_order')
             ->get();
 
-        $activeOrderIds = Order::where('store_id', $store->id)
+        $activeOrdersByTable = Order::with('items')
+            ->where('store_id', $store->id)
             ->whereNotNull('table_id')
             ->whereNotIn('status', ['done', 'cancelled'])
             ->get()
             ->groupBy('table_id');
 
-        return $floors->map(function ($floor) use ($activeOrderIds) {
+        return $floors->map(function ($floor) use ($activeOrdersByTable) {
             $tables = $floor->diningTables()
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get()
-                ->map(function ($t) use ($activeOrderIds) {
-                    $orders = $activeOrderIds->get($t->id, collect())
+                ->map(function ($t) use ($activeOrdersByTable) {
+                    $orders = $activeOrdersByTable->get($t->id, collect())
                         ->map(fn ($o) => [
                             'id'          => $o->id,
                             'order_code'  => $o->order_code,
                             'status'      => $o->status,
                             'final_amount'=> (float) $o->final_amount,
-                            'items_count' => $o->items()->count(),
+                            'items_count' => $o->items->count(),
                             'created_at'  => $o->created_at->format('H:i'),
                             'is_rental'   => (bool) $o->is_rental,
                             'rental_started_at' => $o->rental_started_at?->toIso8601String(),
                             'rental_end_at' => $o->rental_end_at?->toIso8601String(),
                             'rental_duration_minutes' => $o->rental_duration_minutes,
+                            'notes'       => $o->notes,
+                            'items'       => $o->items->map(fn($item) => [
+                                'name' => $item->product_name,
+                                'qty' => (float) $item->quantity,
+                                'price' => (float) $item->unit_price,
+                                'total' => (float) $item->subtotal,
+                            ])->values()->all(),
                         ])
                         ->values()
                         ->toArray();

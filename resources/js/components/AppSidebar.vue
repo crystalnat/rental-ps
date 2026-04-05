@@ -46,10 +46,6 @@ const navigationGroups = computed((): NavGroup[] => {
                 href: `/admin/stores/${stores.value[0].id}/products`,
                 icon: Package,
                 roles: ['owner'],
-                children: stores.value.map((s) => ({
-                    label: s.name,
-                    href: `/admin/stores/${s.id}/products`,
-                })),
             }
             : {
                 label: 'Produk',
@@ -60,23 +56,12 @@ const navigationGroups = computed((): NavGroup[] => {
 
     const denahMejaItem: NavItem =
         (user.value?.role === 'owner' || user.value?.role === 'admin') && stores.value.length > 0
-            ? stores.value.length > 1
-                ? {
-                    label: 'Denah Unit PS',
-                    href: `/admin/stores/${stores.value[0].id}/floor-plan`,
-                    icon: Gamepad2,
-                    roles: ['owner', 'admin'],
-                    children: stores.value.map((s) => ({
-                        label: s.name,
-                        href: `/admin/stores/${s.id}/floor-plan`,
-                    })),
-                }
-                : {
-                    label: 'Denah Unit PS',
-                    href: `/admin/stores/${stores.value[0].id}/floor-plan`,
-                    icon: Gamepad2,
-                    roles: ['owner', 'admin'],
-                }
+            ? {
+                label: 'Denah Unit PS',
+                href: `/admin/stores/${stores.value[0].id}/floor-plan`,
+                icon: Gamepad2,
+                roles: ['owner', 'admin'],
+            }
             : {
                 label: 'Denah Unit PS',
                 href: '/admin/stores',
@@ -131,7 +116,6 @@ const navigationGroups = computed((): NavGroup[] => {
                 { label: 'Pelanggan', href: '/admin/customers', icon: UserCircle, roles: ['owner', 'admin'] },
                 { label: 'Promo & Voucher', href: '/admin/promos', icon: Tags, roles: ['owner', 'admin'] },
                 { label: 'Karyawan', href: '/admin/users', icon: Users, roles: ['owner', 'admin'] },
-                { label: 'Cabang', href: '/admin/stores', icon: Store, roles: ['owner'] },
                 denahMejaItem,
             ],
         },

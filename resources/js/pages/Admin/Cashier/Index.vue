@@ -16,7 +16,7 @@ import RentalPanel from '@/components/RentalPanel.vue'
 import {
     Search, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone,
     ShoppingBag, Mic, MicOff, X, Clock, Loader2, RotateCcw, ShoppingCart,
-    TicketPercent, Receipt, Gamepad2, Package,
+    TicketPercent, Receipt, Gamepad2, Package, ChevronLeft, ChevronRight,
 } from 'lucide-vue-next'
 import axios from 'axios'
 import FeedbackModal from '@/components/FeedbackModal.vue'
@@ -99,59 +99,96 @@ interface CartItem {
 }
 
 const props = defineProps<{
-    store: Store
-    pending_orders_count?: number
-    products: Product[]
-    categories: Category[]
-    tables: Table[]
-    stores: Store[]
-    payment_methods: PaymentMethodItem[]
-    last_order_id?: number | null
+    store: Store;
+    pending_orders_count?: number;
+    products: Product[];
+    categories: Category[];
+    tables: Table[];
+    stores: Store[];
+    payment_methods: PaymentMethodItem[];
+    last_order_id?: number | null;
     floor_plan?: Array<{
-        id: number
-        name: string
-        width_meters: number
-        length_meters: number
+        id: number;
+        name: string;
+        width_meters: number;
+        length_meters: number;
         tables: Array<{
-            id: number
-            name: string
-            capacity: number
-            x_meters: number
-            y_meters: number
-            width_meters: number
-            length_meters: number
-            rotation_deg: number
-            shape: string
-            tuya_device_id: string | null
-            tuya_status: boolean
-            rental_price_per_hour: number
+            id: number;
+            name: string;
+            capacity: number;
+            x_meters: number;
+            y_meters: number;
+            width_meters: number;
+            length_meters: number;
+            rotation_deg: number;
+            shape: string;
+            tuya_device_id: string | null;
+            tuya_status: boolean;
+            rental_price_per_hour: number;
             active_orders: Array<{
-                id: number
-                order_code: string
-                status: string
-                final_amount: number
-                items_count: number
-                created_at: string
-                is_rental: boolean
-                rental_started_at: string | null
-                rental_end_at: string | null
-                rental_duration_minutes: number | null
-            }>
-            has_orders: boolean
-        }>
-    }>
+                id: number;
+                order_code: string;
+                status: string;
+                final_amount: number;
+                items_count: number;
+                created_at: string;
+                is_rental: boolean;
+                rental_started_at: string | null;
+                rental_end_at: string | null;
+                rental_duration_minutes: number | null;
+            }>;
+            has_orders: boolean;
+        }>;
+    }>;
+    flash: {
+        success?: string;
+        error?: string;
+        last_order_id?: number | null;
+        last_stopped_order_id?: number | null;
+        last_stopped_order_time?: number | null;
+    }
 }>()
 
 const showSuccessDialog = ref(false)
 const lastCreatedOrderId = ref<number | null>(null)
 
-watch(() => props.last_order_id, (newVal) => {
+watch(() => props.flash.last_order_id, (newVal) => {
     if (newVal) {
         lastCreatedOrderId.value = newVal
         currentFeedbackOrderId.value = newVal
         showSuccessDialog.value = true
     }
 }, { immediate: true })
+
+watch(() => props.flash.last_stopped_order_time, (newVal) => {
+    const orderId = props.flash.last_stopped_order_id
+    if (newVal && newVal !== lastProcessedOrderTime.value && orderId) {
+        lastProcessedOrderTime.value = newVal
+        void openReceiptForStoppedRental(orderId)
+    }
+}, { immediate: true })
+
+async function openReceiptForStoppedRental(orderId: number) {
+    try {
+        const res = await axios.get(`/admin/orders/${orderId}/detail`)
+        const order = res.data
+        const pendingOrder: PendingOrderItem = {
+            id: order.id,
+            order_code: order.order_code,
+            table_name: order.table_name,
+            customer_name: order.customer_name,
+            customer_email: order.customer_email,
+            customer_phone: order.customer_phone,
+            final_amount: Number(order.final_amount),
+            created_at: order.created_at,
+            items: order.items,
+            notes: order.notes
+        }
+        openPayModal(pendingOrder)
+    } catch (e) {
+        console.error('Failed to open receipt', e)
+    }
+}
 
 function printLastOrder() {
     if (lastCreatedOrderId.value) {
@@ -183,6 +220,7 @@ const showFeedbackModal = ref(false)
 const currentFeedbackOrderId = ref<number | null>(null)
 
 const showMobileCart = ref(false)
+const isCartCollapsed = ref(false)
 const activeTab = ref<'rental' | 'produk'>('rental')
 const paymentMethod = ref<string>('')
 const cashReceived = ref('')
@@ -214,9 +252,11 @@ type PendingOrderItem = {
     notes?: string
     final_amount: number
     created_at: string
+    items?: Array<{ product_name: string; quantity: number; unit: string; subtotal: number; modifiers?: Array<{ name: string; price_extra: number }> }>
 }
 const pendingOrdersList = ref<PendingOrderItem[]>([])
 const selectedPendingOrder = ref<PendingOrderItem | null>(null)
+const lastProcessedOrderTime = ref<number | null>(null)
 const payForm = ref({ payment_method: '', cash_received: '' })
 const payProcessing = ref(false)
 let pendingOrdersPollInterval: ReturnType<typeof setInterval> | null = null
@@ -754,6 +794,17 @@ const finalAmount = computed(() => {
     return Math.max(0, subtotal.value - (Number(discountAmount.value) || 0))
 })
 
+const activeRentalOrder = computed(() => {
+    if (orderType.value !== 'dine_in' || !selectedTableId.value) return null;
+    for (const floor of props.floor_plan || []) {
+        const table = (floor.tables as any[]).find(t => t.id === selectedTableId.value);
+        if (table) {
+            return (table.active_orders as any[]).find(o => o.is_rental && o.status === 'confirmed');
+        }
+    }
+    return null;
+});
+
 const canCheckout = computed(() => cart.value.length > 0)
 
 function addToCart(product: Product, qty = 1) {
@@ -926,6 +977,33 @@ function submitOrder() {
     })
 }
 
+function submitToRentalBilling() {
+    if (!canCheckout.value || !activeRentalOrder.value) return;
+    
+    processing.value = true;
+    showMobileCart.value = false;
+    
+    router.post('/admin/cashier/add-to-rental', {
+        table_id: selectedTableId.value,
+        store: props.store.id,
+        items: cart.value.map((i) => ({
+            product_id: i.product_id,
+            quantity: i.quantity,
+            notes: i.notes,
+            modifiers: i.modifiers.map(m => ({ option_id: m.option_id })),
+        })),
+        notes: notes.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            cart.value = [];
+            notes.value = '';
+            selectedTableId.value = null;
+        },
+        onFinish: () => { processing.value = false },
+    });
+}
+
 function changeStore(storeId: number) {
     router.get('/admin/cashier', { store: storeId })
 }
@@ -962,9 +1040,12 @@ function submitPayOrder() {
     const prevOrder = selectedPendingOrder.value
     selectedPendingOrder.value = null
 
+    // Clean formatting for backend
+    const cleanCash = String(payForm.value.cash_received).replace(/\D/g, '')
+
     router.post(`/admin/orders/${order.id}/pay`, {
         payment_method: payForm.value.payment_method,
-        cash_received: getRequiresCashInput() ? payForm.value.cash_received : null,
+        cash_received: getRequiresCashInput() ? cleanCash : null,
     }, {
         preserveScroll: true,
         onSuccess: () => {
@@ -1208,26 +1289,44 @@ const showQrOrAccount = computed(() => {
 
             <div
                 :class="[
-                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-transform md:static md:z-auto md:h-auto md:w-[320px] lg:w-[380px] md:shrink-0 md:translate-y-0 md:rounded-lg md:border md:bg-card md:p-3 md:shadow-none min-h-0',
-                    showMobileCart ? 'translate-y-0' : 'translate-y-full'
+                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-all duration-300 md:static md:z-auto md:h-full md:shrink-0 md:translate-y-0 md:rounded-lg md:border md:bg-card md:p-3 md:shadow-none min-h-0 relative',
+                    showMobileCart ? 'translate-y-0' : 'translate-y-full',
+                    isCartCollapsed ? 'md:w-[60px] md:overflow-visible' : 'md:w-[320px] lg:w-[380px]'
                 ]"
             >
+                <!-- Toggle Button (Desktop Only) -->
+                <button
+                    type="button"
+                    class="absolute -left-3 top-12 z-[60] hidden h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent md:flex"
+                    @click="isCartCollapsed = !isCartCollapsed"
+                >
+                    <ChevronRight v-if="isCartCollapsed" class="h-4 w-4" />
+                    <ChevronLeft v-else class="h-4 w-4" />
+                </button>
+
                 <div class="mb-2 flex items-center justify-between md:hidden">
                     <h2 class="text-lg font-semibold">Keranjang</h2>
                     <Button variant="ghost" size="icon" @click="showMobileCart = false">
                         <X class="h-5 w-5" />
                     </Button>
                 </div>
-                <!-- Pesanan Menunggu - tinggi tetap, scroll dalam, keranjang dapat sisa ruang -->
-                <Card v-if="pendingOrdersList.length > 0" class="shrink-0 max-h-[140px] min-h-0 flex flex-col overflow-hidden">
+
+                <!-- Collapsed View Content -->
+                <div v-if="isCartCollapsed" class="hidden md:flex flex-col items-center gap-6 py-4">
+                    <div class="relative cursor-pointer" @click="isCartCollapsed = false">
+                        <ShoppingBag class="h-6 w-6 text-primary" />
+                        <Badge v-if="cart.length > 0" class="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center p-0 text-[10px]">{{ cart.length }}</Badge>
+                    </div>
+                </div>
+
+                <template v-else>
+                    <!-- Pesanan Menunggu -->
+                    <Card v-if="pendingOrdersList.length > 0" class="shrink-0 max-h-[140px] min-h-0 flex flex-col overflow-hidden">
                     <CardHeader class="shrink-0 px-4 py-2">
                         <CardTitle class="flex items-center justify-between text-sm">
                             <span>Pesanan Menunggu</span>
                             <Badge variant="destructive">{{ pendingOrdersList.length }}</Badge>
                         </CardTitle>
-                        <CardDescription class="text-xs">
-                            Klik untuk terima pembayaran
-                        </CardDescription>
                     </CardHeader>
                     <CardContent class="min-h-0 flex-1 overflow-y-auto p-4 pt-0">
                         <div class="space-y-2">
@@ -1240,230 +1339,121 @@ const showQrOrAccount = computed(() => {
                             >
                                 <div class="min-w-0">
                                     <p class="font-mono text-sm font-medium truncate">{{ o.order_code }}</p>
-                                    <p class="text-xs text-muted-foreground">
-                                        Meja {{ o.table_name ?? '—' }} · {{ o.created_at }}
-                                    </p>
+                                    <p class="text-xs text-muted-foreground">Meja {{ o.table_name ?? '—' }}</p>
                                 </div>
-                                <span class="ml-2 shrink-0 font-semibold text-primary">{{ formatCurrency(o.final_amount) }}</span>
+                                <span class="ml-2 shrink-0 font-semibold text-primary text-xs">{{ formatCurrency(o.final_amount) }}</span>
                             </button>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card class="flex flex-1 min-h-0 flex-col overflow-hidden">
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-base">Keranjang</CardTitle>
-                        <Badge variant="secondary">{{ cart.length }} item</Badge>
+                    <CardHeader class="shrink-0 flex flex-row items-center justify-between space-y-0 pb-2 px-4">
+                        <CardTitle class="text-sm font-bold uppercase tracking-wider">Keranjang</CardTitle>
+                        <Badge variant="secondary" class="text-[10px]">{{ cart.length }} Item</Badge>
                     </CardHeader>
                     <CardContent class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-                        <div class="flex gap-2 border-b px-4 pb-3">
+                        <!-- Tipe Order & Meja -->
+                        <div class="shrink-0 flex gap-2 border-b px-4 pb-3">
                             <select
                                 v-model="orderType"
-                                class="filter-select flex h-9 flex-1 rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
+                                class="filter-select flex h-8 flex-1 rounded-md border border-input bg-transparent px-2 py-1 text-xs text-foreground"
                             >
-                                <option value="walk_in">
-                                    {{ orderTypeLabel.walk_in }}
-                                </option>
-                                <option value="dine_in">
-                                    {{ orderTypeLabel.dine_in }}
-                                </option>
-                                <option value="takeaway">
-                                    {{ orderTypeLabel.takeaway }}
-                                </option>
+                                <option value="walk_in">{{ orderTypeLabel.walk_in }}</option>
+                                <option value="dine_in">{{ orderTypeLabel.dine_in }}</option>
+                                <option value="takeaway">{{ orderTypeLabel.takeaway }}</option>
                             </select>
                             <select
                                 v-if="orderType === 'dine_in'"
                                 v-model="selectedTableId"
-                                class="filter-select flex h-9 min-w-[100px] rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
+                                class="filter-select flex h-8 min-w-[100px] rounded-md border border-input bg-transparent px-2 py-1 text-xs text-foreground"
                             >
-                                <option :value="null">Pilih Meja</option>
-                                <option
-                                    v-for="t in tables"
-                                    :key="t.id"
-                                    :value="t.id"
-                                >
-                                    {{ t.name }}
-                                </option>
+                                <option :value="null">Meja</option>
+                                <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
                             </select>
                         </div>
-                        <div v-if="orderType === 'dine_in'" class="space-y-2 border-b px-4 pb-3">
-                            <p class="text-xs font-medium text-muted-foreground">Data Pelanggan (opsional — isi HP atau email untuk menyimpan)</p>
-                            <div class="grid gap-2 sm:grid-cols-3">
-                                <Input
-                                    v-model="customerName"
-                                    placeholder="Nama"
-                                    class="h-9 text-sm"
-                                />
-                                <Input
-                                    v-model="customerPhone"
-                                    placeholder="No. HP"
-                                    type="tel"
-                                    inputmode="numeric"
-                                    class="h-9 text-sm"
-                                    @input="(e: Event) => { customerPhone = (e.target as HTMLInputElement).value.replace(/\D/g, '') }"
-                                />
-                                <Input
-                                    v-model="customerEmail"
-                                    placeholder="Email"
-                                    type="email"
-                                    class="h-9 text-sm"
-                                />
-                            </div>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-4">
-                            <div
-                                v-if="cart.length === 0"
-                                class="flex flex-col items-center justify-center py-12 text-center text-muted-foreground"
-                            >
-                                <ShoppingBag class="mb-2 h-12 w-12 opacity-50" />
-                                <p class="text-sm">Keranjang kosong</p>
-                                <p class="text-xs">Klik produk untuk menambah</p>
+
+
+
+                        <!-- Daftar Item (Scrollable) -->
+                        <div class="flex-1 overflow-y-auto p-3">
+                            <div v-if="cart.length === 0" class="flex flex-col items-center justify-center py-12 text-center text-muted-foreground opacity-50">
+                                <ShoppingBag class="mb-2 h-8 w-8" />
+                                <p class="text-[11px]">Keranjang kosong</p>
                             </div>
                             <div v-else class="space-y-2">
-                                <div
-                                    v-for="item in cart"
-                                    :key="item.id"
-                                    class="flex items-center gap-2 rounded-lg border p-2"
-                                >
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-medium">{{ item.name }}</p>
-                                        <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-0.5">
-                                            <span v-for="m in item.modifiers" :key="m.option_id" class="text-[9px] bg-muted px-1 rounded text-muted-foreground uppercase tracking-tighter">
-                                                {{ m.name }}
-                                            </span>
+                                <div v-for="item in cart" :key="item.id" class="flex flex-col gap-1.5 rounded-lg border bg-muted/5 p-2.5 transition-all hover:border-primary/30">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[12px] font-bold leading-tight">{{ item.name }}</p>
+                                            <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-1">
+                                                <span v-for="m in item.modifiers" :key="m.option_id" class="text-[8px] bg-primary/10 px-1 rounded text-primary font-bold uppercase">{{ m.name }}</span>
+                                            </div>
                                         </div>
-                                        <p class="text-xs text-muted-foreground mt-0.5">
-                                            <span v-if="item.discount_percent > 0" class="line-through text-muted-foreground/50 mr-1">{{ formatCurrency(item.sell_price) }}</span>
-                                            <span v-if="item.discount_percent > 0" class="font-bold text-destructive">{{ formatCurrency(item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100))) }}</span>
-                                            <span v-else>{{ formatCurrency(item.sell_price) }}</span>
-                                            <span v-if="item.modifiers.length > 0" class="text-primary font-medium ml-1">
-                                                +{{ formatCurrency(item.modifiers.reduce((s, m) => s + m.price_extra, 0)) }}
-                                            </span>
-                                            × {{ item.quantity }} {{ item.unit }}
+                                        <p class="shrink-0 text-[12px] font-black text-primary">
+                                            {{ formatCurrency((item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100)) + item.modifiers.reduce((s, m) => s + m.price_extra, 0)) * item.quantity) }}
                                         </p>
                                     </div>
-                                    <div class="flex items-center gap-1">
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            class="h-7 w-7"
-                                            @click="updateQty(item, -1)"
-                                        >
-                                            <Minus class="h-3 w-3" />
-                                        </Button>
-                                        <span class="min-w-[2rem] text-center text-sm">{{ item.quantity }}</span>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            class="h-7 w-7"
-                                            @click="updateQty(item, 1)"
-                                        >
-                                            <Plus class="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            class="h-7 w-7 text-destructive"
-                                            @click="removeFromCart(item)"
-                                        >
-                                            <Trash2 class="h-3 w-3" />
-                                        </Button>
+                                    <div class="flex items-center justify-between border-t border-dashed pt-1.5">
+                                        <div class="text-[10px] text-muted-foreground">
+                                            <span>{{ formatCurrency(item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100))) }}</span>
+                                            <span class="mx-1">×</span>
+                                            <span class="font-bold text-foreground">{{ item.quantity }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <Button variant="outline" size="icon" class="h-6 w-6 rounded" @click="updateQty(item, -1)"><Minus class="h-2.5 w-2.5" /></Button>
+                                            <span class="min-w-[1.2rem] text-center text-[11px] font-bold">{{ item.quantity }}</span>
+                                            <Button variant="outline" size="icon" class="h-6 w-6 rounded" @click="updateQty(item, 1)"><Plus class="h-2.5 w-2.5" /></Button>
+                                            <Button variant="ghost" size="icon" class="h-6 w-6 text-destructive/60 hover:text-destructive ml-1" @click="removeFromCart(item)"><Trash2 class="h-2.5 w-2.5" /></Button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div v-if="cart.length > 0" class="border-t p-4 space-y-4">
-                            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">
-                                <Receipt class="h-3.5 w-3.5" />
-                                <span>Ringkasan Pesanan</span>
-                            </div>
 
-                            <div class="space-y-2">
-                                <div class="flex justify-between text-sm">
+                        <!-- Ringkasan & Checkout -->
+                        <div v-if="cart.length > 0" class="shrink-0 border-t bg-muted/10 p-3 space-y-3">
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-[11px]">
                                     <span class="text-muted-foreground">Subtotal</span>
                                     <span class="font-medium tabular-nums">{{ formatCurrency(subtotal) }}</span>
                                 </div>
-                                
-                                <div class="space-y-1.5 pt-1">
-                                    <Label class="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/80">Kode Promo (Opsional)</Label>
-                                    <div class="flex items-center gap-2">
-                                        <div class="relative flex-1">
-                                            <TicketPercent class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
-                                            <Input
-                                                v-model="promoCodeInput"
-                                                placeholder="KODEPROMO"
-                                                class="h-9 pl-8 text-xs uppercase tracking-wider focus-visible:ring-primary/30"
-                                                :disabled="activePromo !== null || promoLoading"
-                                                @keyup.enter="applyPromoCode"
-                                            />
-                                        </div>
-                                        <Button
-                                            v-if="!activePromo"
-                                            size="sm"
-                                            variant="secondary"
-                                            class="h-9 px-4 text-xs font-semibold shrink-0"
-                                            :disabled="!promoCodeInput || promoLoading"
-                                            @click="applyPromoCode"
-                                        >
-                                            <Loader2 v-if="promoLoading" class="h-3 w-3 animate-spin mr-1.5" />
-                                            Terapkan
-                                        </Button>
-                                        <Button
-                                            v-else
-                                            size="sm"
-                                            variant="outline"
-                                            class="h-9 px-4 text-xs font-semibold text-destructive border-destructive/20 hover:bg-destructive/10 shrink-0"
-                                            @click="removePromo"
-                                        >
-                                            Batal
-                                        </Button>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="relative flex-1">
+                                        <TicketPercent class="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/60" />
+                                        <Input v-model="promoCodeInput" placeholder="PROMO" class="h-7 pl-6 text-[10px] uppercase focus-visible:ring-primary/20" :disabled="activePromo !== null || promoLoading" @keyup.enter="applyPromoCode" />
                                     </div>
-                                    <p v-if="promoError" class="text-[10px] text-destructive px-1">{{ promoError }}</p>
-                                    <p v-if="activePromo" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded inline-block">
-                                        ✨ Promo aktif: {{ activePromo.type === 'percentage' ? activePromo.value + '%' : 'Rp ' + activePromo.value }}
-                                    </p>
+                                    <Button v-if="!activePromo" size="sm" variant="secondary" class="h-7 px-2 text-[10px]" :disabled="!promoCodeInput || promoLoading" @click="applyPromoCode">Pakai</Button>
+                                    <Button v-else size="sm" variant="ghost" class="h-7 px-2 text-[10px] text-destructive" @click="removePromo">Batal</Button>
+                                    <Input v-model="discountAmount" type="number" class="h-7 w-16 text-right text-[10px] px-1 font-bold" placeholder="Disc" min="0" :disabled="activePromo !== null" />
                                 </div>
+                                <p v-if="activePromo" class="text-[9px] text-emerald-600 font-bold bg-emerald-500/5 px-1.5 py-0.5 rounded">Promo: {{ activePromo.type === 'percentage' ? activePromo.value + '%' : 'Rp' + activePromo.value }}</p>
+                                <p v-if="promoError" class="text-[9px] text-destructive px-1">{{ promoError }}</p>
+                            </div>
 
-                                <div class="flex items-center justify-between gap-4 pt-1">
-                                    <Label class="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/80">Diskon Laci / Manual (Rp)</Label>
-                                    <Input
-                                        v-model="discountAmount"
-                                        type="number"
-                                        class="h-8 w-32 text-right text-xs px-2 font-bold tabular-nums border-muted focus-visible:ring-primary/30"
-                                        placeholder="0"
-                                        min="0"
-                                        :disabled="activePromo !== null"
-                                    />
+                            <div class="flex gap-2">
+                                <textarea v-model="notes" placeholder="Catatan..." rows="1" class="flex-1 rounded border border-input bg-background px-2 py-1 text-[10px] placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/20 resize-none min-h-[30px]" />
+                                <div class="shrink-0 text-right">
+                                    <p class="text-[8px] font-bold uppercase text-muted-foreground leading-none">Total</p>
+                                    <p class="text-base font-black text-primary leading-tight">{{ formatCurrency(finalAmount) }}</p>
                                 </div>
                             </div>
 
-                            <div class="mb-4 flex flex-col pt-3 border-t">
-                                <Label class="text-[10px] font-bold uppercase tracking-tight text-muted-foreground/80 mb-1.5">Catatan Pesanan</Label>
-                                <textarea
-                                    v-model="notes"
-                                    placeholder="Contoh: Sambal pisah, pedas sedang..."
-                                    rows="1"
-                                    class="w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30 resize-none min-h-[40px]"
-                                />
+                            <div v-if="activeRentalOrder" class="grid grid-cols-2 gap-2">
+                                <Button variant="outline" class="h-10 text-xs font-bold border-primary text-primary hover:bg-primary/5" :disabled="processing" @click="submitToRentalBilling">
+                                    <Plus class="mr-1 h-3.5 w-3.5" /> Billing PS
+                                </Button>
+                                <Button class="h-10 text-xs font-bold" :disabled="!canCheckout" @click="openPaymentDialog">
+                                    <CreditCard class="mr-1 h-3.5 w-3.5" /> Bayar
+                                </Button>
                             </div>
-
-                            <div class="flex justify-between font-bold text-xl pt-2 border-t-2 border-dashed border-primary/20">
-                                <span class="text-muted-foreground text-sm uppercase self-center">Total Tagihan</span>
-                                <span class="text-primary tabular-nums tracking-tighter">{{ formatCurrency(finalAmount) }}</span>
-                            </div>
-
-                            <Button
-                                class="w-full h-12 text-base font-bold shadow-lg shadow-primary/10"
-                                size="lg"
-                                :disabled="!canCheckout"
-                                @click="openPaymentDialog"
-                            >
-                                <CreditCard class="mr-2 h-5 w-5" />
-                                Bayar Sekarang
+                            <Button v-else class="w-full h-10 text-sm font-bold shadow-md shadow-primary/10" :disabled="!canCheckout" @click="openPaymentDialog">
+                                <CreditCard class="mr-2 h-4 w-4" /> Bayar
                             </Button>
                         </div>
                     </CardContent>
                 </Card>
+                </template>
             </div>
         </div>
 
@@ -1534,19 +1524,56 @@ const showQrOrAccount = computed(() => {
                         </div>
                     </div>
                     <div v-if="requiresCashInput">
-                        <p class="mb-2 text-sm font-medium">Uang Diterima</p>
-                        <Input
-                            v-model="cashReceived"
-                            type="number"
-                            placeholder="0"
-                            min="0"
-                            step="0.01"
-                        />
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            Kembalian: {{ formatCurrency(Math.max(0, (Number(cashReceived) || 0) - finalAmount)) }}
-                        </p>
+                        <Label for="checkout_cash_received">Uang Diterima</Label>
+                        <div class="relative mt-1.5">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">Rp</span>
+                            <Input
+                                id="checkout_cash_received"
+                                :value="cashReceived ? Number(cashReceived).toLocaleString('id-ID') : ''"
+                                @input="(e: any) => {
+                                    const raw = e.target.value.replace(/\D/g, '');
+                                    cashReceived = raw;
+                                }"
+                                type="text"
+                                class="pl-9 font-mono font-bold text-primary"
+                                :placeholder="finalAmount.toLocaleString('id-ID')"
+                            />
+                        </div>
+                        <div class="mt-2 flex items-center justify-between">
+                            <p class="text-xs text-muted-foreground">
+                                Total: {{ formatCurrency(finalAmount) }}
+                            </p>
+                            <p v-if="cashReceived && Number(cashReceived) > finalAmount" class="text-xs font-bold text-emerald-600">
+                                Kembalian: {{ formatCurrency(Number(cashReceived) - finalAmount) }}
+                            </p>
+                        </div>
                     </div>
-                    <div class="rounded-lg bg-muted p-3">
+
+                    <!-- Receipt Detail in Payment Modal -->
+                    <div v-if="selectedPendingOrder.items && selectedPendingOrder.items.length > 0" class="rounded-xl border bg-muted/30 p-4">
+                        <p class="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Rincian Pesanan</p>
+                        <div class="space-y-2 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
+                            <div v-for="(item, idx) in selectedPendingOrder.items" :key="idx" class="flex justify-between border-b border-dashed border-muted-foreground/20 pb-2 last:border-0 last:pb-0">
+                                <div class="min-w-0 pr-2">
+                                    <p class="text-xs font-bold leading-tight">{{ item.product_name }}</p>
+                                    <p class="text-[10px] text-muted-foreground">{{ item.quantity }} {{ item.unit }}</p>
+                                    <!-- Modifiers -->
+                                    <div v-if="item.modifiers && item.modifiers.length > 0" class="mt-1 flex flex-wrap gap-1">
+                                        <span v-for="(mod, midx) in item.modifiers" :key="midx" class="text-[9px] text-muted-foreground/80 italic">
+                                            + {{ mod.name }}{{ midx < item.modifiers.length - 1 ? ',' : '' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span class="shrink-0 font-mono text-xs font-bold">{{ formatCurrency(item.subtotal) }}</span>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex justify-between border-t pt-3 font-black text-primary">
+                            <span class="text-xs uppercase tracking-wider">Total Tagihan</span>
+                            <span class="text-base font-mono">{{ formatCurrency(selectedPendingOrder.final_amount) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 rounded-xl border bg-card p-4 shadow-sm">
                         <p class="text-sm text-muted-foreground">Total Dibayar</p>
                         <p class="text-2xl font-black text-primary">{{ formatCurrency(finalAmount) }}</p>
                     </div>
@@ -1592,6 +1619,30 @@ const showQrOrAccount = computed(() => {
                     </p>
                 </div>
                 <form class="space-y-4" @submit.prevent="submitPayOrder">
+                    <!-- Receipt Detail in Payment Modal -->
+                    <div v-if="selectedPendingOrder.items && selectedPendingOrder.items.length > 0" class="rounded-xl border bg-muted/30 p-4">
+                        <p class="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Rincian Pesanan</p>
+                        <div class="space-y-2 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
+                            <div v-for="(item, idx) in selectedPendingOrder.items" :key="idx" class="flex justify-between border-b border-dashed border-muted-foreground/20 pb-2 last:border-0 last:pb-0">
+                                <div class="min-w-0 pr-2">
+                                    <p class="text-xs font-bold leading-tight">{{ item.product_name }}</p>
+                                    <p class="text-[10px] text-muted-foreground">{{ item.quantity }} {{ item.unit }}</p>
+                                    <!-- Modifiers -->
+                                    <div v-if="item.modifiers && item.modifiers.length > 0" class="mt-1 flex flex-wrap gap-1">
+                                        <span v-for="(mod, midx) in item.modifiers" :key="midx" class="text-[9px] text-muted-foreground/80 italic">
+                                            + {{ mod.name }}{{ midx < item.modifiers.length - 1 ? ',' : '' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span class="shrink-0 font-mono text-xs font-bold">{{ formatCurrency(item.subtotal) }}</span>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex justify-between border-t pt-3 font-black text-primary">
+                            <span class="text-xs uppercase tracking-wider">Total Tagihan</span>
+                            <span class="text-base font-mono">{{ formatCurrency(selectedPendingOrder.final_amount) }}</span>
+                        </div>
+                    </div>
+
                     <div>
                         <Label>Metode Pembayaran</Label>
                         <select
@@ -1609,18 +1660,28 @@ const showQrOrAccount = computed(() => {
                     </div>
                     <div v-if="getRequiresCashInput()">
                         <Label for="pay_cash_received">Uang Diterima</Label>
-                        <Input
-                            id="pay_cash_received"
-                            v-model="payForm.cash_received"
-                            type="number"
-                            min="0"
-                            step="100"
-                            class="mt-1.5"
-                            :placeholder="formatCurrency(selectedPendingOrder.final_amount)"
-                        />
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            Total: {{ formatCurrency(selectedPendingOrder.final_amount) }}
-                        </p>
+                        <div class="relative mt-1.5">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">Rp</span>
+                            <Input
+                                id="pay_cash_received"
+                                :value="payForm.cash_received ? Number(payForm.cash_received).toLocaleString('id-ID') : ''"
+                                @input="(e: any) => {
+                                    const raw = e.target.value.replace(/\D/g, '');
+                                    payForm.cash_received = raw;
+                                }"
+                                type="text"
+                                class="pl-9 font-mono font-bold text-primary"
+                                :placeholder="selectedPendingOrder.final_amount.toLocaleString('id-ID')"
+                            />
+                        </div>
+                        <div class="mt-2 flex items-center justify-between">
+                            <p class="text-xs text-muted-foreground">
+                                Total: {{ formatCurrency(selectedPendingOrder.final_amount) }}
+                            </p>
+                            <p v-if="payForm.cash_received && Number(payForm.cash_received) > selectedPendingOrder.final_amount" class="text-xs font-bold text-emerald-600">
+                                Kembalian: {{ formatCurrency(Number(payForm.cash_received) - selectedPendingOrder.final_amount) }}
+                            </p>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" @click="closePayModal">
@@ -1628,7 +1689,7 @@ const showQrOrAccount = computed(() => {
                         </Button>
                         <Button
                             type="submit"
-                            :disabled="payProcessing || (getRequiresCashInput() && (Number(payForm.cash_received) || 0) < selectedPendingOrder.final_amount)"
+                            :disabled="payProcessing || (getRequiresCashInput() && (Number(String(payForm.cash_received).replace(/\D/g, '')) || 0) < selectedPendingOrder.final_amount)"
                         >
                             {{ payProcessing ? 'Memproses...' : 'Konfirmasi Pembayaran' }}
                         </Button>

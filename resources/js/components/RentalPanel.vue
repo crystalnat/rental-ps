@@ -26,6 +26,7 @@ interface TableOrder {
     rental_started_at: string | null
     rental_end_at: string | null
     rental_duration_minutes: number | null
+    items?: Array<{ name: string; qty: number; price: number; total: number }>
 }
 
 interface FloorTable {
@@ -119,7 +120,7 @@ const stoppingRental = ref<Record<number, boolean>>({})
 // Dialogs
 const showStartRentalDialog = ref(false)
 const startRentalForm = ref({ duration: 60 })
-const startMode = ref<'paket' | 'custom'>('paket')
+const startMode = ref<'paket' | 'custom' | 'open'>('paket')
 const selectedPackageId = ref<number | null>(null)
 const showAddDurationDialog = ref(false)
 const addDurationForm = ref({ minutes: 30 })
@@ -163,9 +164,18 @@ function getRemainingMs(endStr: string): number {
     return new Date(endStr).getTime() - now.value.getTime()
 }
 
-function formatRemaining(endStr: string | null | undefined): string {
-    if (!endStr) return '—'
-    const ms = getRemainingMs(endStr)
+function formatRemaining(order: TableOrder): string {
+    if (!order.rental_end_at) {
+        if (!order.rental_started_at) return '00:00:00'
+        const ms = now.value.getTime() - new Date(order.rental_started_at).getTime()
+        const totalSec = Math.floor(Math.max(0, ms) / 1000)
+        const h = Math.floor(totalSec / 3600)
+        const m = Math.floor((totalSec % 3600) / 60)
+        const s = totalSec % 60
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    }
+
+    const ms = getRemainingMs(order.rental_end_at)
     if (ms <= 0) return 'Habis'
     const totalSec = Math.floor(ms / 1000)
     const h = Math.floor(totalSec / 3600)
@@ -190,6 +200,42 @@ function isExpiringSoon(order: TableOrder): boolean {
 function isExpired(order: TableOrder): boolean {
     if (!order.rental_end_at) return false
     return getRemainingMs(order.rental_end_at) <= 0
+}
+
+function getRunningCost(order: TableOrder, pricePerHour: number): number {
+    if (order.rental_end_at) return order.final_amount
+
+    if (!order.rental_started_at) return order.final_amount
+    const ms = now.value.getTime() - new Date(order.rental_started_at).getTime()
+    const msSafe = Math.max(0, ms)
+    
+    // Calculate rental cost based on exact seconds running
+    const totalSec = Math.floor(msSafe / 1000)
+    const costPerSec = pricePerHour / 3600
+    const rentalCost = Math.floor(costPerSec * totalSec)
+
+    return (Number(order.final_amount) || 0) + rentalCost
+}
+
+function getRentalOnlyCost(order: TableOrder, pricePerHour: number): number {
+    if (order.rental_end_at) {
+        // For fixed duration, rental cost is (final_amount - items)
+        const itemsTotal = order.items?.reduce((s, i) => s + i.total, 0) ?? 0
+        return order.final_amount - itemsTotal
+    }
+    
+    // For open billing
+    if (!order.rental_started_at) return 0
+    const ms = now.value.getTime() - new Date(order.rental_started_at).getTime()
+    const totalSec = Math.floor(Math.max(0, ms) / 1000)
+    return Math.floor((pricePerHour / 3600) * totalSec)
+}
+
+function getRunningDurationMinutes(order: TableOrder): number {
+    if (order.rental_end_at) return order.rental_duration_minutes ?? 0
+    if (!order.rental_started_at) return 0
+    const ms = now.value.getTime() - new Date(order.rental_started_at).getTime()
+    return Math.floor(Math.max(0, ms) / 60000)
 }
 
 // ─── Table actions ─────────────────────────────────────────────────────────────
@@ -263,9 +309,14 @@ function submitStartRental() {
         emit('add-to-cart', { product: pkg, tableId })
     }
 
-    router.post(getFloorUrl('start-rental', tableId), {
-        duration_minutes: startRentalForm.value.duration,
-    }, {
+    let payload = {}
+    if (startMode.value === 'paket') {
+        payload = { duration_minutes: startRentalForm.value.duration }
+    } else {
+        payload = { duration_minutes: startMode.value === 'open' ? null : startRentalForm.value.duration }
+    }
+
+    router.post(getFloorUrl('start-rental', tableId), payload, {
         preserveScroll: true,
         onSuccess: () => { syncSelectedTable() },
         onFinish: () => { startingRental.value[tableId] = false },
@@ -339,6 +390,7 @@ function getActiveRental(table: FloorTable): TableOrder | null {
 function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expired' {
     const rental = getActiveRental(table)
     if (!rental) return 'idle'
+    if (!rental.rental_end_at) return 'active' // Open billing logic
     if (isExpired(rental)) return 'expired'
     if (isExpiringSoon(rental)) return 'expiring'
     return 'active'
@@ -432,7 +484,7 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                     <div v-if="getActiveRental(t)" class="mt-0.5 flex items-center gap-0.5">
                                         <Timer class="h-2.5 w-2.5" :class="getUnitState(t) === 'expiring' ? 'text-amber-300' : 'text-emerald-300'" />
                                         <span class="font-mono text-[9px] font-bold" :class="getUnitState(t) === 'expiring' ? 'text-amber-200' : 'text-emerald-200'">
-                                            {{ formatRemaining(getActiveRental(t)?.rental_end_at) }}
+                                            {{ formatRemaining(getActiveRental(t)!) }}
                                         </span>
                                     </div>
 
@@ -525,35 +577,61 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                     getUnitState(selectedTable) === 'expired' ? 'bg-red-500/10 border border-red-500/30' :
                                     'bg-emerald-500/10 border border-emerald-400/30']">
                                     <p class="text-xs font-medium uppercase tracking-wider" :class="getUnitState(selectedTable) === 'expiring' ? 'text-amber-600' : getUnitState(selectedTable) === 'expired' ? 'text-red-500' : 'text-emerald-600'">
-                                        <template v-if="getUnitState(selectedTable) === 'expired'">⏰ Waktu Habis</template>
-                                        <template v-else-if="getUnitState(selectedTable) === 'expiring'">⚡ Segera Habis</template>
-                                        <template v-else>🕹️ Sisa Waktu</template>
+                                        <template v-if="getUnitState(selectedTable) === 'expired'">Waktu Habis</template>
+                                        <template v-else-if="getUnitState(selectedTable) === 'expiring'">Segera Habis</template>
+                                        <template v-else-if="ord.rental_end_at">Sisa Waktu</template>
+                                        <template v-else>Waktu Berjalan</template>
                                     </p>
                                     <p class="mt-1 font-mono text-3xl font-black tracking-tight" :class="getUnitState(selectedTable) === 'expiring' ? 'text-amber-500' : getUnitState(selectedTable) === 'expired' ? 'text-red-500' : 'text-emerald-500'">
-                                        {{ formatRemaining(ord.rental_end_at) }}
+                                        {{ formatRemaining(ord) }}
                                     </p>
                                     <!-- Progress bar -->
-                                    <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
+                                    <div v-if="ord.rental_end_at" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
                                         <div
                                             class="h-full rounded-full transition-all duration-1000"
                                             :class="getUnitState(selectedTable) === 'expiring' ? 'bg-amber-400' : getUnitState(selectedTable) === 'expired' ? 'bg-red-500' : 'bg-emerald-400'"
                                             :style="{ width: getRemainingPercent(ord) + '%' }"
                                         />
                                     </div>
-                                    <p class="mt-1.5 text-[10px] text-muted-foreground">
-                                        Berakhir: {{ ord.rental_end_at ? new Date(ord.rental_end_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—' }}
+                                    <p v-if="ord.rental_end_at" class="mt-1.5 text-[10px] text-muted-foreground">
+                                        Berakhir: {{ new Date(ord.rental_end_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                                    </p>
+                                    <p v-else class="mt-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                        Billing Terbuka (Open Rent)
                                     </p>
                                 </div>
 
                                 <!-- Order info -->
                                 <div class="rounded-lg border bg-muted/30 p-3 text-xs space-y-1">
                                     <div class="flex justify-between"><span class="text-muted-foreground">Kode Pesanan:</span><span class="font-mono font-bold">{{ ord.order_code }}</span></div>
-                                    <div class="flex justify-between"><span class="text-muted-foreground">Durasi:</span><span class="font-medium">{{ ord.rental_duration_minutes }}m</span></div>
-                                    <div class="flex justify-between"><span class="text-muted-foreground">Total:</span><span class="font-bold text-primary">{{ formatCurrency(ord.final_amount) }}</span></div>
+                                    <div class="flex justify-between">
+                                        <span class="text-muted-foreground">Durasi:</span>
+                                        <span class="font-medium" v-if="ord.rental_end_at">{{ ord.rental_duration_minutes }}m</span>
+                                        <span class="font-medium text-emerald-600" v-else>{{ getRunningDurationMinutes(ord) }}m (Berjalan)</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-muted-foreground">Total:</span>
+                                        <span class="font-bold text-primary text-sm font-mono tracking-tighter">{{ formatCurrency(getRunningCost(ord, selectedTable.rental_price_per_hour)) }}</span>
+                                    </div>
                                     <div class="flex justify-between items-center"><span class="text-muted-foreground">Status:</span>
                                         <span :class="['rounded px-1.5 py-0.5 text-[10px] font-bold uppercase', ord.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700']">
                                             {{ ord.status === 'ready' ? 'Selesai' : 'Aktif' }}
                                         </span>
+                                    </div>
+
+                                    <!-- Detail Billing breakdown -->
+                                    <div v-if="(ord.items && ord.items.length > 0) || getRentalOnlyCost(ord, selectedTable.rental_price_per_hour) > 0" class="mt-3 pt-2 border-t border-dashed border-muted-foreground/20">
+                                        <p class="text-[9px] font-black text-muted-foreground/60 uppercase mb-1.5 tracking-widest text-center">Rincian Tagihan</p>
+                                        <div class="space-y-1 max-h-[120px] overflow-y-auto pr-1 scrollbar-thin">
+                                            <div class="flex justify-between text-[11px] leading-tight">
+                                                <span class="text-muted-foreground">Sewa PS ({{ ord.rental_end_at ? ord.rental_duration_minutes : getRunningDurationMinutes(ord) }}m)</span>
+                                                <span class="font-medium font-mono">{{ formatCurrency(getRentalOnlyCost(ord, selectedTable.rental_price_per_hour)) }}</span>
+                                            </div>
+                                            <div v-for="(item, idx) in ord.items" :key="idx" class="flex justify-between text-[11px] leading-tight pt-0.5">
+                                                <span class="text-muted-foreground truncate mr-2">{{ item.name }} <span class="font-bold">x{{ item.qty }}</span></span>
+                                                <span class="font-medium font-mono shrink-0">{{ formatCurrency(item.total) }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -589,6 +667,7 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                     <template v-else-if="ord.status !== 'ready'">
                                         <div class="grid grid-cols-2 gap-2">
                                             <Button
+                                                v-if="ord.rental_end_at"
                                                 variant="outline"
                                                 size="sm"
                                                 class="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
@@ -679,7 +758,7 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                     :class="startMode === 'paket' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
                     @click="startMode = 'paket'; selectedPackageId = null"
                 >
-                    🎮 Pilih Paket
+                    Pilih Paket
                 </button>
                 <button
                     type="button"
@@ -687,7 +766,15 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                     :class="startMode === 'custom' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
                     @click="startMode = 'custom'; selectedPackageId = null; startRentalForm.duration = 60"
                 >
-                    ⏱️ Durasi Custom
+                    Durasi Custom
+                </button>
+                <button
+                    type="button"
+                    class="flex-1 rounded-md py-1.5 text-sm font-semibold transition-all"
+                    :class="startMode === 'open' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                    @click="startMode = 'open'; selectedPackageId = null; startRentalForm.duration = 0"
+                >
+                    Start Rent
                 </button>
             </div>
 
@@ -750,7 +837,7 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                     <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pilih Durasi</Label>
                     <div class="mt-2 grid grid-cols-3 gap-2">
                         <button
-                            v-for="d in [30, 60, 90, 120, 180, 300]"
+                            v-for="d in [60, 120, 180, 300, 480]"
                             :key="d"
                             type="button"
                             class="rounded-lg border py-2.5 text-sm font-semibold transition-all"
@@ -774,6 +861,18 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                         <span>Estimasi Biaya</span>
                         <span>{{ formatCurrency((selectedTable.rental_price_per_hour / 60) * startRentalForm.duration) }}</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- TAB: OPEN -->
+            <div v-if="startMode === 'open'" class="flex flex-col items-center py-6 text-center">
+                <Timer class="h-12 w-12 text-primary mb-3" />
+                <h3 class="text-lg font-bold">Start Rent (Billing Berjalan)</h3>
+                <p class="text-sm text-muted-foreground mt-2 px-6">
+                    Waktu rental akan dimulai dari 00:00:00, dan biaya dihitung <strong>{{ formatCurrency(selectedTable?.rental_price_per_hour ?? 0) }}/jam</strong> saat Anda menekan Stop Rental.
+                </p>
+                <div class="mt-4 rounded border bg-emerald-500/10 px-4 py-2 flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    <Play class="h-4 w-4" /> Siap untuk memulai sesi.
                 </div>
             </div>
 

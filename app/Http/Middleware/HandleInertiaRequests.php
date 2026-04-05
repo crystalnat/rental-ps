@@ -47,6 +47,9 @@ class HandleInertiaRequests extends Middleware
                 'warning' => fn () => $request->session()->get('warning'),
                 'order_payment_method' => fn () => $request->session()->get('order_payment_method'),
                 'order_final_amount'   => fn () => $request->session()->get('order_final_amount'),
+                'last_stopped_order_id' => fn () => $request->session()->get('last_stopped_order_id'),
+                'last_stopped_order_time' => fn () => $request->session()->get('last_stopped_order_time'),
+                'last_order_id'        => fn () => $request->session()->get('last_order_id'),
             ],
         ]);
     }
