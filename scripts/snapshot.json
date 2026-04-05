@@ -1,0 +1,39 @@
+{
+    "timestamp": 1775373532.3507369,
+    "devices": [
+        {
+            "id": "a34e6cef962d8dcb708db0",
+            "ip": "10.32.168.237",
+            "active": 2,
+            "encrypt": true,
+            "productKey": "keyjnuy4s3kre7m7",
+            "token": true,
+            "wf_cfg": true,
+            "clientLink": 2,
+            "name": "T34-Smart Plug+",
+            "key": "8ZbBprc./!p@kim`",
+            "mac": "",
+            "ability": 0,
+            "dev_type": "default",
+            "err": "",
+            "type": "default",
+            "dps": {
+                "dps": {
+                    "1": false,
+                    "9": 0,
+                    "21": 0,
+                    "22": 0,
+                    "23": 2343,
+                    "24": 1,
+                    "29": 0,
+                    "38": "memory",
+                    "42": "",
+                    "43": "",
+                    "44": "AAAC"
+                }
+            },
+            "origin": "broadcast",
+            "ver": "3.5"
+        }
+    ]
+}

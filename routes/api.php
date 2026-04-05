@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CashierController;
+use App\Http\Controllers\Api\TuyaBridgeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\Route;
 
 // Public
 Route::get('/health', fn () => response()->json(['ok' => true, 'message' => 'API siap']));
+
+// Tuya Bridge (pakai token statis, bukan Sanctum)
+Route::get('/tuya/commands', [TuyaBridgeController::class, 'pending']);
+Route::post('/tuya/commands/{id}/ack', [TuyaBridgeController::class, 'ack']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Protected (auth:sanctum)

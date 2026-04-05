@@ -36,9 +36,7 @@ return [
     ],
 
     'tuya' => [
-        'client_id'     => env('TUYA_CLIENT_ID', 'gr95nans9e9ruwdtuuvp'),
-        'client_secret' => env('TUYA_CLIENT_SECRET', '79470deb5eea48fc863f9baa6386af8f'),
-        'base_url'      => env('TUYA_BASE_URL', 'https://openapi-sg.iotbing.com'),
+        'bridge_token' => env('TUYA_BRIDGE_TOKEN', 'ganti-dengan-token-rahasia'),
     ],
 
 ];
