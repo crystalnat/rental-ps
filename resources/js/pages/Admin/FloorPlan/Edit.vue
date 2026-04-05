@@ -165,6 +165,7 @@ const showQrDialog = ref(false)
 const selectedTable = ref<Table | null>(null)
 const editTableTarget = ref<Table | null>(null)
 const processing = ref(false)
+let saveTimer: ReturnType<typeof setTimeout> | null = null
 const guideLines = ref<{ type: 'h' | 'v'; pos: number }[]>([])
 
 const contextMenu = ref<{ type: 'table' | 'element'; item: Table | Element; x: number; y: number } | null>(null)
@@ -241,7 +242,7 @@ watch(showAddTable, (open) => {
     }
 })
 const addElementForm = ref({ type: 'pillar' as string, name: '', width_meters: 0.5, length_meters: 0.5 })
-const editTableForm = ref({ width_meters: 0.8, length_meters: 1.2, tuya_device_id: '', rental_price_per_hour: 0 })
+const editTableForm = ref({ name: '', width_meters: 0.8, length_meters: 1.2, tuya_device_id: '', rental_price_per_hour: 0 })
 
 const elementIcons: Record<string, unknown> = {
     pillar: Box,
@@ -254,6 +255,7 @@ const elementIcons: Record<string, unknown> = {
 }
 
 let dragTarget: { type: 'table' | 'element'; id: number; startX: number; startY: number; origX: number; origY: number } | null = null
+let resizeTarget: { type: 'table' | 'element'; id: number; startX: number; startY: number; origW: number; origH: number } | null = null
 
 function toPx(meters: number) {
     return meters * BASE_PIXELS_PER_METER
@@ -379,7 +381,58 @@ function stopDrag() {
     document.removeEventListener('mouseup', stopDrag)
 }
 
-function saveLayout() {
+function startResize(type: 'table' | 'element', id: number, e: MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    const item = type === 'table'
+        ? tables.value.find(t => t.id === id)
+        : elements.value.find(el => el.id === id)
+    if (!item) return
+    resizeTarget = {
+        type, id,
+        startX: e.clientX,
+        startY: e.clientY,
+        origW: item.width_meters,
+        origH: item.length_meters,
+    }
+    document.addEventListener('mousemove', onResize)
+    document.addEventListener('mouseup', stopResize)
+}
+
+function onResize(e: MouseEvent) {
+    if (!resizeTarget) return
+    const pxPerMeter = BASE_PIXELS_PER_METER * scale.value
+    const dw = (e.clientX - resizeTarget.startX) / pxPerMeter
+    const dh = (e.clientY - resizeTarget.startY) / pxPerMeter
+    const MIN = 0.3
+    if (resizeTarget.type === 'table') {
+        const t = tables.value.find(x => x.id === resizeTarget!.id)
+        if (t) {
+            t.width_meters = Math.max(MIN, snapValue(resizeTarget.origW + dw))
+            t.length_meters = Math.max(MIN, snapValue(resizeTarget.origH + dh))
+        }
+    } else {
+        const el = elements.value.find(x => x.id === resizeTarget!.id)
+        if (el) {
+            el.width_meters = Math.max(MIN, snapValue(resizeTarget.origW + dw))
+            el.length_meters = Math.max(MIN, snapValue(resizeTarget.origH + dh))
+        }
+    }
+}
+
+function stopResize() {
+    if (resizeTarget) saveLayout()
+    resizeTarget = null
+    document.removeEventListener('mousemove', onResize)
+    document.removeEventListener('mouseup', stopResize)
+}
+
+function saveLayout(immediate = false) {
+    if (saveTimer) clearTimeout(saveTimer)
+    if (!immediate) {
+        saveTimer = setTimeout(() => saveLayout(true), 800)
+        return
+    }
     processing.value = true
     return router.post(
         `/admin/stores/${props.store.id}/floor-plan/${props.floor.id}/save-layout`,
@@ -412,7 +465,7 @@ function saveLayout() {
 }
 
 function submitSave() {
-    saveLayout()
+    saveLayout(true)
 }
 
 function submitAddTable() {
@@ -450,6 +503,7 @@ function submitAddElement() {
 function openEditTable(t: Table) {
     editTableTarget.value = t
     editTableForm.value = {
+        name: t.name,
         width_meters: t.width_meters,
         length_meters: t.length_meters,
         tuya_device_id: t.tuya_device_id || '',
@@ -463,6 +517,7 @@ function submitEditTable() {
     if (!t) return
     const idx = tables.value.findIndex((x) => x.id === t.id)
     if (idx >= 0) {
+        tables.value[idx].name = editTableForm.value.name
         tables.value[idx].width_meters = editTableForm.value.width_meters
         tables.value[idx].length_meters = editTableForm.value.length_meters
         tables.value[idx].tuya_device_id = editTableForm.value.tuya_device_id
@@ -470,6 +525,7 @@ function submitEditTable() {
 
         // We need to send these extra fields to the backend too
         router.post(`/admin/stores/${props.store.id}/floor-plan/${props.floor.id}/tables/${t.id}/update-meta`, {
+            name: editTableForm.value.name,
             tuya_device_id: editTableForm.value.tuya_device_id,
             rental_price_per_hour: editTableForm.value.rental_price_per_hour,
         }, {
@@ -667,13 +723,12 @@ function qrImageUrl(url: string) {
         <!-- Floor Plan Canvas (Ctrl+scroll untuk zoom) -->
         <div
             ref="viewportRef"
-            class="flex items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-white dark:bg-zinc-950"
+            class="flex items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-slate-900"
             :class="scale > fitScale ? 'overflow-auto' : 'overflow-hidden'"
             style="height: calc(100vh - 220px); min-height: 400px;"
         >
-            <!-- Wrapper: putih, hanya inner floor (grid) yang gelap -->
             <div
-                class="relative m-auto shrink-0 bg-white dark:bg-zinc-950 shadow-inner"
+                class="relative m-auto shrink-0 bg-slate-900 shadow-inner"
                 :style="{
                     width: wrapperWidthPx + 'px',
                     height: wrapperHeightPx + 'px',
@@ -681,9 +736,8 @@ function qrImageUrl(url: string) {
                     minHeight: wrapperHeightPx + 'px',
                 }"
             >
-                <!-- Inner floor: hijau papan arsitektur -->
                 <div
-                    class="absolute rounded-lg bg-teal-950/90"
+                    class="absolute rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-teal-950"
                     :style="{
                         left: innerFloorOffset.left + 'px',
                         top: innerFloorOffset.top + 'px',
@@ -721,18 +775,18 @@ function qrImageUrl(url: string) {
                     <p class="text-xs">Klik <strong>Tambah Meja</strong> atau <strong>Tambah Elemen</strong> untuk mulai</p>
                 </div>
 
-                <!-- Grid lines: putih saja -->
+                <!-- Grid lines -->
                 <template v-for="i in Math.floor(floorW)" :key="'v-' + i">
                     <div
                         v-if="i < floorW"
-                        class="absolute top-0 bottom-0 w-px bg-white"
+                        class="absolute top-0 bottom-0 w-px bg-white/10"
                         :style="{ left: toPx(i) + 'px' }"
                     />
                 </template>
                 <template v-for="i in Math.floor(floorH)" :key="'h-' + i">
                     <div
                         v-if="i < floorH"
-                        class="absolute left-0 right-0 h-px bg-white"
+                        class="absolute left-0 right-0 h-px bg-white/10"
                         :style="{ top: toPx(i) + 'px' }"
                     />
                 </template>
@@ -741,7 +795,7 @@ function qrImageUrl(url: string) {
                 <div
                     v-for="el in elements"
                     :key="'el-' + el.id"
-                    class="group absolute cursor-move select-none rounded-md border-2 border-amber-400 bg-amber-50 text-xs font-medium text-amber-900"
+                    class="group absolute cursor-move select-none rounded-md border-2 border-slate-500/60 bg-slate-700/60 text-xs font-medium text-white"
                     :style="{
                         left: toPx(el.x_meters) + 'px',
                         top: toPx(el.y_meters) + 'px',
@@ -761,12 +815,22 @@ function qrImageUrl(url: string) {
                         <component :is="elementIcons[el.type] || MoreHorizontal" class="h-3 w-3 shrink-0" />
                         <span>{{ element_types[el.type] || el.type }}</span>
                         <button
-                            class="ml-0.5 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-amber-200 text-amber-900"
+                            class="ml-0.5 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-white/20 text-white"
                             title="Copy"
                             @click.stop="copyElement(el)"
                         >
                             <Copy class="h-3 w-3" />
                         </button>
+                    </div>
+                    <!-- Resize handle -->
+                    <div
+                        class="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize"
+                        style="touch-action:none"
+                        @mousedown.stop="startResize('element', el.id, $event)"
+                    >
+                        <svg viewBox="0 0 10 10" class="h-full w-full opacity-50 text-white fill-current">
+                            <path d="M8 2 L8 8 L2 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                        </svg>
                     </div>
                 </div>
 
@@ -774,7 +838,7 @@ function qrImageUrl(url: string) {
                 <div
                     v-for="t in tables"
                     :key="'t-' + t.id"
-                    class="group absolute cursor-move select-none rounded-lg border-2 border-amber-400 bg-amber-50 text-center shadow-sm"
+                    class="group absolute cursor-move select-none rounded-xl border-2 border-slate-500/60 bg-slate-800/60 text-center transition-all hover:brightness-110"
                     :style="{
                         left: toPx(t.x_meters) + 'px',
                         top: toPx(t.y_meters) + 'px',
@@ -791,31 +855,42 @@ function qrImageUrl(url: string) {
                             transformOrigin: 'center center',
                         }"
                     >
-                        <span class="font-semibold text-amber-900">{{ t.name }}</span>
-                        <span class="text-xs text-amber-700">Unit PS</span>
-                        <div class="mt-1 flex gap-0.5">
+                        <Gamepad2 class="h-5 w-5 shrink-0 text-slate-400" />
+                        <span class="text-center text-[10px] font-bold leading-none text-white">{{ t.name }}</span>
+                        <span class="text-[9px] text-slate-400">Unit PS</span>
+                        <div class="mt-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                                class="rounded bg-amber-200/80 p-1 text-amber-900 hover:bg-amber-300"
-                                title="Edit ukuran"
+                                class="rounded bg-white/10 p-1 text-white hover:bg-white/20"
+                                title="Edit"
                                 @click.stop="openEditTable(t)"
                             >
                                 <Pencil class="h-3 w-3" />
                             </button>
                             <button
-                                class="rounded bg-amber-200/80 p-1 text-amber-900 hover:bg-amber-300"
+                                class="rounded bg-white/10 p-1 text-white hover:bg-white/20"
                                 title="Lihat QR"
                                 @click.stop="openQr(t)"
                             >
                                 <QrCode class="h-3 w-3" />
                             </button>
                             <button
-                                class="rounded bg-amber-200/80 p-1 text-amber-900 hover:bg-amber-300"
+                                class="rounded bg-white/10 p-1 text-white hover:bg-white/20"
                                 title="Copy"
                                 @click.stop="copyTable(t)"
                             >
                                 <Copy class="h-3 w-3" />
                             </button>
                         </div>
+                    </div>
+                    <!-- Resize handle -->
+                    <div
+                        class="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize"
+                        style="touch-action:none"
+                        @mousedown.stop="startResize('table', t.id, $event)"
+                    >
+                        <svg viewBox="0 0 10 10" class="h-full w-full opacity-50 text-white fill-current">
+                            <path d="M8 2 L8 8 L2 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                        </svg>
                     </div>
                 </div>
                 </div>
@@ -869,6 +944,10 @@ function qrImageUrl(url: string) {
                     <DialogDescription>Atur detail unit PS dan integrasi Tuya.</DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4">
+                    <div>
+                        <Label>Nama Unit</Label>
+                        <Input v-model="editTableForm.name" placeholder="Contoh: PS-01, PS4 VIP" class="mt-1.5" />
+                    </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <Label>Lebar (m)</Label>

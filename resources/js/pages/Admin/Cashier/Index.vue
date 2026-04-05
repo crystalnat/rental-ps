@@ -678,7 +678,7 @@ onBeforeUnmount(() => {
 })
 
 const filteredProducts = computed(() => {
-    let list = props.products
+    let list = props.products.filter(p => !p.is_rental_package)
     const q = searchQuery.value.toLowerCase().trim()
     if (q) {
         list = list.filter(

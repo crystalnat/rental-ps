@@ -260,7 +260,7 @@ class FloorPlanController extends Controller
             }
         }
 
-        return back()->with('success', 'Denah berhasil disimpan.');
+        return back();
     }
 
     public function addTable(Store $store, Floor $floor, Request $request): RedirectResponse
@@ -387,6 +387,7 @@ class FloorPlanController extends Controller
         abort_unless($floor->store_id === $store->id && $table->floor_id === $floor->id, 403);
 
         $data = $request->validate([
+            'name'                  => ['nullable', 'string', 'max:50'],
             'tuya_device_id'        => ['nullable', 'string', 'max:100'],
             'rental_price_per_hour' => ['nullable', 'numeric', 'min:0'],
         ]);
