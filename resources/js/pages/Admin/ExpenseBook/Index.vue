@@ -80,7 +80,7 @@ const form = ref({
     category: 'other' as string,
     description: '',
     amount: '',
-    expense_date: isCashier.value ? new Date().toISOString().slice(0, 10) : (props.selected_date ?? new Date().toISOString().slice(0, 10)),
+    expense_date: new Date().toISOString().slice(0, 10),
 })
 
 const filterState = ref({

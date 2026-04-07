@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import {
     Power, Play, Square, Clock, Gamepad2, Plus, Minus, Zap,
-    ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, Info,
+    ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, Info, CreditCard,
 } from 'lucide-vue-next'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -19,6 +19,7 @@ interface TableOrder {
     id: number
     order_code: string
     status: string
+    payment_status: string
     final_amount: number
     items_count: number
     created_at: string
@@ -99,6 +100,8 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: 'add-to-cart', item: { product: Product; tableId: number | null }): void
     (e: 'update:floor-plan', plan: FloorData[]): void
+    (e: 'checkout'): void
+    (e: 'pay-order', orderId: number): void
 }>()
 
 // ─── State ─────────────────────────────────────────────────────────────────────
@@ -373,7 +376,6 @@ function openProductForTable(table: FloorTable) {
 
 function addProductToCart(product: Product) {
     emit('add-to-cart', { product, tableId: selectedTable.value?.id ?? null })
-    showProductDialog.value = false
 }
 
 // ─── Active rental order helper ─────────────────────────────────────────────────
@@ -698,28 +700,50 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                         </Button>
                                     </template>
 
-                                    <!-- Already stopped / ready: show new rental button -->
-                                    <div v-if="ord.status === 'ready'" class="rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-3 space-y-2">
-                                        <p class="text-center text-xs font-medium text-emerald-700">
-                                            ✅ Sesi selesai — Unit siap digunakan
-                                        </p>
-                                        <Button
-                                            class="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
-                                            size="sm"
-                                            @click="openStartRental(selectedTable)"
-                                        >
-                                            <Play class="h-3.5 w-3.5" />
-                                            Mulai Rental Baru
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            class="w-full gap-1.5"
-                                            @click="openProductForTable(selectedTable)"
-                                        >
-                                            <ShoppingCart class="h-3.5 w-3.5" />
-                                            Pesan Produk
-                                        </Button>
+                                    <!-- Already stopped / ready -->
+                                    <div v-if="ord.status === 'ready'" class="rounded-xl border p-3 space-y-2"
+                                        :class="ord.payment_status === 'paid' ? 'border-emerald-400/30 bg-emerald-500/5' : 'border-amber-400/40 bg-amber-500/5'"
+                                    >
+                                        <!-- Belum dibayar -->
+                                        <template v-if="ord.payment_status !== 'paid'">
+                                            <p class="text-center text-xs font-medium text-amber-700">
+                                                Sesi selesai — Menunggu pembayaran
+                                            </p>
+                                            <p class="text-center text-sm font-black text-amber-800">
+                                                {{ formatCurrency(ord.final_amount) }}
+                                            </p>
+                                            <Button
+                                                class="w-full gap-2"
+                                                size="sm"
+                                                @click="emit('pay-order', ord.id)"
+                                            >
+                                                <CreditCard class="h-3.5 w-3.5" />
+                                                Bayar Sekarang
+                                            </Button>
+                                        </template>
+                                        <!-- Sudah dibayar -->
+                                        <template v-else>
+                                            <p class="text-center text-xs font-medium text-emerald-700">
+                                                    Sesi selesai — Unit siap digunakan
+                                            </p>
+                                            <Button
+                                                class="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+                                                size="sm"
+                                                @click="openStartRental(selectedTable)"
+                                            >
+                                                <Play class="h-3.5 w-3.5" />
+                                                Mulai Rental Baru
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                class="w-full gap-1.5"
+                                                @click="openProductForTable(selectedTable)"
+                                            >
+                                                <ShoppingCart class="h-3.5 w-3.5" />
+                                                Pesan Produk
+                                            </Button>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -959,8 +983,16 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                     </button>
                 </div>
             </div>
-            <DialogFooter>
+            <DialogFooter class="flex-col gap-2 sm:flex-row">
                 <Button variant="outline" @click="showProductDialog = false">Tutup</Button>
+                <Button
+                    v-if="props.cart.length > 0"
+                    class="gap-2"
+                    @click="showProductDialog = false; emit('checkout')"
+                >
+                    <ShoppingCart class="h-4 w-4" />
+                    Bayar ({{ props.cart.length }} item)
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

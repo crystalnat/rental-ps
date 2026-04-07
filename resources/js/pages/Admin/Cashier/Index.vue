@@ -182,7 +182,11 @@ async function openReceiptForStoppedRental(orderId: number) {
             final_amount: Number(order.final_amount),
             created_at: order.created_at,
             items: order.items,
-            notes: order.notes
+            notes: order.notes,
+            is_rental: order.is_rental,
+            rental_started_at: order.rental_started_at,
+            rental_end_at: order.rental_end_at,
+            rental_duration_minutes: order.rental_duration_minutes,
         }
         openPayModal(pendingOrder)
     } catch (e) {
@@ -192,8 +196,17 @@ async function openReceiptForStoppedRental(orderId: number) {
 
 function printLastOrder() {
     if (lastCreatedOrderId.value) {
-        window.open(`/admin/orders/${lastCreatedOrderId.value}/receipt`, '_blank')
         showSuccessDialog.value = false
+        const id = lastCreatedOrderId.value
+        setTimeout(() => {
+            window.open(`/admin/orders/${id}/receipt`, '_blank')
+            // Force-clean any leftover Radix UI body locks
+            setTimeout(() => {
+                document.body.style.pointerEvents = ''
+                document.body.style.overflow = ''
+                document.body.removeAttribute('data-scroll-locked')
+            }, 300)
+        }, 50)
     }
 }
 
@@ -252,6 +265,10 @@ type PendingOrderItem = {
     notes?: string
     final_amount: number
     created_at: string
+    is_rental?: boolean
+    rental_started_at?: string | null
+    rental_end_at?: string | null
+    rental_duration_minutes?: number | null
     items?: Array<{ product_name: string; quantity: number; unit: string; subtotal: number; modifiers?: Array<{ name: string; price_extra: number }> }>
 }
 const pendingOrdersList = ref<PendingOrderItem[]>([])
@@ -1174,6 +1191,8 @@ const showQrOrAccount = computed(() => {
                         :products="products"
                         :cart="cart"
                         @add-to-cart="addProductFromRental"
+                        @checkout="openPaymentDialog"
+                        @pay-order="openReceiptForStoppedRental"
                     />
                 </div>
 
@@ -1529,47 +1548,32 @@ const showQrOrAccount = computed(() => {
                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">Rp</span>
                             <Input
                                 id="checkout_cash_received"
-                                :value="cashReceived ? Number(cashReceived).toLocaleString('id-ID') : ''"
-                                @input="(e: any) => {
-                                    const raw = e.target.value.replace(/\D/g, '');
-                                    cashReceived = raw;
-                                }"
-                                type="text"
+                                v-model="cashReceived"
+                                type="number"
+                                min="0"
+                                step="any"
                                 class="pl-9 font-mono font-bold text-primary"
-                                :placeholder="finalAmount.toLocaleString('id-ID')"
+                                :placeholder="String(finalAmount)"
+                                autofocus
                             />
                         </div>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            <button
+                                v-for="amt in [finalAmount, 10000, 20000, 50000, 100000].filter((v, i, a) => a.indexOf(v) === i).sort((a,b) => a-b)"
+                                :key="amt"
+                                type="button"
+                                class="rounded-md border px-2 py-1 text-[11px] font-bold transition-colors hover:border-primary hover:bg-primary/5"
+                                :class="Number(cashReceived) === amt ? 'border-primary bg-primary/10 text-primary' : 'border-input text-muted-foreground'"
+                                @click="cashReceived = String(amt)"
+                            >
+                                {{ formatCurrency(amt) }}
+                            </button>
+                        </div>
                         <div class="mt-2 flex items-center justify-between">
-                            <p class="text-xs text-muted-foreground">
-                                Total: {{ formatCurrency(finalAmount) }}
-                            </p>
-                            <p v-if="cashReceived && Number(cashReceived) > finalAmount" class="text-xs font-bold text-emerald-600">
+                            <p class="text-xs text-muted-foreground">Total: {{ formatCurrency(finalAmount) }}</p>
+                            <p v-if="Number(cashReceived) > finalAmount" class="text-xs font-bold text-emerald-600">
                                 Kembalian: {{ formatCurrency(Number(cashReceived) - finalAmount) }}
                             </p>
-                        </div>
-                    </div>
-
-                    <!-- Receipt Detail in Payment Modal -->
-                    <div v-if="selectedPendingOrder.items && selectedPendingOrder.items.length > 0" class="rounded-xl border bg-muted/30 p-4">
-                        <p class="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Rincian Pesanan</p>
-                        <div class="space-y-2 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin">
-                            <div v-for="(item, idx) in selectedPendingOrder.items" :key="idx" class="flex justify-between border-b border-dashed border-muted-foreground/20 pb-2 last:border-0 last:pb-0">
-                                <div class="min-w-0 pr-2">
-                                    <p class="text-xs font-bold leading-tight">{{ item.product_name }}</p>
-                                    <p class="text-[10px] text-muted-foreground">{{ item.quantity }} {{ item.unit }}</p>
-                                    <!-- Modifiers -->
-                                    <div v-if="item.modifiers && item.modifiers.length > 0" class="mt-1 flex flex-wrap gap-1">
-                                        <span v-for="(mod, midx) in item.modifiers" :key="midx" class="text-[9px] text-muted-foreground/80 italic">
-                                            + {{ mod.name }}{{ midx < item.modifiers.length - 1 ? ',' : '' }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <span class="shrink-0 font-mono text-xs font-bold">{{ formatCurrency(item.subtotal) }}</span>
-                            </div>
-                        </div>
-                        <div class="mt-3 flex justify-between border-t pt-3 font-black text-primary">
-                            <span class="text-xs uppercase tracking-wider">Total Tagihan</span>
-                            <span class="text-base font-mono">{{ formatCurrency(selectedPendingOrder.final_amount) }}</span>
                         </div>
                     </div>
 
@@ -1619,6 +1623,22 @@ const showQrOrAccount = computed(() => {
                     </p>
                 </div>
                 <form class="space-y-4" @submit.prevent="submitPayOrder">
+                    <!-- Rental Info -->
+                    <div v-if="selectedPendingOrder.is_rental" class="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+                        <Clock class="h-4 w-4 shrink-0" />
+                        <div class="flex flex-wrap gap-x-4 gap-y-0.5">
+                            <span v-if="selectedPendingOrder.rental_duration_minutes">
+                                <span class="font-medium">Durasi:</span>
+                                {{ Math.floor(selectedPendingOrder.rental_duration_minutes / 60) > 0 ? Math.floor(selectedPendingOrder.rental_duration_minutes / 60) + 'j ' : '' }}{{ selectedPendingOrder.rental_duration_minutes % 60 }}m
+                            </span>
+                            <span v-if="selectedPendingOrder.rental_started_at">
+                                <span class="font-medium">Mulai:</span> {{ selectedPendingOrder.rental_started_at }}
+                            </span>
+                            <span v-if="selectedPendingOrder.rental_end_at">
+                                <span class="font-medium">Selesai:</span> {{ selectedPendingOrder.rental_end_at }}
+                            </span>
+                        </div>
+                    </div>
                     <!-- Receipt Detail in Payment Modal -->
                     <div v-if="selectedPendingOrder.items && selectedPendingOrder.items.length > 0" class="rounded-xl border bg-muted/30 p-4">
                         <p class="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Rincian Pesanan</p>
@@ -1664,21 +1684,33 @@ const showQrOrAccount = computed(() => {
                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">Rp</span>
                             <Input
                                 id="pay_cash_received"
-                                :value="payForm.cash_received ? Number(payForm.cash_received).toLocaleString('id-ID') : ''"
-                                @input="(e: any) => {
-                                    const raw = e.target.value.replace(/\D/g, '');
-                                    payForm.cash_received = raw;
-                                }"
-                                type="text"
+                                v-model="payForm.cash_received"
+                                type="number"
+                                min="0"
+                                step="any"
                                 class="pl-9 font-mono font-bold text-primary"
-                                :placeholder="selectedPendingOrder.final_amount.toLocaleString('id-ID')"
+                                :placeholder="String(selectedPendingOrder.final_amount)"
+                                autofocus
                             />
+                        </div>
+                        <!-- Quick amount buttons -->
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            <button
+                                v-for="amt in [selectedPendingOrder.final_amount, 10000, 20000, 50000, 100000].filter((v, i, a) => a.indexOf(v) === i).sort((a,b) => a-b)"
+                                :key="amt"
+                                type="button"
+                                class="rounded-md border px-2 py-1 text-[11px] font-bold transition-colors hover:border-primary hover:bg-primary/5"
+                                :class="Number(payForm.cash_received) === amt ? 'border-primary bg-primary/10 text-primary' : 'border-input text-muted-foreground'"
+                                @click="payForm.cash_received = String(amt)"
+                            >
+                                {{ formatCurrency(amt) }}
+                            </button>
                         </div>
                         <div class="mt-2 flex items-center justify-between">
                             <p class="text-xs text-muted-foreground">
                                 Total: {{ formatCurrency(selectedPendingOrder.final_amount) }}
                             </p>
-                            <p v-if="payForm.cash_received && Number(payForm.cash_received) > selectedPendingOrder.final_amount" class="text-xs font-bold text-emerald-600">
+                            <p v-if="Number(payForm.cash_received) > selectedPendingOrder.final_amount" class="text-xs font-bold text-emerald-600">
                                 Kembalian: {{ formatCurrency(Number(payForm.cash_received) - selectedPendingOrder.final_amount) }}
                             </p>
                         </div>

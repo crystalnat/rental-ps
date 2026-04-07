@@ -299,7 +299,7 @@ class CashierController extends Controller
                 // Rental fields
                 'is_rental'       => $hasRentalPackage ?? false,
                 'rental_started_at' => ($hasRentalPackage ?? false) ? now() : null,
-                'rental_duration_minutes' => $rentalDuration ?? null,
+                'rental_duration_minutes' => $rentalDuration ?? 0,
                 'rental_end_at'   => ($hasRentalPackage ?? false) ? now()->addMinutes($rentalDuration ?? 0) : null,
             ]);
 
@@ -743,6 +743,7 @@ class CashierController extends Controller
                             'id'          => $o->id,
                             'order_code'  => $o->order_code,
                             'status'      => $o->status,
+                            'payment_status' => $o->payment_status,
                             'final_amount'=> (float) $o->final_amount,
                             'items_count' => $o->items->count(),
                             'created_at'  => $o->created_at->format('H:i'),

@@ -33,6 +33,8 @@ interface Order {
     customer_name: string | null
     created_at: string
     paid_at: string | null
+    is_rental: boolean
+    rental_duration_minutes: number | null
     items: OrderItem[]
 }
 
@@ -52,6 +54,16 @@ const props = defineProps<{
 
 function formatRp(amount: number): string {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount)
+}
+
+const itemsTotal = props.order.items.reduce((sum, i) => sum + i.subtotal, 0)
+const rentalFee = props.order.is_rental ? Math.max(0, props.order.subtotal - itemsTotal) : 0
+
+function formatDuration(minutes: number | null): string {
+    if (!minutes) return ''
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    return h > 0 ? `${h}j ${m}m` : `${m}m`
 }
 
 const typeLabels: Record<string, string> = {
@@ -111,6 +123,15 @@ onMounted(() => {
 
             <!-- Items -->
             <div class="items">
+                <!-- Biaya Rental -->
+                <div v-if="rentalFee > 0" class="item">
+                    <div class="item-name">Biaya Rental{{ order.table_name ? ' — ' + order.table_name : '' }}</div>
+                    <div class="item-detail">
+                        <span v-if="order.rental_duration_minutes">Durasi: {{ formatDuration(order.rental_duration_minutes) }}</span>
+                        <span v-else></span>
+                        <span class="item-subtotal">{{ formatRp(rentalFee) }}</span>
+                    </div>
+                </div>
                 <div v-for="(item, i) in order.items" :key="i" class="item">
                     <div class="item-name">{{ item.product_name }}</div>
                     <div v-if="item.modifiers && item.modifiers.length > 0" class="item-modifiers">

@@ -44,6 +44,7 @@ const props = defineProps<{
         last_page?: number
     }
     users?: { value: string; label: string }[]
+    is_cashier?: boolean
     filters?: {
         status: string
         date_from: string | null
@@ -144,10 +145,10 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
 
             <!-- Filters -->
             <Card>
-                <CardContent class="pt-6">
+                <CardContent class="pt-4 pb-4">
                     <div class="flex flex-wrap items-end gap-3">
-                        <div>
-                            <Label>Status</Label>
+                        <div class="flex-1 min-w-[120px]">
+                            <Label class="text-xs text-muted-foreground">Status</Label>
                             <select
                                 v-model="filterStatus"
                                 class="filter-select mt-1 flex h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
@@ -157,8 +158,8 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                                 <option value="closed">Tutup</option>
                             </select>
                         </div>
-                        <div v-if="users && users.length > 1">
-                            <Label>Kasir</Label>
+                        <div v-if="users && users.length > 1" class="flex-1 min-w-[140px]">
+                            <Label class="text-xs text-muted-foreground">Kasir</Label>
                             <select
                                 v-model="filterUserId"
                                 class="filter-select mt-1 flex h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
@@ -167,17 +168,28 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                                 <option v-for="u in users" :key="u.value" :value="u.value">{{ u.label }}</option>
                             </select>
                         </div>
-                        <div>
-                            <Label>Dari Tanggal</Label>
-                            <Input v-model="filterDateFrom" type="date" class="mt-1" />
+                        <div class="flex-1 min-w-[140px]">
+                            <Label class="text-xs text-muted-foreground">Dari Tanggal</Label>
+                            <Input v-model="filterDateFrom" type="date" class="mt-1 h-9 w-full" />
                         </div>
-                        <div>
-                            <Label>Sampai Tanggal</Label>
-                            <Input v-model="filterDateTo" type="date" class="mt-1" />
+                        <div class="flex-1 min-w-[140px]">
+                            <Label class="text-xs text-muted-foreground">Sampai Tanggal</Label>
+                            <Input v-model="filterDateTo" type="date" class="mt-1 h-9 w-full" />
                         </div>
-                        <Button variant="outline" @click="applyFilters">
-                            Terapkan
-                        </Button>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <Button
+                                v-if="filterStatus !== 'all' || filterDateFrom || filterDateTo || filterUserId !== 'all'"
+                                variant="ghost"
+                                size="sm"
+                                class="text-muted-foreground"
+                                @click="filterStatus = 'all'; filterDateFrom = ''; filterDateTo = ''; filterUserId = 'all'; applyFilters()"
+                            >
+                                Reset
+                            </Button>
+                            <Button @click="applyFilters">
+                                Terapkan
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -203,7 +215,7 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b">
-                                    <th class="py-3 px-4 text-left font-medium text-muted-foreground">Kasir</th>
+                                    <th v-if="!is_cashier" class="py-3 px-4 text-left font-medium text-muted-foreground">Kasir</th>
                                     <th class="py-3 px-4 text-left font-medium text-muted-foreground">Jadwal</th>
                                     <th class="py-3 px-4 text-left font-medium text-muted-foreground">Buka</th>
                                     <th class="py-3 px-4 text-left font-medium text-muted-foreground">Tutup</th>
@@ -221,7 +233,7 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                                     class="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
                                     @click="viewShift(shift.id)"
                                 >
-                                    <td class="py-3 px-4 font-medium">{{ shift.user_name }}</td>
+                                    <td v-if="!is_cashier" class="py-3 px-4 font-medium">{{ shift.user_name }}</td>
                                     <td class="py-3 px-4 text-xs text-muted-foreground">
                                         <span v-if="shift.scheduled_start && shift.scheduled_end">
                                             {{ shift.scheduled_start }} — {{ shift.scheduled_end }}
@@ -264,7 +276,7 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                             @click="viewShift(shift.id)"
                         >
                             <div class="flex items-center justify-between mb-2">
-                                <span class="font-medium">{{ shift.user_name }}</span>
+                                <span class="font-medium">{{ is_cashier ? shift.opened_at : shift.user_name }}</span>
                                 <Badge :variant="shift.status === 'open' ? 'default' : 'secondary'" class="text-xs">
                                     {{ shift.status === 'open' ? 'Buka' : 'Tutup' }}
                                 </Badge>

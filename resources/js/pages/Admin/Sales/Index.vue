@@ -213,6 +213,10 @@ interface OrderDetail {
     customer_phone: string | null
     customer_email: string | null
     created_at: string
+    is_rental: boolean
+    rental_duration_minutes: number | null
+    rental_started_at: string | null
+    rental_end_at: string | null
     items: { product_name: string; quantity: number; unit: string; unit_price: number; subtotal: number }[]
 }
 
@@ -235,6 +239,13 @@ async function viewOrder(id: number) {
 
 function fmtQty(q: number) {
     return q === Math.floor(q) ? String(Math.floor(q)) : String(q)
+}
+
+function formatDuration(minutes: number | null): string {
+    if (!minutes) return ''
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    return h > 0 ? `${h}j ${m}m` : `${m}m`
 }
 
 function printReceipt(order: OrderDetail) {
@@ -637,6 +648,14 @@ function getPaymentLabel(code: string) {
                             </div>
                         </div>
 
+                        <!-- Info Rental PS -->
+                        <div v-if="detailOrder.is_rental" class="flex flex-wrap gap-x-5 gap-y-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+                            <span class="font-semibold">Rental PS{{ detailOrder.table_name ? ' — ' + detailOrder.table_name : '' }}</span>
+                            <span v-if="detailOrder.rental_duration_minutes">Durasi: <strong>{{ formatDuration(detailOrder.rental_duration_minutes) }}</strong></span>
+                            <span v-if="detailOrder.rental_started_at">Mulai: <strong>{{ detailOrder.rental_started_at }}</strong></span>
+                            <span v-if="detailOrder.rental_end_at">Selesai: <strong>{{ detailOrder.rental_end_at }}</strong></span>
+                        </div>
+
                         <div class="rounded-lg border">
                             <table class="w-full text-sm">
                                 <thead>
@@ -648,6 +667,16 @@ function getPaymentLabel(code: string) {
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <!-- Baris biaya rental jika ada -->
+                                    <tr v-if="detailOrder.is_rental && detailOrder.subtotal - detailOrder.items.reduce((s, i) => s + i.subtotal, 0) > 0" class="border-b bg-blue-50/50">
+                                        <td class="px-3 py-2 font-medium text-blue-700">
+                                            Biaya Rental{{ detailOrder.table_name ? ' — ' + detailOrder.table_name : '' }}
+                                            <span v-if="detailOrder.rental_duration_minutes" class="ml-1 text-xs font-normal text-blue-500">({{ formatDuration(detailOrder.rental_duration_minutes) }})</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-center text-muted-foreground">—</td>
+                                        <td class="px-3 py-2 text-right text-muted-foreground">—</td>
+                                        <td class="px-3 py-2 text-right font-medium text-blue-700">{{ formatCurrency(detailOrder.subtotal - detailOrder.items.reduce((s, i) => s + i.subtotal, 0)) }}</td>
+                                    </tr>
                                     <tr
                                         v-for="(item, i) in detailOrder.items"
                                         :key="i"

@@ -54,9 +54,20 @@ class ShiftController extends Controller
             ]);
         }
 
+        $isCashier = $user->role === 'cashier';
+
         $query = CashierShift::with('user:id,name')
             ->where('store_id', $store->id)
             ->orderByDesc('opened_at');
+
+        // Kasir hanya bisa melihat shift miliknya sendiri
+        if ($isCashier) {
+            $query->where('user_id', $user->id);
+        } else {
+            if ($request->filled('user_id') && $request->user_id !== 'all') {
+                $query->where('user_id', $request->user_id);
+            }
+        }
 
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
@@ -66,9 +77,6 @@ class ShiftController extends Controller
         }
         if ($request->filled('date_to')) {
             $query->whereDate('opened_at', '<=', $request->date_to);
-        }
-        if ($request->filled('user_id') && $request->user_id !== 'all') {
-            $query->where('user_id', $request->user_id);
         }
 
         $shifts = $query->paginate(20)
@@ -87,25 +95,29 @@ class ShiftController extends Controller
                 'cash_difference' => $shift->cash_difference !== null ? (float) $shift->cash_difference : null,
             ]);
 
-        // Users for filter
-        $users = CashierShift::where('cashier_shifts.store_id', $store->id)
-            ->distinct()
-            ->join('users', 'cashier_shifts.user_id', '=', 'users.id')
-            ->pluck('users.name', 'users.id')
-            ->map(fn ($name, $id) => ['value' => (string) $id, 'label' => $name])
-            ->values()
-            ->toArray();
+        // Filter kasir hanya untuk owner/admin
+        $users = [];
+        if (! $isCashier) {
+            $users = CashierShift::where('cashier_shifts.store_id', $store->id)
+                ->distinct()
+                ->join('users', 'cashier_shifts.user_id', '=', 'users.id')
+                ->pluck('users.name', 'users.id')
+                ->map(fn ($name, $id) => ['value' => (string) $id, 'label' => $name])
+                ->values()
+                ->toArray();
+        }
 
         return Inertia::render('Admin/Shifts/Index', [
-            'stores'  => $stores,
-            'store'   => $store->only('id', 'name', 'slug'),
-            'shifts'  => $shifts,
-            'users'   => $users,
-            'filters' => [
+            'stores'     => $stores,
+            'store'      => $store->only('id', 'name', 'slug'),
+            'shifts'     => $shifts,
+            'users'      => $users,
+            'is_cashier' => $isCashier,
+            'filters'    => [
                 'status'    => $request->status ?? 'all',
                 'date_from' => $request->date_from,
                 'date_to'   => $request->date_to,
-                'user_id'   => $request->user_id ?? 'all',
+                'user_id'   => $isCashier ? (string) $user->id : ($request->user_id ?? 'all'),
             ],
         ]);
     }

@@ -197,6 +197,10 @@ class OrderController extends Controller
             'customer_phone'  => $order->customer?->phone,
             'customer_email'  => $order->customer?->email,
             'created_at'      => $order->created_at->format('d M Y H:i'),
+            'is_rental'            => (bool) $order->is_rental,
+            'rental_started_at'    => $order->rental_started_at?->format('H:i'),
+            'rental_end_at'        => $order->rental_end_at?->format('H:i'),
+            'rental_duration_minutes' => $order->rental_duration_minutes,
             'items'           => $order->items->map(fn ($i) => [
                 'product_name' => $i->product_name,
                 'quantity'     => (float) $i->quantity,
@@ -332,6 +336,8 @@ class OrderController extends Controller
             'customer_email'  => $order->customer?->email,
             'created_at'      => $order->created_at->format('d M Y H:i'),
             'paid_at'         => $order->paid_at?->format('d M Y H:i'),
+            'is_rental'       => (bool) $order->is_rental,
+            'rental_duration_minutes' => $order->rental_duration_minutes,
             'items'           => $order->items->map(fn ($i) => [
                 'product_name'    => $i->product_name,
                 'quantity'        => (float) $i->quantity,

@@ -128,12 +128,9 @@ class DailyExpenseController extends Controller
             'expense_date' => ['required', 'date'],
         ]);
 
-        // Restrict cashier to today only
+        // Kasir selalu mencatat untuk hari ini
         if ($user->role === 'cashier') {
-            $date = \Carbon\Carbon::parse($validated['expense_date'])->toDateString();
-            if ($date !== now()->toDateString()) {
-                return back()->with('error', 'Kasir hanya boleh mencatat pengeluaran untuk hari ini.');
-            }
+            $validated['expense_date'] = now()->toDateString();
         }
 
         DailyExpense::create([
