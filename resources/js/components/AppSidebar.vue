@@ -114,7 +114,6 @@ const navigationGroups = computed((): NavGroup[] => {
             label: 'Manajemen',
             items: [
                 { label: 'Pelanggan', href: '/admin/customers', icon: UserCircle, roles: ['owner', 'admin'] },
-                { label: 'Promo & Voucher', href: '/admin/promos', icon: Tags, roles: ['owner', 'admin'] },
                 { label: 'Karyawan', href: '/admin/users', icon: Users, roles: ['owner', 'admin'] },
                 denahMejaItem,
             ],

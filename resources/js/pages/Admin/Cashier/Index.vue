@@ -241,6 +241,64 @@ const processing = ref(false)
 const isListening = ref(false)
 const newOrderNotification = ref<{ order_code: string; table_name?: string; amount: number } | null>(null)
 
+// Multi-cart state management
+const cartStates = ref<Record<string, any>>({})
+const currentCartKey = computed(() => {
+    if (orderType.value === 'dine_in' && selectedTableId.value) {
+        return `table-${selectedTableId.value}`
+    }
+    return orderType.value
+})
+
+watch(currentCartKey, (newKey, oldKey) => {
+    // Save previous state
+    if (oldKey) {
+        cartStates.value[oldKey] = {
+            cart: [...cart.value],
+            notes: notes.value,
+            discountAmount: discountAmount.value,
+            activePromo: activePromo.value,
+            promoCodeInput: promoCodeInput.value,
+            customerName: customerName.value,
+            customerPhone: customerPhone.value,
+            customerEmail: customerEmail.value,
+        }
+    }
+    
+    // Load or initialize new state
+    const state = cartStates.value[newKey] || {
+        cart: [],
+        notes: '',
+        discountAmount: '',
+        activePromo: null,
+        promoCodeInput: '',
+        customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+    }
+    
+    cart.value = [...state.cart]
+    notes.value = state.notes
+    discountAmount.value = state.discountAmount
+    activePromo.value = state.activePromo
+    promoCodeInput.value = state.promoCodeInput
+    customerName.value = state.customerName
+    customerPhone.value = state.customerPhone
+    customerEmail.value = state.customerEmail
+}, { immediate: true })
+
+watch(selectedTableId, (newVal) => {
+    if (newVal) {
+        orderType.value = 'dine_in'
+    }
+})
+
+watch(orderType, (newVal) => {
+    if (newVal !== 'dine_in') {
+        selectedTableId.value = null
+    }
+})
+
 // Modifier Modal State
 const showModifierDialog = ref(false)
 const selectedProductForModifiers = ref<Product | null>(null)
@@ -797,7 +855,10 @@ function addProductFromRental({ product, tableId }: { product: any; tableId: num
         orderType.value = 'dine_in'
         selectedTableId.value = tableId
     }
-    addToCart(product as Product)
+    // Timeout added to ensure the watcher has finished swapping the cart state before adding item
+    setTimeout(() => {
+        addToCart(product as Product)
+    }, 0)
 }
 
 function removePromo() {
@@ -1190,6 +1251,7 @@ const showQrOrAccount = computed(() => {
                         :floor-plan="floor_plan ?? []"
                         :products="products"
                         :cart="cart"
+                        v-model:selected-table-id="selectedTableId"
                         @add-to-cart="addProductFromRental"
                         @checkout="openPaymentDialog"
                         @pay-order="openReceiptForStoppedRental"

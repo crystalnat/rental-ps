@@ -95,6 +95,7 @@ const props = defineProps<{
     floorPlan: FloorData[]
     products: Product[]
     cart: CartItem[]
+    selectedTableId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -102,6 +103,7 @@ const emit = defineEmits<{
     (e: 'update:floor-plan', plan: FloorData[]): void
     (e: 'checkout'): void
     (e: 'pay-order', orderId: number): void
+    (e: 'update:selectedTableId', id: number | null): void
 }>()
 
 // ─── State ─────────────────────────────────────────────────────────────────────
@@ -245,10 +247,12 @@ function getRunningDurationMinutes(order: TableOrder): number {
 function selectTable(t: FloorTable) {
     selectedTable.value = t
     showUnitDetail.value = true
+    emit('update:selectedTableId', t.id)
 }
 
 function closeUnitDetail() {
     showUnitDetail.value = false
+    emit('update:selectedTableId', null)
     setTimeout(() => { selectedTable.value = null }, 200)
 }
 
@@ -275,6 +279,24 @@ function syncSelectedTable() {
 
 // Auto-sync selectedTable whenever Inertia refreshes floorPlan props
 watch(() => props.floorPlan, () => { syncSelectedTable() }, { deep: true })
+
+// Watch for external selectedTableId changes
+watch(() => props.selectedTableId, (newId) => {
+    if (newId === null || newId === undefined) {
+        selectedTable.value = null
+        showUnitDetail.value = false
+    } else if (selectedTable.value?.id !== newId) {
+        // Find the table and select it
+        for (const floor of props.floorPlan) {
+            const found = floor.tables.find(t => t.id === newId)
+            if (found) {
+                selectedTable.value = { ...found }
+                showUnitDetail.value = true
+                return
+            }
+        }
+    }
+}, { immediate: true })
 
 function toggleTuya(table: FloorTable) {
     if (toggling.value[table.id]) return

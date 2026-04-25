@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(php artisan:*)",
-      "Bash(del \"d:\\\\laragon\\\\www\\\\rental-ps\\\\scripts\\\\setup.py\")"
+      "Bash(del \"d:\\\\laragon\\\\www\\\\rental-ps\\\\scripts\\\\setup.py\")",
+      "Bash(git -C C:/laragon/www/rental-ps log --oneline --all)",
+      "Bash(git -C C:/laragon/www/rental-ps log --oneline --diff-filter=M -- \"*/Categories*\" \"*/CategoryController*\")",
+      "Bash(*)",
+      "Bash(git -C C:/laragon/www/rental-ps show 0b26ac8 --stat)"
     ]
   }
 }

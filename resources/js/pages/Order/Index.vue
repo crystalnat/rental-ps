@@ -145,7 +145,7 @@ function openCheckout() {
 function submitOrder() {
     if (cart.value.length === 0) return
     const { customer_name, customer_email, customer_phone, notes } = checkoutForm.value
-    if (!customer_name?.trim() || !customer_email?.trim() || !customer_phone?.trim()) return
+    if (!customer_name?.trim() || !customer_phone?.trim()) return
 
     submitting.value = true
     router.post('/order', {
@@ -375,14 +375,13 @@ function submitOrder() {
                             />
                         </div>
                         <div>
-                            <Label for="customer_email">Email</Label>
+                            <Label for="customer_email">Email <span class="text-muted-foreground">(opsional)</span></Label>
                             <Input
                                 id="customer_email"
                                 v-model="checkoutForm.customer_email"
                                 type="email"
                                 placeholder="email@contoh.com"
                                 class="mt-1.5"
-                                required
                             />
                         </div>
                         <div>
@@ -420,7 +419,7 @@ function submitOrder() {
                             <Button
                                 type="submit"
                                 class="flex-1"
-                                :disabled="submitting || !checkoutForm.customer_name?.trim() || !checkoutForm.customer_email?.trim() || !checkoutForm.customer_phone?.trim()"
+                                :disabled="submitting || !checkoutForm.customer_name?.trim() || !checkoutForm.customer_phone?.trim()"
                             >
                                 {{ submitting ? 'Memproses...' : 'Kirim Pesanan' }}
                             </Button>
