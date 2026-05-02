@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import {
     Power, Play, Square, Clock, Gamepad2, Plus, Minus, Zap,
-    ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, Info, CreditCard,
+    ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, Info, CreditCard, X,
 } from 'lucide-vue-next'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -122,6 +122,16 @@ const toggling = ref<Record<number, boolean>>({})
 const startingRental = ref<Record<number, boolean>>({})
 const stoppingRental = ref<Record<number, boolean>>({})
 
+// ─── Rental 10-min warning notifications ───────────────────────────────────────
+interface RentalWarning {
+    id: string
+    tableName: string
+    orderId: number
+    remainingMin: number
+}
+const rentalWarnings = ref<RentalWarning[]>([])
+const notified10Min = new Set<number>()
+
 // Dialogs
 const showStartRentalDialog = ref(false)
 const startRentalForm = ref({ duration: 60 })
@@ -161,7 +171,10 @@ function zoomFit() { userZoom.value = 1 }
 
 // ─── Timer ─────────────────────────────────────────────────────────────────────
 onMounted(() => {
-    timerInterval = setInterval(() => now.value = new Date(), 1000)
+    timerInterval = setInterval(() => {
+        now.value = new Date()
+        checkRental10MinWarning()
+    }, 1000)
 })
 onBeforeUnmount(() => { if (timerInterval) clearInterval(timerInterval) })
 
@@ -205,6 +218,40 @@ function isExpiringSoon(order: TableOrder): boolean {
 function isExpired(order: TableOrder): boolean {
     if (!order.rental_end_at) return false
     return getRemainingMs(order.rental_end_at) <= 0
+}
+
+function checkRental10MinWarning() {
+    const allTables = props.floorPlan.flatMap(f => f.tables)
+    for (const table of allTables) {
+        const rental = getActiveRental(table)
+        if (!rental?.rental_end_at) continue
+        const msLeft = getRemainingMs(rental.rental_end_at)
+        const tenMin = 10 * 60 * 1000
+        // Trigger once when crossing below 10 minutes (and still > 0)
+        if (msLeft > 0 && msLeft <= tenMin && !notified10Min.has(rental.id)) {
+            notified10Min.add(rental.id)
+            const minLeft = Math.ceil(msLeft / 60000)
+            const warningId = `rental-warn-${rental.id}`
+            if (!rentalWarnings.value.find(w => w.id === warningId)) {
+                rentalWarnings.value.push({
+                    id: warningId,
+                    tableName: table.name,
+                    orderId: rental.id,
+                    remainingMin: minLeft,
+                })
+                // Auto-dismiss after 15 seconds
+                setTimeout(() => dismissWarning(warningId), 15000)
+            }
+        }
+        // Reset notified flag when rental ends (so next rental on same table can notify)
+        if (msLeft <= 0) {
+            notified10Min.delete(rental.id)
+        }
+    }
+}
+
+function dismissWarning(id: string) {
+    rentalWarnings.value = rentalWarnings.value.filter(w => w.id !== id)
 }
 
 function getRunningCost(order: TableOrder, pricePerHour: number): number {
@@ -1018,6 +1065,42 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <!-- ─── Rental 10-min Warning Toasts (bottom-right) ──────────────── -->
+    <Teleport to="body">
+        <div class="pointer-events-none fixed bottom-4 right-4 z-[70] flex flex-col gap-2">
+            <TransitionGroup
+                enter-active-class="transition-all duration-300 ease-out"
+                enter-from-class="translate-y-4 opacity-0"
+                enter-to-class="translate-y-0 opacity-100"
+                leave-active-class="transition-all duration-200 ease-in"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-for="w in rentalWarnings"
+                    :key="w.id"
+                    class="pointer-events-auto flex w-80 items-start gap-3 rounded-xl border border-amber-400/50 bg-amber-50 px-4 py-3 text-sm shadow-lg ring-1 ring-amber-300/30 dark:bg-amber-950/90 dark:border-amber-500/40"
+                >
+                    <Timer class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                    <div class="flex-1">
+                        <p class="font-semibold text-amber-800 dark:text-amber-200">Waktu Hampir Habis!</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                            <span class="font-bold">{{ w.tableName }}</span> — sisa waktu sekitar
+                            <span class="font-bold">{{ w.remainingMin }} menit</span> lagi.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="mt-0.5 rounded-md p-1 text-amber-500 hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900"
+                        @click="dismissWarning(w.id)"
+                    >
+                        <X class="h-4 w-4" />
+                    </button>
+                </div>
+            </TransitionGroup>
+        </div>
+    </Teleport>
 </template>
 
 <style scoped>

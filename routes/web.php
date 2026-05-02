@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CashflowController;
+use App\Http\Controllers\Admin\ManualInvoiceController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\Admin\DailyExpenseController;
 use App\Http\Controllers\Admin\CashierController;
@@ -58,6 +59,13 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
         Route::post('/shifts/open', [ShiftController::class, 'open'])->name('admin.shifts.open');
         Route::post('/shifts/{shift}/close', [ShiftController::class, 'close'])->name('admin.shifts.close');
         Route::get('/shifts/{shift}', [ShiftController::class, 'show'])->name('admin.shifts.show');
+    });
+
+    // Struk Manual (owner, admin, cashier)
+    Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
+        Route::get('/manual-invoice', [ManualInvoiceController::class, 'index'])->name('admin.manual-invoice.index');
+        Route::post('/manual-invoice', [ManualInvoiceController::class, 'store'])->name('admin.manual-invoice.store');
+        Route::get('/manual-invoice/{order}/receipt', [ManualInvoiceController::class, 'receipt'])->name('admin.manual-invoice.receipt');
     });
 
     // Orders / Pesanan (owner, admin, cashier)

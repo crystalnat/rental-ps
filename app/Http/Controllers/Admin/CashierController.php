@@ -300,7 +300,7 @@ class CashierController extends Controller
                 'is_rental'       => $hasRentalPackage ?? false,
                 'rental_started_at' => ($hasRentalPackage ?? false) ? now() : null,
                 'rental_duration_minutes' => $rentalDuration ?? 0,
-                'rental_end_at'   => ($hasRentalPackage ?? false) ? now()->addMinutes($rentalDuration ?? 0) : null,
+                'rental_end_at'   => ($hasRentalPackage ?? false) ? now()->addMinutes(($rentalDuration ?? 0) + 10) : null,
             ]);
 
             // If rental package, turn on PS
