@@ -2,15 +2,13 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        // Add 'manual' to orders.type enum
-        DB::statement("ALTER TABLE orders MODIFY COLUMN type ENUM('dine_in','takeaway','walk_in','manual') NOT NULL DEFAULT 'dine_in'");
+        // SQLite stores type as TEXT — no ENUM alteration needed
 
         // Make order_items.product_id nullable
         Schema::table('order_items', function (Blueprint $table) {
@@ -24,7 +22,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE orders MODIFY COLUMN type ENUM('dine_in','takeaway','walk_in') NOT NULL DEFAULT 'dine_in'");
+        // SQLite stores type as TEXT — no ENUM alteration needed
 
         Schema::table('order_items', function (Blueprint $table) {
             $table->dropForeign(['product_id']);
