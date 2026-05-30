@@ -1,2 +1,2 @@
 @echo off
-start "" pythonw.exe "%~dp0tuya_bridge.py"
+start "" pythonw.exe "%~dp0adb_bridge.py"
