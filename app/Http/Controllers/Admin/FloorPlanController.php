@@ -443,7 +443,7 @@ class FloorPlanController extends Controller
                 'status'        => 'confirmed', // Assuming it's active immediately
                 'rental_started_at' => now(),
                 'rental_duration_minutes' => $duration ?? 0,
-                'rental_end_at' => $duration ? now()->addMinutes($duration) : null,
+                'rental_end_at' => $duration ? now()->addMinutes($duration + 10) : null,
                 'subtotal'      => $subtotal,
                 'final_amount'  => $subtotal,
                 'payment_status'=> 'pending',
@@ -478,12 +478,19 @@ class FloorPlanController extends Controller
                 $started = \Carbon\Carbon::parse($order->rental_started_at);
                 $elapsedSeconds = $started->diffInSeconds($now);
                 if ($elapsedSeconds < 0) $elapsedSeconds = 0;
-                
-                $elapsedMinutes = (int) ceil($elapsedSeconds / 60);
-                if ($elapsedMinutes < 1 && $elapsedSeconds > 0) $elapsedMinutes = 1;
 
-                $costPerSec = $table->rental_price_per_hour / 3600;
-                $cost = (int) floor($costPerSec * $elapsedSeconds);
+                // Billing rules (open bill):
+                // - Minimum 1 jam
+                // - Sisa menit < 10 → bulatkan ke bawah (1j 9m = 1 jam)
+                // - Sisa menit >= 10 → bulatkan ke atas (1j 11m = 2 jam)
+                $totalMinutes = (int) floor($elapsedSeconds / 60);
+                $wholeHours   = (int) floor($totalMinutes / 60);
+                $remainderMin = $totalMinutes % 60;
+                $billableHours = $remainderMin >= 10 ? $wholeHours + 1 : $wholeHours;
+                $billableHours = max(1, $billableHours); // minimum 1 jam
+                $elapsedMinutes = $billableHours * 60;
+
+                $cost = (int) round($table->rental_price_per_hour * $billableHours);
 
                 $order->update([
                     'status' => 'ready',

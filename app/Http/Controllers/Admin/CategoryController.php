@@ -4,24 +4,27 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Services\Admin\CategoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class CategoryController extends Controller
 {
+    protected $categoryService;
+
+    public function __construct(CategoryService $categoryService)
+    {
+        $this->categoryService = $categoryService;
+    }
+
     public function index(): Response
     {
         $brandId = Auth::user()->brand_id;
 
-        $categories = Category::where('brand_id', $brandId)
-            ->withCount('products')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get()
+        $categories = $this->categoryService->getAllForBrand($brandId)
             ->map(fn ($cat) => [
                 'id'             => $cat->id,
                 'name'           => $cat->name,
@@ -56,16 +59,7 @@ class CategoryController extends Controller
             'is_active'  => ['boolean'],
         ]);
 
-        $slug = $this->generateUniqueSlug($data['name']);
-
-        Category::create([
-            'brand_id'   => $brandId,
-            'name'       => $data['name'],
-            'slug'       => $slug,
-            'color'      => ! empty($data['color']) ? $data['color'] : null,
-            'sort_order' => $data['sort_order'] ?? 0,
-            'is_active'  => $data['is_active'] ?? true,
-        ]);
+        $this->categoryService->create($brandId, $data);
 
         return redirect()->route('admin.categories.index')
             ->with('success', "Kategori \"{$data['name']}\" berhasil ditambahkan.");
@@ -99,17 +93,7 @@ class CategoryController extends Controller
             'is_active'  => ['boolean'],
         ]);
 
-        if ($data['name'] !== $category->name) {
-            $data['slug'] = $this->generateUniqueSlug($data['name'], $category->id);
-        }
-
-        $category->update([
-            'name'       => $data['name'],
-            'slug'       => $data['slug'] ?? $category->slug,
-            'color'      => ! empty($data['color']) ? $data['color'] : null,
-            'sort_order' => $data['sort_order'] ?? 0,
-            'is_active'  => $data['is_active'] ?? true,
-        ]);
+        $this->categoryService->update($category, $data);
 
         return redirect()->route('admin.categories.index')
             ->with('success', "Kategori \"{$category->name}\" berhasil diperbarui.");
@@ -119,7 +103,7 @@ class CategoryController extends Controller
     {
         $this->authorizeCategory($category);
 
-        $category->delete();
+        $this->categoryService->delete($category);
 
         return redirect()->route('admin.categories.index')
             ->with('success', "Kategori \"{$category->name}\" berhasil dihapus.");
@@ -129,22 +113,5 @@ class CategoryController extends Controller
     {
         abort_unless($category->brand_id === Auth::user()->brand_id, 403);
     }
-
-    private function generateUniqueSlug(string $name, ?int $excludeId = null): string
-    {
-        $brandId = Auth::user()->brand_id;
-        $slug    = Str::slug($name);
-        $count   = 1;
-
-        while (
-            Category::where('brand_id', $brandId)
-                ->where('slug', $slug)
-                ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
-                ->exists()
-        ) {
-            $slug = Str::slug($name) . '-' . $count++;
-        }
-
-        return $slug;
-    }
 }
+

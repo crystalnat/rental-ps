@@ -396,7 +396,7 @@ class ReportController extends Controller
 
     private function buildSalesByTypeForStores(Collection $storeIds, string $dateFrom, string $dateTo): array
     {
-        $typeLabels = ['dine_in' => 'Dine In', 'takeaway' => 'Take Away', 'walk_in' => 'Walk In'];
+        $typeLabels = ['dine_in' => 'Dine In', 'takeaway' => 'Take Away', 'walk_in' => 'Walk In', 'manual' => 'Manual'];
         $data = Order::whereIn('store_id', $storeIds)
             ->where('payment_status', 'paid')
             ->whereDate('created_at', '>=', $dateFrom)

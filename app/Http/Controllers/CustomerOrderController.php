@@ -78,7 +78,7 @@ class CustomerOrderController extends Controller
             'table_id'        => ['required', 'exists:dining_tables,id'],
             'payment_method'  => ['required', 'in:cash,qris'],
             'customer_name'   => ['required', 'string', 'max:255'],
-            'customer_email'  => ['required', 'email', 'max:255'],
+            'customer_email'  => ['nullable', 'email', 'max:255'],
             'customer_phone'  => ['required', 'string', 'max:20'],
             'items'           => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -254,12 +254,15 @@ class CustomerOrderController extends Controller
     private function resolveCustomer(int $brandId, array $data): int
     {
         $name = trim($data['customer_name']);
-        $email = trim($data['customer_email']);
+        $email = !empty($data['customer_email']) ? trim($data['customer_email']) : null;
         $phone = trim($data['customer_phone']);
 
-        $customer = Customer::where('brand_id', $brandId)
-            ->where('email', $email)
-            ->first();
+        $customer = null;
+        if ($email) {
+            $customer = Customer::where('brand_id', $brandId)
+                ->where('email', $email)
+                ->first();
+        }
 
         if ($customer) {
             $customer->update([
