@@ -28,7 +28,7 @@ CLIENT_SECRET = "79470deb5eea48fc863f9baa6386af8f"
 # https://openapi-sg.iotbing.com  -> Singapore (Indonesia)
 BASE_URL = "https://openapi-sg.iotbing.com"
 
-SERVER_URL   = "http://10.32.168.209:8000"   # URL Laravel (ganti ke VPS saat deploy)
+SERVER_URL   = "http://192.168.1.85:8000"   # URL Laravel (ganti ke VPS saat deploy)
 STORE_ID     = "1"
 BRIDGE_TOKEN = "ganti-dengan-token-rahasia"  # Sama dengan TUYA_BRIDGE_TOKEN di .env
 

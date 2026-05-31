@@ -917,7 +917,7 @@ function qrImageUrl(url: string) {
             <DialogContent class="max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Tambah Unit PS</DialogTitle>
-                    <DialogDescription>Unit PS akan muncul di denah. Atur ADB Address & Harga nanti.</DialogDescription>
+                    <DialogDescription>Unit PS akan muncul di denah. Atur Device Address & Harga nanti.</DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4">
                     <div>
@@ -941,7 +941,7 @@ function qrImageUrl(url: string) {
             <DialogContent class="max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Edit Unit PS — {{ editTableTarget?.name }}</DialogTitle>
-                    <DialogDescription>Atur detail unit PS dan koneksi ADB Android TV.</DialogDescription>
+                    <DialogDescription>Atur detail unit PS dan koneksi TV (Android ADB / Hisense VIDAA).</DialogDescription>
                 </DialogHeader>
                 <div class="space-y-4">
                     <div>
@@ -959,9 +959,9 @@ function qrImageUrl(url: string) {
                         </div>
                     </div>
                     <div>
-                        <Label>ADB Address (Android TV)</Label>
-                        <Input v-model="editTableForm.tuya_device_id" placeholder="Contoh: 192.168.1.20:5555" class="mt-1.5" />
-                        <p class="mt-1 text-[10px] text-muted-foreground">IP:Port ADB dari Android TV untuk menyalakan/mematikan PS via adb_bridge.</p>
+                        <Label>Device Address</Label>
+                        <Input v-model="editTableForm.tuya_device_id" placeholder="Android TV: 192.168.1.20:5555 | VIDAA: vidaa:192.168.1.21" class="mt-1.5" />
+                        <p class="mt-1 text-[10px] text-muted-foreground">Android TV (ADB): IP:5555 &nbsp;|&nbsp; Hisense VIDAA: vidaa:IP (pair dulu via vidaa_pair.py)</p>
                     </div>
                     <div>
                         <Label>Harga Rental per Jam</Label>
