@@ -480,14 +480,14 @@ class FloorPlanController extends Controller
                 if ($elapsedSeconds < 0) $elapsedSeconds = 0;
 
                 // Billing rules (open bill):
-                // - Minimum 1 jam
+                // - 0-9 menit pertama gratis
+                // - Menit ke-10 ke atas mulai dihitung 1 jam
                 // - Sisa menit < 10 → bulatkan ke bawah (1j 9m = 1 jam)
-                // - Sisa menit >= 10 → bulatkan ke atas (1j 11m = 2 jam)
+                // - Sisa menit >= 10 → bulatkan ke atas (1j 10m = 2 jam)
                 $totalMinutes = (int) floor($elapsedSeconds / 60);
                 $wholeHours   = (int) floor($totalMinutes / 60);
                 $remainderMin = $totalMinutes % 60;
                 $billableHours = $remainderMin >= 10 ? $wholeHours + 1 : $wholeHours;
-                $billableHours = max(1, $billableHours); // minimum 1 jam
                 $elapsedMinutes = $billableHours * 60;
 
                 $cost = (int) round($table->rental_price_per_hour * $billableHours);
