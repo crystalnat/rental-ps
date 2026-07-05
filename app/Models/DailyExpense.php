@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['store_id', 'created_by', 'category', 'description', 'amount', 'expense_date', 'receipt_image'])]
+#[Fillable(['store_id', 'shift_id', 'created_by', 'category', 'description', 'amount', 'expense_date', 'receipt_image'])]
 class DailyExpense extends Model
 {
     use SoftDeletes;

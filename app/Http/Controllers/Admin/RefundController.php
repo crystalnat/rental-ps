@@ -231,9 +231,15 @@ class RefundController extends Controller
                 // Generate refund code
                 $refundCode = 'RF-' . strtoupper(substr(md5(uniqid()), 0, 8));
 
+                $openShiftId = \App\Models\CashierShift::where('store_id', $order->store_id)
+                    ->where('user_id', $user->id)
+                    ->where('status', 'open')
+                    ->value('id');
+
                 $refund = Refund::create([
                     'order_id'      => $order->id,
                     'store_id'      => $order->store_id,
+                    'shift_id'      => $openShiftId,
                     'user_id'       => $user->id,
                     'refund_code'   => $refundCode,
                     'type'          => $type,
