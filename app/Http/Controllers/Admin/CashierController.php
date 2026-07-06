@@ -44,19 +44,16 @@ class CashierController extends Controller
             ]);
         }
 
-        $products = Cache::remember("store_products_{$store->id}", 3600, function() use ($store) {
-            return $this->getProductsForStore($store);
-        });
+        // Tidak di-cache: harga & stok berubah tiap transaksi; cache lama menampilkan harga/stok basi di layar kasir
+        $products = $this->getProductsForStore($store);
 
-        $categories = Cache::remember("brand_categories_{$store->brand_id}", 3600, function() use ($store) {
-            return Category::where('brand_id', $store->brand_id)
-                ->where('is_active', true)
-                ->orderBy('sort_order', 'asc')
-                ->orderBy('name', 'asc')
-                ->get(['id', 'name', 'color'])
-                ->values()
-                ->toArray();
-        });
+        $categories = Category::where('brand_id', $store->brand_id)
+            ->where('is_active', true)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name', 'color'])
+            ->values()
+            ->toArray();
 
         $tables = DiningTable::where('store_id', $store->id)
             ->where('is_active', true)
@@ -201,9 +198,11 @@ class CashierController extends Controller
                 $subtotal += $itemSubtotal;
 
                 // Check stock if tracking
+                // lockForUpdate: kunci baris stok sampai transaksi commit agar tidak oversell saat checkout paralel
                 if ($product->track_stock) {
                     $inventory = StoreInventory::where('store_id', $store->id)
                         ->where('product_id', $product->id)
+                        ->lockForUpdate()
                         ->first();
                     $currentStock = (float) ($inventory?->current_stock ?? 0);
                     if ($currentStock < $qty) {
@@ -228,10 +227,13 @@ class CashierController extends Controller
             $promoId = null;
 
             if (!empty($data['promo_code'])) {
+                // lockForUpdate: serialize cek kuota + increment agar kuota tidak terlampaui saat 2 checkout paralel
+                // strtoupper: konsisten dengan checkPromo() yang mencari uppercase
                 $promo = Promo::where('brand_id', $store->brand_id)
-                    ->where('code', $data['promo_code'])
+                    ->where('code', strtoupper($data['promo_code']))
+                    ->lockForUpdate()
                     ->first();
-                
+
                 if (!$promo || !$promo->isValid()) {
                     throw new \RuntimeException("Kode promo tidak valid atau sudah kedaluwarsa.");
                 }
@@ -346,11 +348,17 @@ class CashierController extends Controller
                 Customer::where('id', $customerId)->increment('total_spent', $finalAmount);
             }
 
-            // Trigger Notifications
-            $this->handlePostOrderNotifications($order);
-
             return $order;
         });
+
+        // Notifikasi dikirim SETELAH commit: agar kunci stok/promo cepat lepas
+        // dan kegagalan kirim notifikasi tidak me-rollback order yang sudah dibayar.
+        // try/catch: order sudah tersimpan; jangan sampai gagal notif bikin layar 500 lalu kasir submit dobel.
+        try {
+            $this->handlePostOrderNotifications($order);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal kirim notifikasi order ' . $order->order_code . ': ' . $e->getMessage());
+        }
 
         return redirect()
             ->route('admin.cashier.index', ['store' => $store->id])
@@ -575,6 +583,7 @@ class CashierController extends Controller
                 if ($product->track_stock) {
                     $inventory = StoreInventory::where('store_id', $store->id)
                         ->where('product_id', $product->id)
+                        ->lockForUpdate()
                         ->first();
                     if (($inventory?->current_stock ?? 0) < $qty) {
                         throw new \RuntimeException("Stok {$product->name} tidak mencukupi.");
@@ -642,8 +651,8 @@ class CashierController extends Controller
 
     private function getProductsForStore(Store $store): array
     {
-        return Product::with([
-            'category', 
+        $products = Product::with([
+            'category',
             'inventories' => fn ($q) => $q->where('store_id', $store->id),
             'modifierGroups.options' => fn ($q) => $q->where('is_active', true)
         ])
@@ -651,14 +660,20 @@ class CashierController extends Controller
             ->where('is_available', true)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get()
-            ->map(function ($product) use ($store) {
+            ->get();
+
+        // Batch harga aktif (hindari N+1): 1 query, ambil per produk yg started_at terbaru
+        $priceByProduct = PriceLog::whereIn('product_id', $products->pluck('id'))
+            ->where(fn ($q) => $q->where('store_id', $store->id)->orWhereNull('store_id'))
+            ->whereNull('ended_at')
+            ->orderBy('started_at') // asc: keyBy simpan yg terakhir = started_at terbaru
+            ->get(['product_id', 'sell_price', 'buy_price'])
+            ->keyBy('product_id');
+
+        return $products
+            ->map(function ($product) use ($priceByProduct) {
                 $inventory = $product->inventories->first();
-                $price = PriceLog::where('product_id', $product->id)
-                    ->where(fn ($q) => $q->where('store_id', $store->id)->orWhereNull('store_id'))
-                    ->whereNull('ended_at')
-                    ->latest('started_at')
-                    ->first();
+                $price = $priceByProduct->get($product->id);
 
                 $sellPrice = (float) ($price?->sell_price ?? 0);
                 if ($sellPrice <= 0) {
@@ -704,10 +719,13 @@ class CashierController extends Controller
 
     private function generateOrderCode(int $storeId): string
     {
+        // ponytail: lockForUpdate serialize dua checkout paralel di store yg sama; dipanggil di dalam DB::transaction store().
+        // Ceiling: order pertama hari itu (belum ada baris) tak terkunci — upgrade ke unique index (store_id, order_code) jika kolisi awal-hari muncul.
         $prefix = 'ORD-' . now()->format('Ymd') . '-';
         $last = Order::where('store_id', $storeId)
             ->where('order_code', 'like', $prefix . '%')
             ->orderByDesc('id')
+            ->lockForUpdate()
             ->value('order_code');
 
         $seq = 1;
@@ -720,7 +738,8 @@ class CashierController extends Controller
 
     private function buildFloorPlanForCashier(Store $store): array
     {
-        $floors = Floor::where('store_id', $store->id)
+        $floors = Floor::with(['diningTables' => fn ($q) => $q->where('is_active', true)->orderBy('name')])
+            ->where('store_id', $store->id)
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get();
@@ -733,10 +752,7 @@ class CashierController extends Controller
             ->groupBy('table_id');
 
         return $floors->map(function ($floor) use ($activeOrdersByTable) {
-            $tables = $floor->diningTables()
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get()
+            $tables = $floor->diningTables
                 ->map(function ($t) use ($activeOrdersByTable) {
                     $orders = $activeOrdersByTable->get($t->id, collect())
                         ->map(fn ($o) => [

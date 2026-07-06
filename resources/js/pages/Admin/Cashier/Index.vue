@@ -1840,7 +1840,7 @@ const showQrOrAccount = computed(() => {
                     </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter class="flex-col gap-2 sm:flex-col">
                     <Button
                         class="w-full"
                         size="lg"
@@ -1849,6 +1849,15 @@ const showQrOrAccount = computed(() => {
                     >
                         <Loader2 v-if="openShiftForm.processing" class="mr-2 h-4 w-4 animate-spin" />
                         {{ openShiftForm.processing ? 'Memproses...' : 'Buka Shift Sekarang' }}
+                    </Button>
+                    <Button
+                        v-if="!activeShift"
+                        class="w-full"
+                        variant="outline"
+                        :disabled="openShiftForm.processing"
+                        @click="router.visit('/admin/dashboard')"
+                    >
+                        Kembali
                     </Button>
                 </DialogFooter>
             </DialogContent>

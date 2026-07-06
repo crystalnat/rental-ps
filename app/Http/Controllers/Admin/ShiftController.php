@@ -160,6 +160,75 @@ class ShiftController extends Controller
             'total'  => $group->sum('final_amount'),
         ])->values();
 
+        // === Mutasi Kas (ledger uang tunai di laci untuk shift ini) ===
+        $cashPaymentCodes = \App\Models\PaymentMethod::where('brand_id', $shift->store->brand_id)
+            ->where('requires_cash_input', true)
+            ->pluck('code')
+            ->toArray();
+
+        $cashOrders = Order::where('shift_id', $shift->id)
+            ->where('payment_status', 'paid')
+            ->whereNull('deleted_at')
+            ->whereIn('payment_method', $cashPaymentCodes)
+            ->get(['order_code', 'final_amount', 'paid_at']);
+
+        $shiftExpenses = DailyExpense::where('shift_id', $shift->id)
+            ->whereNull('deleted_at')
+            ->get(['description', 'amount', 'created_at']);
+
+        $cashRefunds = \App\Models\Refund::where('shift_id', $shift->id)
+            ->where('refund_method', 'cash')
+            ->where('status', 'completed')
+            ->whereNull('deleted_at')
+            ->get(['refund_code', 'refund_amount', 'processed_at']);
+
+        $movements = collect()
+            ->push([
+                'at'     => $shift->opened_at,
+                'label'  => 'Kas Awal',
+                'ref'    => null,
+                'type'   => 'in',
+                'amount' => (float) $shift->opening_cash,
+            ])
+            ->concat($cashOrders->map(fn ($o) => [
+                'at'     => $o->paid_at ?? $shift->opened_at,
+                'label'  => 'Penjualan Tunai',
+                'ref'    => $o->order_code,
+                'type'   => 'in',
+                'amount' => (float) $o->final_amount,
+            ]))
+            ->concat($shiftExpenses->map(fn ($e) => [
+                'at'     => $e->created_at,
+                'label'  => 'Pengeluaran: ' . $e->description,
+                'ref'    => null,
+                'type'   => 'out',
+                'amount' => (float) $e->amount,
+            ]))
+            ->concat($cashRefunds->map(fn ($r) => [
+                'at'     => $r->processed_at ?? $shift->opened_at,
+                'label'  => 'Refund Tunai',
+                'ref'    => $r->refund_code,
+                'type'   => 'out',
+                'amount' => (float) $r->refund_amount,
+            ]))
+            ->sortBy('at')
+            ->values();
+
+        // Running balance (saldo laci berjalan)
+        $balance = 0.0;
+        $movements = $movements->map(function ($m) use (&$balance) {
+            $balance += $m['type'] === 'in' ? $m['amount'] : -$m['amount'];
+
+            return [
+                'time'    => $m['at']->format('d M H:i'),
+                'label'   => $m['label'],
+                'ref'     => $m['ref'],
+                'type'    => $m['type'],
+                'amount'  => $m['amount'],
+                'balance' => round($balance, 2),
+            ];
+        });
+
         return Inertia::render('Admin/Shifts/Show', [
             'shift' => [
                 'id'                  => $shift->id,
@@ -184,6 +253,7 @@ class ShiftController extends Controller
             ],
             'orders'            => $orders,
             'payment_breakdown' => $paymentBreakdown,
+            'cash_movements'    => $movements,
         ]);
     }
 
@@ -244,6 +314,11 @@ class ShiftController extends Controller
             abort(403);
         }
 
+        // Kasir hanya boleh menutup shift miliknya sendiri; owner/admin boleh menutup shift siapa pun
+        if ($user->role === 'cashier' && $shift->user_id !== $user->id) {
+            abort(403);
+        }
+
         if ($shift->status === 'closed') {
             return back()->with('error', 'Shift sudah ditutup.');
         }
@@ -271,15 +346,20 @@ class ShiftController extends Controller
         $totalCashSales = (float) $orders->whereIn('payment_method', $cashPaymentCodes)->sum('final_amount');
         $totalNonCashSales = $totalSales - $totalCashSales;
 
-        // Expenses during shift
-        $totalExpenses = (float) DailyExpense::where('store_id', $shift->store_id)
-            ->whereDate('expense_date', '>=', $shift->opened_at->toDateString())
-            ->whereDate('expense_date', '<=', now()->toDateString())
+        // Pengeluaran yang tercatat DI shift ini saja (bukan per-tanggal seluruh toko)
+        $totalExpenses = (float) DailyExpense::where('shift_id', $shift->id)
             ->whereNull('deleted_at')
             ->sum('amount');
 
-        // Expected cash = opening_cash + cash_sales - expenses
-        $expectedCash = (float) $shift->opening_cash + $totalCashSales - $totalExpenses;
+        // Refund tunai keluar dari laci kasir shift ini
+        $totalCashRefunds = (float) \App\Models\Refund::where('shift_id', $shift->id)
+            ->where('refund_method', 'cash')
+            ->where('status', 'completed')
+            ->whereNull('deleted_at')
+            ->sum('refund_amount');
+
+        // Expected cash = kas awal + penjualan tunai - pengeluaran - refund tunai
+        $expectedCash = (float) $shift->opening_cash + $totalCashSales - $totalExpenses - $totalCashRefunds;
         $actualCash = (float) $data['actual_cash'];
         $cashDifference = $actualCash - $expectedCash;
 
@@ -294,6 +374,7 @@ class ShiftController extends Controller
             'total_cash_sales'     => $totalCashSales,
             'total_non_cash_sales' => $totalNonCashSales,
             'total_expenses'       => $totalExpenses,
+            'total_refunds'        => $totalCashRefunds,
             'notes'                => $data['notes'] ?? $shift->notes,
         ]);
 

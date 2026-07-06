@@ -56,10 +56,20 @@ interface PaymentBreakdown {
     total: number
 }
 
+interface CashMovement {
+    time: string
+    label: string
+    ref: string | null
+    type: 'in' | 'out'
+    amount: number
+    balance: number
+}
+
 const props = defineProps<{
     shift: ShiftDetail
     orders: ShiftOrder[]
     payment_breakdown: PaymentBreakdown[]
+    cash_movements: CashMovement[]
 }>()
 
 const showCloseDialog = ref(false)
@@ -256,6 +266,10 @@ const paymentMethodLabels: Record<string, string> = {
                                 <span class="text-muted-foreground">− Pengeluaran</span>
                                 <span class="font-medium text-red-600">-{{ formatCurrency(shift.total_expenses ?? 0) }}</span>
                             </div>
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-muted-foreground">− Refund Tunai</span>
+                                <span class="font-medium text-red-600">-{{ formatCurrency(shift.total_refunds ?? 0) }}</span>
+                            </div>
                             <div class="flex justify-between py-2 border-b-2 border-foreground font-bold text-base">
                                 <span>Kas Seharusnya</span>
                                 <span>{{ formatCurrency(shift.expected_cash ?? 0) }}</span>
@@ -296,6 +310,81 @@ const paymentMethodLabels: Record<string, string> = {
                             <div v-if="shift.notes" class="mt-4 rounded-lg bg-muted/50 p-3">
                                 <p class="text-xs text-muted-foreground mb-1">Catatan</p>
                                 <p class="text-sm">{{ shift.notes }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Mutasi Kas -->
+            <Card>
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <Wallet class="h-5 w-5 text-primary" />
+                        Mutasi Kas
+                    </CardTitle>
+                    <CardDescription>Aliran uang tunai di laci: kas awal, penjualan tunai, pengeluaran, dan refund tunai.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="cash_movements.length === 0" class="py-8 text-center text-muted-foreground">
+                        Belum ada mutasi kas.
+                    </div>
+
+                    <!-- Desktop: tabel -->
+                    <div v-else class="hidden sm:block overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-left text-muted-foreground border-b">
+                                <tr>
+                                    <th class="py-2 pr-3 font-medium">Waktu</th>
+                                    <th class="py-2 px-3 font-medium">Keterangan</th>
+                                    <th class="py-2 px-3 font-medium text-right">Masuk</th>
+                                    <th class="py-2 px-3 font-medium text-right">Keluar</th>
+                                    <th class="py-2 pl-3 font-medium text-right">Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr v-for="(m, i) in cash_movements" :key="i" class="hover:bg-muted/40">
+                                    <td class="py-2 pr-3 whitespace-nowrap text-muted-foreground">{{ m.time }}</td>
+                                    <td class="py-2 px-3">
+                                        {{ m.label }}
+                                        <span v-if="m.ref" class="font-mono text-xs text-muted-foreground">· {{ m.ref }}</span>
+                                    </td>
+                                    <td class="py-2 px-3 text-right text-green-600 font-medium whitespace-nowrap">
+                                        {{ m.type === 'in' ? formatCurrency(m.amount) : '—' }}
+                                    </td>
+                                    <td class="py-2 px-3 text-right text-red-600 font-medium whitespace-nowrap">
+                                        {{ m.type === 'out' ? '-' + formatCurrency(m.amount) : '—' }}
+                                    </td>
+                                    <td class="py-2 pl-3 text-right font-semibold whitespace-nowrap">{{ formatCurrency(m.balance) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Mobile: list -->
+                    <div v-if="cash_movements.length > 0" class="sm:hidden space-y-2">
+                        <div
+                            v-for="(m, i) in cash_movements"
+                            :key="i"
+                            class="rounded-lg border p-3"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium truncate">{{ m.label }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        {{ m.time }}<span v-if="m.ref" class="font-mono"> · {{ m.ref }}</span>
+                                    </p>
+                                </div>
+                                <span
+                                    class="text-sm font-semibold whitespace-nowrap"
+                                    :class="m.type === 'in' ? 'text-green-600' : 'text-red-600'"
+                                >
+                                    {{ m.type === 'in' ? '+' : '-' }}{{ formatCurrency(m.amount) }}
+                                </span>
+                            </div>
+                            <div class="mt-1 flex justify-between text-xs text-muted-foreground">
+                                <span>Saldo laci</span>
+                                <span class="font-medium text-foreground">{{ formatCurrency(m.balance) }}</span>
                             </div>
                         </div>
                     </div>

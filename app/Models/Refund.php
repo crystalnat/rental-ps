@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'order_id', 'store_id', 'user_id', 'refund_code',
+    'order_id', 'store_id', 'shift_id', 'user_id', 'refund_code',
     'type', 'reason', 'refund_amount', 'refund_method',
     'status', 'processed_at',
 ])]

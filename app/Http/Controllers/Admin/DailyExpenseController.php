@@ -133,8 +133,15 @@ class DailyExpenseController extends Controller
             $validated['expense_date'] = now()->toDateString();
         }
 
+        // Kaitkan ke shift yang sedang buka agar pengeluaran ini masuk rekonsiliasi kas shift tsb
+        $openShiftId = \App\Models\CashierShift::where('store_id', $store->id)
+            ->where('user_id', $user->id)
+            ->where('status', 'open')
+            ->value('id');
+
         DailyExpense::create([
             'store_id'     => $store->id,
+            'shift_id'     => $openShiftId,
             'created_by'   => $user->id,
             'category'     => $validated['category'],
             'description'  => $validated['description'],
