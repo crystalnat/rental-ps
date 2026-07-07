@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import {
     DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { CreditCard, Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { CreditCard, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-vue-next'
 
 const PAYMENT_TYPES = [
     { value: 'cash', label: 'Tunai', fields: ['cash_input'] },
@@ -42,6 +42,26 @@ const props = defineProps<{
 const showAddDialog = ref(false)
 const editingId = ref<number | null>(null)
 const processing = ref(false)
+
+const page = usePage<{ auth: { user: { role: string } } }>()
+const isOwner = computed(() => page.props?.auth?.user?.role === 'owner')
+
+const showResetDialog = ref(false)
+const resetConfirm = ref('')
+const resetting = ref(false)
+
+function submitReset() {
+    if (resetConfirm.value !== 'RESET') return
+    resetting.value = true
+    router.post(route('admin.settings.reset-trial'), { confirm: resetConfirm.value }, {
+        preserveScroll: true,
+        onFinish: () => {
+            resetting.value = false
+            showResetDialog.value = false
+            resetConfirm.value = ''
+        },
+    })
+}
 
 const form = ref({
     type: 'cash' as string,
@@ -244,6 +264,63 @@ function confirmDelete(pm: PaymentMethod) {
                 </div>
             </CardContent>
         </Card>
+
+        <!-- Zona Berbahaya: Reset Data Trial (owner saja) -->
+        <Card v-if="isOwner" class="mt-6 border-destructive/40">
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2 text-destructive">
+                    <AlertTriangle class="h-5 w-5" />
+                    Reset Data Trial
+                </CardTitle>
+                <CardDescription>
+                    Menghapus seluruh katalog produk, harga, kategori, pelanggan, promo, dan semua transaksi
+                    (pesanan, shift, pendapatan, pengeluaran, refund). Akun pengguna, denah meja, dan konfigurasi
+                    Tuya tetap dipertahankan. Tindakan ini permanen dan tidak bisa dibatalkan.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button variant="destructive" @click="showResetDialog = true">
+                    <AlertTriangle class="h-4 w-4" />
+                    Reset Data Trial
+                </Button>
+            </CardContent>
+        </Card>
+
+        <Dialog v-model:open="showResetDialog">
+            <DialogContent class="max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2 text-destructive">
+                        <AlertTriangle class="h-5 w-5" />
+                        Konfirmasi Reset Data Trial
+                    </DialogTitle>
+                    <DialogDescription>
+                        Semua katalog dan transaksi brand akan dihapus permanen. Ketik
+                        <span class="font-mono font-bold">RESET</span> untuk melanjutkan.
+                    </DialogDescription>
+                </DialogHeader>
+                <form class="space-y-4" @submit.prevent="submitReset">
+                    <div>
+                        <Label for="reset_confirm">Ketik RESET</Label>
+                        <Input
+                            id="reset_confirm"
+                            v-model="resetConfirm"
+                            placeholder="RESET"
+                            autocomplete="off"
+                            class="mt-1"
+                            :disabled="resetting"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" @click="showResetDialog = false" :disabled="resetting">
+                            Batal
+                        </Button>
+                        <Button type="submit" variant="destructive" :disabled="resetting || resetConfirm !== 'RESET'">
+                            {{ resetting ? 'Mereset...' : 'Reset Sekarang' }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
 
         <!-- Add/Edit Dialog -->
         <Dialog v-model:open="showAddDialog">

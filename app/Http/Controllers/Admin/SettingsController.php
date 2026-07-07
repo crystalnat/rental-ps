@@ -7,6 +7,7 @@ use App\Models\PaymentMethod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -137,5 +138,69 @@ class SettingsController extends Controller
     private function authorizeBrand(PaymentMethod $paymentMethod): void
     {
         abort_unless($paymentMethod->brand_id === Auth::user()->brand_id, 403);
+    }
+
+    /**
+     * Reset data trial: hapus katalog & transaksi brand, pertahankan user, denah meja, dan config Tuya.
+     * Untuk membersihkan data uji coba tanpa drop database.
+     */
+    public function resetTrial(Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+        abort_unless($user->role === 'owner', 403);
+
+        $request->validate(['confirm' => ['required', 'in:RESET']]);
+
+        $brandId = $user->brand_id;
+
+        DB::transaction(function () use ($brandId) {
+            $storeIds   = DB::table('stores')->where('brand_id', $brandId)->pluck('id');
+            $productIds = DB::table('products')->where('brand_id', $brandId)->pluck('id');
+            $orderIds   = DB::table('orders')->whereIn('store_id', $storeIds)->pluck('id');
+            $userIds    = DB::table('users')->where('brand_id', $brandId)->pluck('id');
+
+            // Transaksi (anak lebih dulu; abaikan soft-delete, hapus permanen)
+            DB::table('order_item_modifiers')->whereIn('order_item_id', fn ($q) =>
+                $q->select('id')->from('order_items')->whereIn('order_id', $orderIds))->delete();
+            DB::table('refund_items')->whereIn('refund_id', fn ($q) =>
+                $q->select('id')->from('refunds')->whereIn('store_id', $storeIds))->delete();
+            DB::table('refunds')->whereIn('store_id', $storeIds)->delete();
+            DB::table('order_feedbacks')->whereIn('order_id', $orderIds)->delete();
+            DB::table('order_items')->whereIn('order_id', $orderIds)->delete();
+            DB::table('orders')->whereIn('store_id', $storeIds)->delete();
+            DB::table('cashier_shifts')->whereIn('store_id', $storeIds)->delete();
+            DB::table('daily_expenses')->whereIn('store_id', $storeIds)->delete();
+
+            // Pembelian & stok
+            DB::table('purchase_order_items')->whereIn('purchase_order_id', fn ($q) =>
+                $q->select('id')->from('purchase_orders')->whereIn('store_id', $storeIds))->delete();
+            DB::table('purchase_orders')->whereIn('store_id', $storeIds)->delete();
+            DB::table('stock_ins')->whereIn('store_id', $storeIds)->delete();
+            DB::table('stock_mutations')->whereIn('store_id', $storeIds)->delete();
+            DB::table('store_inventories')->whereIn('store_id', $storeIds)->delete();
+
+            // Katalog
+            DB::table('price_logs')->whereIn('product_id', $productIds)->delete();
+            DB::table('product_modifier_options')->whereIn('modifier_group_id', fn ($q) =>
+                $q->select('id')->from('product_modifier_groups')->whereIn('product_id', $productIds))->delete();
+            DB::table('product_modifier_groups')->whereIn('product_id', $productIds)->delete();
+            DB::table('products')->where('brand_id', $brandId)->delete();
+            DB::table('categories')->where('brand_id', $brandId)->delete();
+
+            // Pelanggan, promo, supplier, notifikasi
+            DB::table('customers')->where('brand_id', $brandId)->delete();
+            DB::table('promos')->where('brand_id', $brandId)->delete();
+            DB::table('suppliers')->where('brand_id', $brandId)->delete();
+            DB::table('notifications')
+                ->where('notifiable_type', \App\Models\User::class)
+                ->whereIn('notifiable_id', $userIds)
+                ->delete();
+
+            // Denah & config Tuya dipertahankan; hanya status runtime meja yang direset
+            DB::table('dining_tables')->whereIn('store_id', $storeIds)
+                ->update(['status' => 'available', 'tuya_status' => false]);
+        });
+
+        return back()->with('success', 'Data trial berhasil direset. Katalog, transaksi, dan pendapatan sudah dibersihkan.');
     }
 }

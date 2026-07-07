@@ -458,8 +458,15 @@ function isOrderDone(order: Order) {
                                         </span>
                                     </td>
                                     <td class="align-middle px-4 py-3">
+                                        <span
+                                            v-if="order.payment_status !== 'paid' && order.status !== 'done' && order.status !== 'cancelled'"
+                                            class="inline-flex rounded-full border border-red-200 bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 whitespace-nowrap dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
+                                            title="Terima pembayaran dulu sebelum pesanan bisa diproses"
+                                        >
+                                            Belum Bayar
+                                        </span>
                                         <select
-                                            v-if="order.status !== 'done' && order.status !== 'cancelled'"
+                                            v-else-if="order.status !== 'done' && order.status !== 'cancelled'"
                                             :value="order.status"
                                             :disabled="updatingOrderId === order.id"
                                             class="h-7 min-w-[100px] rounded border border-input bg-background px-2 text-xs"

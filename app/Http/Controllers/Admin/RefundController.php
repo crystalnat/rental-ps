@@ -93,15 +93,20 @@ class RefundController extends Controller
     public function lookup(Request $request): RedirectResponse
     {
         $user = Auth::user();
-        $code = $request->input('order_code');
-        
-        if (!$code) {
+        $code = trim((string) $request->input('order_code'));
+
+        if ($code === '') {
             return back()->with('error', 'Silakan masukkan kode pesanan.');
         }
 
-        $order = Order::where('order_code', 'like', "%{$code}%")
-            ->whereHas('store', fn($q) => $q->where('brand_id', $user->brand_id))
+        // Exact match diprioritaskan; partial hanya fallback dan ambil yang terbaru,
+        // supaya kode ambigu tidak membuka order lama/yang sudah di-refund penuh.
+        $order = Order::whereHas('store', fn($q) => $q->where('brand_id', $user->brand_id))
             ->where('payment_status', 'paid')
+            ->where(fn($q) => $q->where('order_code', $code)
+                ->orWhere('order_code', 'like', "%{$code}%"))
+            ->orderByRaw('CASE WHEN order_code = ? THEN 0 ELSE 1 END', [$code])
+            ->orderByDesc('id')
             ->first();
 
         if (!$order) {
@@ -115,7 +120,7 @@ class RefundController extends Controller
     {
         $user = Auth::user();
 
-        if ($order->store->brand_id !== $user->brand_id) {
+        if (! $order->store || $order->store->brand_id !== $user->brand_id) {
             abort(403);
         }
 
@@ -177,7 +182,7 @@ class RefundController extends Controller
 
         $order = Order::with(['store', 'items'])->findOrFail($data['order_id']);
 
-        if ($order->store->brand_id !== $user->brand_id) {
+        if (! $order->store || $order->store->brand_id !== $user->brand_id) {
             abort(403);
         }
 

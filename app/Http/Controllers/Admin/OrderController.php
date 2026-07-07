@@ -447,6 +447,11 @@ class OrderController extends Controller
             'status' => ['required', 'in:pending,confirmed,processing,ready'],
         ]);
 
+        // Bayar di awal: pesanan hanya boleh diproses (maju dari pending) setelah lunas.
+        if ($data['status'] !== 'pending' && $order->payment_status !== 'paid') {
+            return back()->with('error', 'Pesanan belum dibayar. Terima pembayaran dulu sebelum diproses.');
+        }
+
         $order->update(['status' => $data['status']]);
 
         return back()->with('success', "Status pesanan {$order->order_code} diperbarui.");

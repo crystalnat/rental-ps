@@ -191,6 +191,11 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
         Route::delete('/settings/payment-methods/{paymentMethod}', [SettingsController::class, 'destroyPaymentMethod'])->name('admin.settings.payment-methods.destroy');
     });
 
+    // Reset data trial (owner only)
+    Route::middleware(EnsureAuthenticated::class . ':owner')->group(function () {
+        Route::post('/settings/reset-trial', [SettingsController::class, 'resetTrial'])->name('admin.settings.reset-trial');
+    });
+
     // Stores (owner only)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin')
         ->group(function () {

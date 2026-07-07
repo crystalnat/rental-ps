@@ -1012,6 +1012,7 @@ function submitOrder() {
         items: cart.value.map((i) => ({
             product_id: i.product_id,
             quantity: i.quantity,
+            unit_price: i.sell_price,
             notes: i.notes,
             modifiers: i.modifiers.map(m => ({ option_id: m.option_id })),
         })),
@@ -1334,7 +1335,7 @@ const showQrOrAccount = computed(() => {
                 :class="[
                     'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-all duration-300 md:static md:z-auto md:h-full md:shrink-0 md:translate-y-0 md:rounded-lg md:border md:bg-card md:p-3 md:shadow-none min-h-0 relative',
                     showMobileCart ? 'translate-y-0' : 'translate-y-full',
-                    isCartCollapsed ? 'md:w-[60px] md:overflow-visible' : 'md:w-[320px] lg:w-[380px]'
+                    isCartCollapsed ? 'md:w-[60px] md:overflow-visible' : 'md:w-[400px] lg:w-[460px]'
                 ]"
             >
                 <!-- Toggle Button (Desktop Only) -->
@@ -1425,29 +1426,35 @@ const showQrOrAccount = computed(() => {
                                 <p class="text-[11px]">Keranjang kosong</p>
                             </div>
                             <div v-else class="space-y-2">
-                                <div v-for="item in cart" :key="item.id" class="flex flex-col gap-1.5 rounded-lg border bg-muted/5 p-2.5 transition-all hover:border-primary/30">
+                                <div v-for="item in cart" :key="item.id" class="flex flex-col gap-2 rounded-lg border bg-muted/5 p-3 transition-all hover:border-primary/30">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[12px] font-bold leading-tight">{{ item.name }}</p>
+                                            <p class="text-sm font-bold leading-tight">{{ item.name }}</p>
                                             <div v-if="item.modifiers.length > 0" class="flex flex-wrap gap-1 mt-1">
-                                                <span v-for="m in item.modifiers" :key="m.option_id" class="text-[8px] bg-primary/10 px-1 rounded text-primary font-bold uppercase">{{ m.name }}</span>
+                                                <span v-for="m in item.modifiers" :key="m.option_id" class="text-[10px] bg-primary/10 px-1 rounded text-primary font-bold uppercase">{{ m.name }}</span>
                                             </div>
                                         </div>
-                                        <p class="shrink-0 text-[12px] font-black text-primary">
+                                        <p class="shrink-0 text-sm font-black text-primary">
                                             {{ formatCurrency((item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100)) + item.modifiers.reduce((s, m) => s + m.price_extra, 0)) * item.quantity) }}
                                         </p>
                                     </div>
-                                    <div class="flex items-center justify-between border-t border-dashed pt-1.5">
-                                        <div class="text-[10px] text-muted-foreground">
-                                            <span>{{ formatCurrency(item.sell_price - Math.round(item.sell_price * (item.discount_percent / 100))) }}</span>
+                                    <div class="flex items-center justify-between border-t border-dashed pt-2">
+                                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <span>Rp</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                v-model.number="item.sell_price"
+                                                class="w-20 rounded border border-input bg-transparent px-1.5 py-0.5 text-xs font-bold text-foreground tabular-nums focus:border-primary focus:outline-none"
+                                            />
                                             <span class="mx-1">×</span>
                                             <span class="font-bold text-foreground">{{ item.quantity }}</span>
                                         </div>
                                         <div class="flex items-center gap-1">
-                                            <Button variant="outline" size="icon" class="h-6 w-6 rounded" @click="updateQty(item, -1)"><Minus class="h-2.5 w-2.5" /></Button>
-                                            <span class="min-w-[1.2rem] text-center text-[11px] font-bold">{{ item.quantity }}</span>
-                                            <Button variant="outline" size="icon" class="h-6 w-6 rounded" @click="updateQty(item, 1)"><Plus class="h-2.5 w-2.5" /></Button>
-                                            <Button variant="ghost" size="icon" class="h-6 w-6 text-destructive/60 hover:text-destructive ml-1" @click="removeFromCart(item)"><Trash2 class="h-2.5 w-2.5" /></Button>
+                                            <Button variant="outline" size="icon" class="h-8 w-8 rounded" @click="updateQty(item, -1)"><Minus class="h-3 w-3" /></Button>
+                                            <span class="min-w-[1.5rem] text-center text-sm font-bold">{{ item.quantity }}</span>
+                                            <Button variant="outline" size="icon" class="h-8 w-8 rounded" @click="updateQty(item, 1)"><Plus class="h-3 w-3" /></Button>
+                                            <Button variant="ghost" size="icon" class="h-8 w-8 text-destructive/60 hover:text-destructive ml-1" @click="removeFromCart(item)"><Trash2 class="h-3 w-3" /></Button>
                                         </div>
                                     </div>
                                 </div>

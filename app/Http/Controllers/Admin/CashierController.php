@@ -125,6 +125,7 @@ class CashierController extends Controller
             'items'            => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity'   => ['required', 'numeric', 'min:0.001'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes'      => ['nullable', 'string', 'max:500'],
             'items.*.modifiers'  => ['nullable', 'array'],
             'items.*.modifiers.*.option_id' => ['required', 'exists:product_modifier_options,id'],
@@ -165,7 +166,10 @@ class CashierController extends Controller
                     ->firstOrFail();
 
                 $qty = (float) $item['quantity'];
-                $unitPrice = (float) $priceLog->sell_price;
+                // Harga bisa di-override kasir saat checkout (fleksibilitas promo). QR/self-order tidak mengirim unit_price sehingga tetap terkunci ke PriceLog.
+                $unitPrice = isset($item['unit_price'])
+                    ? (float) $item['unit_price']
+                    : (float) $priceLog->sell_price;
                 $buyPrice = (float) $priceLog->buy_price;
                 $discountPercent = (float) $product->discount_percent;
                 $discount = $discountPercent > 0 ? round($unitPrice * ($discountPercent / 100)) : 0;
