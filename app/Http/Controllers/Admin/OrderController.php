@@ -405,6 +405,13 @@ class OrderController extends Controller
             return back()->withErrors(['cash_received' => 'Jumlah tunai kurang dari total.']);
         }
 
+        // Rental dibayar di awal: sesi masih berjalan, jadi jangan tutup order.
+        // Order baru ditutup (done) saat Stop Rental atau saat waktu habis.
+        $isRunningRental = $order->is_rental
+            && $order->rental_end_at
+            && \Carbon\Carbon::parse($order->rental_end_at)->isFuture()
+            && ! in_array($order->status, ['ready', 'done', 'cancelled']);
+
         $order->update([
             'payment_status' => 'paid',
             'payment_method' => $data['payment_method'],
@@ -412,8 +419,8 @@ class OrderController extends Controller
             'cash_received'  => $requiresCash ? $cashReceived : null,
             'change_amount'  => $changeAmount > 0 ? $changeAmount : null,
             'paid_at'        => now(),
-            'status'         => 'done',
-            'completed_at'   => now(),
+            'status'         => $isRunningRental ? $order->status : 'done',
+            'completed_at'   => $isRunningRental ? null : now(),
         ]);
 
         return back()

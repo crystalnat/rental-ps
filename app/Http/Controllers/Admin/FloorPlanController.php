@@ -10,7 +10,6 @@ use App\Models\Store;
 use App\Models\Order;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -413,54 +412,6 @@ class FloorPlanController extends Controller
         return back()->with('success', $msg);
     }
 
-    public function startRental(Store $store, Floor $floor, DiningTable $table, Request $request): RedirectResponse
-    {
-        $this->authorizeStore($store);
-        abort_unless($floor->store_id === $store->id && $table->floor_id === $floor->id, 403);
-
-        $data = $request->validate([
-            'duration_minutes' => ['nullable', 'integer', 'min:1'],
-        ]);
-
-        $orderId = DB::transaction(function () use ($store, $table, $data) {
-            // Logic for auto-starting a rental: Create a special 'rental' order
-            // or modify an existing one. For now, creating a new one as 'pending/active'
-            
-            $prefix = 'RNL-' . now()->format('Ymd') . '-';
-            $last = Order::where('store_id', $store->id)->where('order_code', 'like', $prefix . '%')->latest('id')->first();
-            $seq = ($last ? (int) substr($last->order_code, -4) + 1 : 1);
-            $code = $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
-
-            $duration = $data['duration_minutes'] ?? null;
-            $subtotal = $duration ? round(($table->rental_price_per_hour / 60) * $duration) : 0;
-
-            $order = Order::create([
-                'store_id'      => $store->id,
-                'table_id'      => $table->id,
-                'order_code'    => $code,
-                'type'          => 'dine_in',
-                'is_rental'     => true,
-                'status'        => 'confirmed', // Assuming it's active immediately
-                'rental_started_at' => now(),
-                'rental_duration_minutes' => $duration ?? 0,
-                'rental_end_at' => $duration ? now()->addMinutes($duration + 10) : null,
-                'subtotal'      => $subtotal,
-                'final_amount'  => $subtotal,
-                'payment_status'=> 'pending',
-                'cashier_id'    => auth()->id(),
-            ]);
-
-            return $order->id;
-        });
-
-        $table->update(['tuya_status' => true]);
-        if ($table->tuya_device_id) {
-            app(\App\Services\TuyaService::class)->sendCommand($table->tuya_device_id, 'switch_1', true);
-        }
-
-        return back()->with('success', "Rental PS {$table->name} dimulai.");
-    }
-
     public function stopRental(Store $store, Floor $floor, DiningTable $table): RedirectResponse
     {
         $this->authorizeStore($store);
@@ -472,39 +423,16 @@ class FloorPlanController extends Controller
             ->whereNotIn('status', ['done', 'cancelled'])
             ->first();
 
+        $alreadyPaid = $order && $order->payment_status === 'paid';
+
         if ($order) {
-            $now = now();
-            if (is_null($order->rental_end_at)) {
-                $started = \Carbon\Carbon::parse($order->rental_started_at);
-                $elapsedSeconds = $started->diffInSeconds($now);
-                if ($elapsedSeconds < 0) $elapsedSeconds = 0;
-
-                // Billing rules (open bill):
-                // - 0-9 menit pertama gratis
-                // - Menit ke-10 ke atas mulai dihitung 1 jam
-                // - Sisa menit < 10 → bulatkan ke bawah (1j 9m = 1 jam)
-                // - Sisa menit >= 10 → bulatkan ke atas (1j 10m = 2 jam)
-                $totalMinutes = (int) floor($elapsedSeconds / 60);
-                $wholeHours   = (int) floor($totalMinutes / 60);
-                $remainderMin = $totalMinutes % 60;
-                $billableHours = $remainderMin >= 10 ? $wholeHours + 1 : $wholeHours;
-                $elapsedMinutes = $billableHours * 60;
-
-                $cost = (int) round($table->rental_price_per_hour * $billableHours);
-
-                $order->update([
-                    'status' => 'ready',
-                    'rental_end_at' => $now,
-                    'rental_duration_minutes' => $elapsedMinutes,
-                    'subtotal' => $order->subtotal + $cost,
-                    'final_amount' => $order->final_amount + $cost,
-                ]);
-            } else {
-                $order->update([
-                    'status' => 'ready',
-                    'rental_end_at' => $now,
-                ]);
-            }
+            // Durasi tetap: kalau sudah dibayar di awal langsung selesai,
+            // kalau belum tetap masuk antrian pembayaran (status ready).
+            $order->update([
+                'status'       => $alreadyPaid ? 'done' : 'ready',
+                'rental_end_at'=> now(),
+                'completed_at' => $alreadyPaid ? now() : null,
+            ]);
         }
 
         // Turn off PS via Tuya
@@ -513,40 +441,16 @@ class FloorPlanController extends Controller
             app(\App\Services\TuyaService::class)->sendCommand($table->tuya_device_id, 'switch_1', false);
         }
 
-        return back()
-            ->with('success', "Rental PS {$table->name} dihentikan.")
-            ->with('last_stopped_order_id', $order?->id)
-            ->with('last_stopped_order_time', now()->timestamp);
-    }
+        $response = back()->with('success', "Rental PS {$table->name} dihentikan.");
 
-    public function addDuration(Store $store, Floor $floor, DiningTable $table, Request $request): RedirectResponse
-    {
-        $this->authorizeStore($store);
-        abort_unless($floor->store_id === $store->id && $table->floor_id === $floor->id, 403);
-
-        $data = $request->validate([
-            'minutes' => ['required', 'integer', 'min:1', 'max:480'],
-        ]);
-
-        $order = Order::where('table_id', $table->id)
-            ->where('is_rental', true)
-            ->whereNotIn('status', ['done', 'cancelled', 'ready'])
-            ->first();
-
-        if ($order) {
-            $currentEnd = $order->rental_end_at ?? now();
-            $newEnd = \Carbon\Carbon::parse($currentEnd)->addMinutes($data['minutes']);
-            $newDuration = ($order->rental_duration_minutes ?? 0) + $data['minutes'];
-            $extraCost = round(($table->rental_price_per_hour / 60) * $data['minutes']);
-
-            $order->update([
-                'rental_end_at' => $newEnd,
-                'rental_duration_minutes' => $newDuration,
-                'final_amount' => $order->final_amount + $extraCost,
-                'subtotal' => $order->subtotal + $extraCost,
-            ]);
+        // Buka modal pembayaran hanya kalau order belum dibayar (mis. sesi lama).
+        // Kalau sudah bayar di awal, tidak perlu tagih lagi.
+        if ($order && ! $alreadyPaid) {
+            $response
+                ->with('last_stopped_order_id', $order->id)
+                ->with('last_stopped_order_time', now()->timestamp);
         }
 
-        return back()->with('success', "Durasi rental {$table->name} ditambah {$data['minutes']} menit.");
+        return $response;
     }
 }

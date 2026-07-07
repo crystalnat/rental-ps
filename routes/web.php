@@ -49,7 +49,6 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
         Route::get('/cashier', [CashierController::class, 'index'])->name('admin.cashier.index');
         Route::post('/cashier', [CashierController::class, 'store'])->name('admin.cashier.store');
-        Route::post('/cashier/add-to-rental', [CashierController::class, 'addToRental'])->name('admin.cashier.add-to-rental');
         Route::post('/cashier/check-promo', [CashierController::class, 'checkPromo'])->name('admin.cashier.check-promo');
         Route::get('/cashier/pending-orders', [CashierController::class, 'pendingOrders'])->name('admin.cashier.pending-orders');
 
@@ -227,9 +226,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
 
     // Floor Plan rental actions (owner, admin, cashier)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
-        Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/start-rental', [FloorPlanController::class, 'startRental'])->name('admin.stores.floor-plan.start-rental');
         Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/stop-rental', [FloorPlanController::class, 'stopRental'])->name('admin.stores.floor-plan.stop-rental');
-        Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/add-duration', [FloorPlanController::class, 'addDuration'])->name('admin.stores.floor-plan.add-duration');
     });
 
     // Notifications

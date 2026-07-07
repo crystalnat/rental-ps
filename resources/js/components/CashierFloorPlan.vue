@@ -8,8 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
-import { LayoutGrid, ZoomIn, ZoomOut, Maximize2, Receipt, Loader2, Power, Play, Square, Clock, Gamepad2 } from 'lucide-vue-next'
-import { Label } from '@/components/ui/label'
+import { LayoutGrid, ZoomIn, ZoomOut, Maximize2, Receipt, Loader2, Power, Square, Clock, Gamepad2 } from 'lucide-vue-next'
 import { router } from '@inertiajs/vue3'
 
 const BASE_PIXELS_PER_METER = 80
@@ -135,26 +134,6 @@ function stopRental(table: FloorTable) {
     })
 }
 
-const showStartRentalDialog = ref(false)
-const startRentalForm = ref({ duration: 60 })
-
-function openStartRental(table: FloorTable) {
-    selectedTable.value = table
-    showStartRentalDialog.value = true
-}
-
-function submitStartRental() {
-    if (!selectedTable.value || !currentFloor.value) return
-    router.post(`/admin/stores/${props.store.id}/floor-plan/${currentFloor.value.id}/tables/${selectedTable.value.id}/start-rental`, {
-        duration_minutes: startRentalForm.value.duration === 0 ? null : startRentalForm.value.duration
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            showStartRentalDialog.value = false
-        }
-    })
-}
-
 function close() {
     emit('update:open', false)
     selectedTable.value = null
@@ -211,13 +190,6 @@ function getRunningCost(order: TableOrder, pricePerHour: number): number {
     const totalSec = Math.floor(msSafe / 1000)
     const costPerSec = pricePerHour / 3600
     return Math.floor(costPerSec * totalSec)
-}
-
-function getRunningDurationMinutes(order: TableOrder): number {
-    if (order.rental_end_at) return order.rental_duration_minutes ?? 0
-    if (!order.rental_started_at) return 0
-    const ms = now.value.getTime() - new Date(order.rental_started_at).getTime()
-    return Math.floor(Math.max(0, ms) / 60000)
 }
 
 interface OrderDetailItem {
@@ -437,14 +409,9 @@ const statusLabels: Record<string, string> = {
                     </div>
 
                     <div class="p-4">
-                        <div v-if="!selectedTable.has_orders" class="flex flex-col items-center gap-3 py-2">
+                        <div v-if="!selectedTable.has_orders" class="flex flex-col items-center gap-3 py-2 text-center">
                             <p class="text-sm text-muted-foreground">Tidak ada rental aktif pada unit ini.</p>
-                            <div class="flex gap-2">
-                                <Button size="sm" @click="openStartRental(selectedTable)">
-                                    <Play class="mr-1.5 h-3.5 w-3.5" />
-                                    Mulai Rental
-                                </Button>
-                            </div>
+                            <p class="text-xs text-muted-foreground">Mulai rental dengan memilih paket dari panel Rental PS.</p>
                         </div>
                         <div v-else class="space-y-3">
                             <div
@@ -492,11 +459,10 @@ const statusLabels: Record<string, string> = {
                                     <Clock class="h-4 w-4" />
                                     <div class="flex-1 text-xs">
                                         <div class="flex items-center justify-between">
-                                            <p class="font-medium">{{ ord.rental_end_at ? 'Sisa Waktu:' : 'Waktu Berjalan:' }} <span class="font-bold text-blue-600 dark:text-blue-400">{{ getRemainingTime(ord) }}</span></p>
-                                            <p class="opacity-60">{{ ord.rental_end_at ? ord.rental_duration_minutes : getRunningDurationMinutes(ord) }}m</p>
+                                            <p class="font-medium">Sisa Waktu: <span class="font-bold text-blue-600 dark:text-blue-400">{{ getRemainingTime(ord) }}</span></p>
+                                            <p class="opacity-60">{{ ord.rental_duration_minutes }}m</p>
                                         </div>
                                         <p v-if="ord.rental_end_at" class="opacity-80">Berakhir pada: {{ new Date(ord.rental_end_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}</p>
-                                        <p v-else class="opacity-80">Open Rent (Mulai: {{ new Date(ord.rental_started_at!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }})</p>
                                     </div>
                                 </div>
                             </div>
@@ -583,50 +549,6 @@ const statusLabels: Record<string, string> = {
             <div class="shrink-0 flex justify-end border-t pt-3">
                 <Button variant="outline" @click="selectedOrderDetail = null">Tutup</Button>
             </div>
-        </DialogContent>
-    </Dialog>
-
-    <!-- Modal Start Rental -->
-    <Dialog :open="showStartRentalDialog" @update:open="showStartRentalDialog = $event">
-        <DialogContent class="max-w-sm">
-            <DialogHeader>
-                <DialogTitle>Mulai Rental — {{ selectedTable?.name }}</DialogTitle>
-                <DialogDescription>
-                    Pilih durasi rental untuk unit PS ini.
-                </DialogDescription>
-            </DialogHeader>
-            <div class="space-y-4 py-2">
-                <div>
-                    <Label>Durasi (Menit)</Label>
-                    <select v-model="startRentalForm.duration" class="mt-1.5 w-full rounded-md border px-3 py-2 text-sm">
-                        <option :value="0">Start Rent (Waktu Terbuka)</option>
-                        <option :value="60">1 Jam</option>
-                        <option :value="120">2 Jam</option>
-                        <option :value="180">3 Jam</option>
-                        <option :value="300">5 Jam</option>
-                        <option :value="480">8 Jam</option>
-                    </select>
-                </div>
-                <!-- Estimasi info -->
-                <div v-if="selectedTable" class="rounded-lg bg-muted/50 p-3 text-sm">
-                    <div class="flex justify-between">
-                        <span>Harga per Jam:</span>
-                        <span class="font-semibold">{{ formatCurrency(selectedTable.rental_price_per_hour) }}</span>
-                    </div>
-                    <div v-if="startRentalForm.duration > 0" class="mt-1 flex justify-between text-primary">
-                        <span>Estimasi Total:</span>
-                        <span class="font-bold border-t border-primary/20">{{ formatCurrency((selectedTable.rental_price_per_hour / 60) * startRentalForm.duration) }}</span>
-                    </div>
-                    <div v-else class="mt-1 flex justify-between text-primary">
-                        <span>Estimasi Total:</span>
-                        <span class="font-bold border-t border-primary/20">Bayar di Akhir (Berjalan)</span>
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" @click="showStartRentalDialog = false">Batal</Button>
-                <Button @click="submitStartRental">Mulai Sekarang</Button>
-            </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>

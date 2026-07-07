@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import {
-    Power, Play, Square, Clock, Gamepad2, Plus, Minus, Zap,
+    Power, Play, Square, Clock, Gamepad2, Zap,
     ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, Info, CreditCard, X,
 } from 'lucide-vue-next'
 
@@ -119,7 +119,6 @@ const ZOOM_STEP = 0.25
 const now = ref(new Date())
 let timerInterval: any = null
 const toggling = ref<Record<number, boolean>>({})
-const startingRental = ref<Record<number, boolean>>({})
 const stoppingRental = ref<Record<number, boolean>>({})
 
 // ─── Rental 10-min warning notifications ───────────────────────────────────────
@@ -134,11 +133,7 @@ const notified10Min = new Set<number>()
 
 // Dialogs
 const showStartRentalDialog = ref(false)
-const startRentalForm = ref({ duration: 60 })
-const startMode = ref<'paket' | 'custom' | 'open'>('paket')
 const selectedPackageId = ref<number | null>(null)
-const showAddDurationDialog = ref(false)
-const addDurationForm = ref({ minutes: 30 })
 const showProductDialog = ref(false)
 const showUnitDetail = ref(false)
 
@@ -283,13 +278,6 @@ function getRentalOnlyCost(order: TableOrder, pricePerHour: number): number {
     return Math.floor((pricePerHour / 3600) * totalSec)
 }
 
-function getRunningDurationMinutes(order: TableOrder): number {
-    if (order.rental_end_at) return order.rental_duration_minutes ?? 0
-    if (!order.rental_started_at) return 0
-    const ms = now.value.getTime() - new Date(order.rental_started_at).getTime()
-    return Math.floor(Math.max(0, ms) / 60000)
-}
-
 // ─── Table actions ─────────────────────────────────────────────────────────────
 function selectTable(t: FloorTable) {
     selectedTable.value = t
@@ -357,8 +345,6 @@ function toggleTuya(table: FloorTable) {
 
 function openStartRental(table: FloorTable) {
     selectedTable.value = table
-    startRentalForm.value.duration = 60
-    startMode.value = rentalPackages.value.length > 0 ? 'paket' : 'custom'
     selectedPackageId.value = null
     showStartRentalDialog.value = true
     showUnitDetail.value = false
@@ -366,33 +352,14 @@ function openStartRental(table: FloorTable) {
 
 function selectPackage(pkg: Product) {
     selectedPackageId.value = pkg.id
-    startRentalForm.value.duration = pkg.rental_duration_minutes ?? 60
 }
 
+// Rental = paket. Pilih paket -> masuk keranjang meja ini.
+// PS menyala & sesi mulai setelah dibayar di checkout (store() yang urus).
 function submitStartRental() {
-    if (!selectedTable.value) return
-    const tableId = selectedTable.value.id
-    startingRental.value[tableId] = true
+    if (!selectedTable.value || !selectedPackage.value) return
+    emit('add-to-cart', { product: selectedPackage.value, tableId: selectedTable.value.id })
     showStartRentalDialog.value = false
-
-    // If a package is selected, add it (+ included items) to cart first
-    if (startMode.value === 'paket' && selectedPackage.value) {
-        const pkg = selectedPackage.value
-        emit('add-to-cart', { product: pkg, tableId })
-    }
-
-    let payload = {}
-    if (startMode.value === 'paket') {
-        payload = { duration_minutes: startRentalForm.value.duration }
-    } else {
-        payload = { duration_minutes: startMode.value === 'open' ? null : startRentalForm.value.duration }
-    }
-
-    router.post(getFloorUrl('start-rental', tableId), payload, {
-        preserveScroll: true,
-        onSuccess: () => { syncSelectedTable() },
-        onFinish: () => { startingRental.value[tableId] = false },
-    })
 }
 
 function stopRental(table: FloorTable) {
@@ -414,27 +381,11 @@ function stopThenNewRental(table: FloorTable) {
         onSuccess: () => {
             // After stop, re-select the table and open start rental
             selectedTable.value = table
-            startRentalForm.value.duration = 60
+            selectedPackageId.value = null
             showStartRentalDialog.value = true
             showUnitDetail.value = true
         },
         onFinish: () => { stoppingRental.value[table.id] = false },
-    })
-}
-
-function openAddDuration(table: FloorTable) {
-    selectedTable.value = table
-    addDurationForm.value.minutes = 30
-    showAddDurationDialog.value = true
-}
-
-function submitAddDuration() {
-    if (!selectedTable.value) return
-    router.post(getFloorUrl('add-duration', selectedTable.value.id), {
-        minutes: addDurationForm.value.minutes,
-    }, {
-        preserveScroll: true,
-        onSuccess: () => { showAddDurationDialog.value = false; syncSelectedTable() },
     })
 }
 
@@ -650,8 +601,7 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                     <p class="text-xs font-medium uppercase tracking-wider" :class="getUnitState(selectedTable) === 'expiring' ? 'text-amber-600' : getUnitState(selectedTable) === 'expired' ? 'text-red-500' : 'text-emerald-600'">
                                         <template v-if="getUnitState(selectedTable) === 'expired'">Waktu Habis</template>
                                         <template v-else-if="getUnitState(selectedTable) === 'expiring'">Segera Habis</template>
-                                        <template v-else-if="ord.rental_end_at">Sisa Waktu</template>
-                                        <template v-else>Waktu Berjalan</template>
+                                        <template v-else>Sisa Waktu</template>
                                     </p>
                                     <p class="mt-1 font-mono text-3xl font-black tracking-tight" :class="getUnitState(selectedTable) === 'expiring' ? 'text-amber-500' : getUnitState(selectedTable) === 'expired' ? 'text-red-500' : 'text-emerald-500'">
                                         {{ formatRemaining(ord) }}
@@ -667,9 +617,6 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                     <p v-if="ord.rental_end_at" class="mt-1.5 text-[10px] text-muted-foreground">
                                         Berakhir: {{ new Date(ord.rental_end_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                                     </p>
-                                    <p v-else class="mt-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                        Billing Terbuka (Open Rent)
-                                    </p>
                                 </div>
 
                                 <!-- Order info -->
@@ -677,8 +624,7 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                     <div class="flex justify-between"><span class="text-muted-foreground">Kode Pesanan:</span><span class="font-mono font-bold">{{ ord.order_code }}</span></div>
                                     <div class="flex justify-between">
                                         <span class="text-muted-foreground">Durasi:</span>
-                                        <span class="font-medium" v-if="ord.rental_end_at">{{ ord.rental_duration_minutes }}m</span>
-                                        <span class="font-medium text-emerald-600" v-else>{{ getRunningDurationMinutes(ord) }}m (Berjalan)</span>
+                                        <span class="font-medium">{{ ord.rental_duration_minutes }}m</span>
                                     </div>
                                     <div class="flex justify-between items-center">
                                         <span class="text-muted-foreground">Total:</span>
@@ -689,13 +635,18 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                             {{ ord.status === 'ready' ? 'Selesai' : 'Aktif' }}
                                         </span>
                                     </div>
+                                    <div class="flex justify-between items-center"><span class="text-muted-foreground">Pembayaran:</span>
+                                        <span :class="['rounded px-1.5 py-0.5 text-[10px] font-bold uppercase', ord.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700']">
+                                            {{ ord.payment_status === 'paid' ? 'Lunas' : 'Belum Bayar' }}
+                                        </span>
+                                    </div>
 
                                     <!-- Detail Billing breakdown -->
                                     <div v-if="(ord.items && ord.items.length > 0) || getRentalOnlyCost(ord, selectedTable.rental_price_per_hour) > 0" class="mt-3 pt-2 border-t border-dashed border-muted-foreground/20">
                                         <p class="text-[9px] font-black text-muted-foreground/60 uppercase mb-1.5 tracking-widest text-center">Rincian Tagihan</p>
                                         <div class="space-y-1 max-h-[120px] overflow-y-auto pr-1 scrollbar-thin">
                                             <div class="flex justify-between text-[11px] leading-tight">
-                                                <span class="text-muted-foreground">Sewa PS ({{ ord.rental_end_at ? ord.rental_duration_minutes : getRunningDurationMinutes(ord) }}m)</span>
+                                                <span class="text-muted-foreground">Sewa PS ({{ ord.rental_duration_minutes }}m)</span>
                                                 <span class="font-medium font-mono">{{ formatCurrency(getRentalOnlyCost(ord, selectedTable.rental_price_per_hour)) }}</span>
                                             </div>
                                             <div v-for="(item, idx) in ord.items" :key="idx" class="flex justify-between text-[11px] leading-tight pt-0.5">
@@ -736,27 +687,15 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
 
                                     <!-- Normal active state actions -->
                                     <template v-else-if="ord.status !== 'ready'">
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <Button
-                                                v-if="ord.rental_end_at"
-                                                variant="outline"
-                                                size="sm"
-                                                class="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
-                                                @click="openAddDuration(selectedTable)"
-                                            >
-                                                <Plus class="h-3.5 w-3.5" />
-                                                Tambah Waktu
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                class="gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50"
-                                                @click="openProductForTable(selectedTable)"
-                                            >
-                                                <ShoppingCart class="h-3.5 w-3.5" />
-                                                Pesan Produk
-                                            </Button>
-                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            class="w-full gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50"
+                                            @click="openProductForTable(selectedTable)"
+                                        >
+                                            <ShoppingCart class="h-3.5 w-3.5" />
+                                            Pesan Produk
+                                        </Button>
                                         <Button
                                             variant="destructive"
                                             size="sm"
@@ -839,40 +778,11 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                     <Play class="h-4 w-4 text-primary" />
                     Mulai Rental — {{ selectedTable?.name }}
                 </DialogTitle>
-                <DialogDescription>Pilih paket atau atur durasi manual.</DialogDescription>
+                <DialogDescription>Pilih paket rental untuk unit ini. PS menyala setelah dibayar.</DialogDescription>
             </DialogHeader>
 
-            <!-- Mode tabs -->
-            <div class="flex gap-1 rounded-lg border bg-muted/30 p-1">
-                <button
-                    v-if="rentalPackages.length > 0"
-                    type="button"
-                    class="flex-1 rounded-md py-1.5 text-sm font-semibold transition-all"
-                    :class="startMode === 'paket' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                    @click="startMode = 'paket'; selectedPackageId = null"
-                >
-                    Pilih Paket
-                </button>
-                <button
-                    type="button"
-                    class="flex-1 rounded-md py-1.5 text-sm font-semibold transition-all"
-                    :class="startMode === 'custom' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                    @click="startMode = 'custom'; selectedPackageId = null; startRentalForm.duration = 60"
-                >
-                    Durasi Custom
-                </button>
-                <button
-                    type="button"
-                    class="flex-1 rounded-md py-1.5 text-sm font-semibold transition-all"
-                    :class="startMode === 'open' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                    @click="startMode = 'open'; selectedPackageId = null; startRentalForm.duration = 0"
-                >
-                    Start Rent
-                </button>
-            </div>
-
-            <!-- TAB: PAKET -->
-            <div v-if="startMode === 'paket'" class="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
+            <!-- Daftar paket rental -->
+            <div class="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
                 <div v-if="rentalPackages.length === 0" class="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
                     <Gamepad2 class="h-10 w-10 opacity-30" />
                     <p class="text-sm">Belum ada paket rental.</p>
@@ -919,105 +829,20 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                     <!-- Selected checkmark -->
                     <div v-if="selectedPackageId === pkg.id" class="mt-3 flex items-center gap-1.5 text-xs font-semibold text-primary">
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                        Paket ini dipilih — Durasi {{ startRentalForm.duration }} menit
+                        Paket ini dipilih
                     </div>
                 </button>
-            </div>
-
-            <!-- TAB: CUSTOM -->
-            <div v-if="startMode === 'custom'" class="space-y-4 py-1">
-                <div>
-                    <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pilih Durasi</Label>
-                    <div class="mt-2 grid grid-cols-3 gap-2">
-                        <button
-                            v-for="d in [60, 120, 180, 300, 480]"
-                            :key="d"
-                            type="button"
-                            class="rounded-lg border py-2.5 text-sm font-semibold transition-all"
-                            :class="startRentalForm.duration === d ? 'border-primary bg-primary text-primary-foreground' : 'border-input hover:border-primary/50 hover:bg-accent'"
-                            @click="startRentalForm.duration = d"
-                        >
-                            {{ d >= 60 ? Math.floor(d / 60) + 'j' + (d % 60 > 0 ? ' ' + d % 60 + 'm' : '') : d + 'm' }}
-                        </button>
-                    </div>
-                </div>
-                <div v-if="selectedTable" class="rounded-xl border bg-muted/50 p-4 space-y-2">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-muted-foreground">Harga per Jam</span>
-                        <span class="font-semibold">{{ formatCurrency(selectedTable.rental_price_per_hour) }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-muted-foreground">Durasi</span>
-                        <span class="font-semibold">{{ startRentalForm.duration }} menit</span>
-                    </div>
-                    <div class="flex justify-between border-t pt-2 text-base font-bold text-primary">
-                        <span>Estimasi Biaya</span>
-                        <span>{{ formatCurrency((selectedTable.rental_price_per_hour / 60) * startRentalForm.duration) }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: OPEN -->
-            <div v-if="startMode === 'open'" class="flex flex-col items-center py-6 text-center">
-                <Timer class="h-12 w-12 text-primary mb-3" />
-                <h3 class="text-lg font-bold">Start Rent (Billing Berjalan)</h3>
-                <p class="text-sm text-muted-foreground mt-2 px-6">
-                    Waktu rental akan dimulai dari 00:00:00, dan biaya dihitung <strong>{{ formatCurrency(selectedTable?.rental_price_per_hour ?? 0) }}/jam</strong> saat Anda menekan Stop Rental.
-                </p>
-                <div class="mt-4 rounded border bg-emerald-500/10 px-4 py-2 flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                    <Play class="h-4 w-4" /> Siap untuk memulai sesi.
-                </div>
             </div>
 
             <DialogFooter>
                 <Button variant="outline" @click="showStartRentalDialog = false">Batal</Button>
                 <Button
                     class="gap-2"
-                    :disabled="startingRental[selectedTable?.id ?? 0] || (startMode === 'paket' && !selectedPackageId)"
+                    :disabled="!selectedPackageId"
                     @click="submitStartRental"
                 >
-                    <Play class="h-4 w-4" />
-                    {{ startingRental[selectedTable?.id ?? 0] ? 'Memulai...' : 'Mulai Sekarang' }}
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-
-    <!-- ─── Add Duration Dialog ──────────────────────────────────── -->
-    <Dialog v-model:open="showAddDurationDialog">
-        <DialogContent class="max-w-sm">
-            <DialogHeader>
-                <DialogTitle class="flex items-center gap-2">
-                    <Timer class="h-4 w-4 text-blue-500" />
-                    Tambah Durasi — {{ selectedTable?.name }}
-                </DialogTitle>
-                <DialogDescription>Perpanjang waktu rental unit ini.</DialogDescription>
-            </DialogHeader>
-            <div class="space-y-4 py-2">
-                <div class="grid grid-cols-3 gap-2">
-                    <button
-                        v-for="d in [15, 30, 45, 60, 90, 120]"
-                        :key="d"
-                        type="button"
-                        class="rounded-lg border py-2.5 text-sm font-semibold transition-all"
-                        :class="addDurationForm.minutes === d ? 'border-blue-500 bg-blue-500 text-white' : 'border-input hover:border-blue-300 hover:bg-blue-50'"
-                        @click="addDurationForm.minutes = d"
-                    >
-                        {{ d >= 60 ? Math.floor(d / 60) + 'j' + (d % 60 > 0 ? ' ' + d % 60 + 'm' : '') : d + 'm' }}
-                    </button>
-                </div>
-                <div v-if="selectedTable" class="rounded-xl border bg-muted/50 p-3 text-sm">
-                    <div class="flex justify-between font-bold text-blue-600">
-                        <span>Biaya Tambahan</span>
-                        <span>{{ formatCurrency((selectedTable.rental_price_per_hour / 60) * addDurationForm.minutes) }}</span>
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="outline" @click="showAddDurationDialog = false">Batal</Button>
-                <Button class="gap-2 bg-blue-600 hover:bg-blue-700" @click="submitAddDuration">
-                    <Plus class="h-4 w-4" />
-                    Tambah Durasi
+                    <ShoppingCart class="h-4 w-4" />
+                    Tambah ke Keranjang
                 </Button>
             </DialogFooter>
         </DialogContent>

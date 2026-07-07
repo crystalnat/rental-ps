@@ -164,11 +164,11 @@ watch(() => props.flash.last_stopped_order_time, (newVal) => {
     const orderId = props.flash.last_stopped_order_id
     if (newVal && newVal !== lastProcessedOrderTime.value && orderId) {
         lastProcessedOrderTime.value = newVal
-        void openReceiptForStoppedRental(orderId)
+        void openPayModalForOrder(orderId)
     }
 }, { immediate: true })
 
-async function openReceiptForStoppedRental(orderId: number) {
+async function openPayModalForOrder(orderId: number) {
     try {
         const res = await axios.get(`/admin/orders/${orderId}/detail`)
         const order = res.data
@@ -872,17 +872,6 @@ const finalAmount = computed(() => {
     return Math.max(0, subtotal.value - (Number(discountAmount.value) || 0))
 })
 
-const activeRentalOrder = computed(() => {
-    if (orderType.value !== 'dine_in' || !selectedTableId.value) return null;
-    for (const floor of props.floor_plan || []) {
-        const table = (floor.tables as any[]).find(t => t.id === selectedTableId.value);
-        if (table) {
-            return (table.active_orders as any[]).find(o => o.is_rental && o.status === 'confirmed');
-        }
-    }
-    return null;
-});
-
 const canCheckout = computed(() => cart.value.length > 0)
 
 function addToCart(product: Product, qty = 1) {
@@ -1053,33 +1042,6 @@ function submitOrder() {
         },
         onFinish: () => { processing.value = false },
     })
-}
-
-function submitToRentalBilling() {
-    if (!canCheckout.value || !activeRentalOrder.value) return;
-    
-    processing.value = true;
-    showMobileCart.value = false;
-    
-    router.post('/admin/cashier/add-to-rental', {
-        table_id: selectedTableId.value,
-        store: props.store.id,
-        items: cart.value.map((i) => ({
-            product_id: i.product_id,
-            quantity: i.quantity,
-            notes: i.notes,
-            modifiers: i.modifiers.map(m => ({ option_id: m.option_id })),
-        })),
-        notes: notes.value,
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            cart.value = [];
-            notes.value = '';
-            selectedTableId.value = null;
-        },
-        onFinish: () => { processing.value = false },
-    });
 }
 
 function changeStore(storeId: number) {
@@ -1254,7 +1216,7 @@ const showQrOrAccount = computed(() => {
                         v-model:selected-table-id="selectedTableId"
                         @add-to-cart="addProductFromRental"
                         @checkout="openPaymentDialog"
-                        @pay-order="openReceiptForStoppedRental"
+                        @pay-order="openPayModalForOrder"
                     />
                 </div>
 
@@ -1520,15 +1482,7 @@ const showQrOrAccount = computed(() => {
                                 </div>
                             </div>
 
-                            <div v-if="activeRentalOrder" class="grid grid-cols-2 gap-2">
-                                <Button variant="outline" class="h-10 text-xs font-bold border-primary text-primary hover:bg-primary/5" :disabled="processing" @click="submitToRentalBilling">
-                                    <Plus class="mr-1 h-3.5 w-3.5" /> Billing PS
-                                </Button>
-                                <Button class="h-10 text-xs font-bold" :disabled="!canCheckout" @click="openPaymentDialog">
-                                    <CreditCard class="mr-1 h-3.5 w-3.5" /> Bayar
-                                </Button>
-                            </div>
-                            <Button v-else class="w-full h-10 text-sm font-bold shadow-md shadow-primary/10" :disabled="!canCheckout" @click="openPaymentDialog">
+                            <Button class="w-full h-10 text-sm font-bold shadow-md shadow-primary/10" :disabled="!canCheckout" @click="openPaymentDialog">
                                 <CreditCard class="mr-2 h-4 w-4" /> Bayar
                             </Button>
                         </div>
