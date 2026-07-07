@@ -32,11 +32,12 @@ SAMSUNG_TOKENS = os.path.join(BASE_DIR, "samsung_tokens.json")
 DEVICES_FILE   = os.path.join(BASE_DIR, "devices.json")
 
 DEFAULT_CONFIG = {
-    "server_url":    "http://192.168.1.85:8000",
-    "store_id":      "1",
-    "token":         "ganti-dengan-token-rahasia",
-    "poll_interval": 2,
-    "adb_path":      "adb",
+    "server_url":      "http://192.168.1.85:8000",
+    "store_id":        "1",
+    "token":           "ganti-dengan-token-rahasia",
+    "poll_interval":   2,
+    "adb_path":        "adb",
+    "status_interval": 30,
 }
 
 KEYEVENT_POWER = "26"
@@ -201,6 +202,34 @@ def _tuya_get_token() -> str:
     return _tuya_token_cache["token"]
 
 
+def execute_tuya_local(device_id: str, switch_on: bool) -> bool:
+    action = "ON" if switch_on else "OFF"
+    try:
+        import tinytuya
+        devices = {}
+        if os.path.exists(DEVICES_FILE):
+            with open(DEVICES_FILE) as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                devices = {d["id"]: d for d in data}
+        info = devices.get(device_id)
+        if not info or not info.get("ip") or not info.get("key"):
+            print(f"[ERR] Tuya local: device '{device_id}' tidak ada di devices.json atau IP/key kosong")
+            return False
+        d = tinytuya.OutletDevice(device_id, info["ip"], info["key"])
+        d.set_version(float(info.get("version", "3.5")))
+        d.set_socketTimeout(2)
+        result = d.turn_on() if switch_on else d.turn_off()
+        if isinstance(result, dict) and result.get("Error"):
+            print(f"[ERR] Tuya local {device_id}: {result}")
+            return False
+        print(f"[OK] Tuya local {device_id} -> {action}")
+        return True
+    except Exception as e:
+        print(f"[ERR] Tuya local {device_id}: {e}")
+        return False
+
+
 def execute_tuya(device_id: str, switch_on: bool) -> bool:
     action = "ON" if switch_on else "OFF"
     try:
@@ -219,30 +248,29 @@ def execute_tuya(device_id: str, switch_on: bool) -> bool:
         }, data=body, timeout=10)
         data = resp.json()
         if data.get("success"):
-            print(f"[OK] Tuya {device_id} -> {action}")
+            print(f"[OK] Tuya cloud {device_id} -> {action}")
             return True
-        else:
-            # Fallback endpoint
-            path2 = f"/v1.0/devices/{device_id}/commands"
-            body2 = json.dumps({"commands": [{"code": "switch_1", "value": switch_on}]})
-            t2    = str(int(time.time() * 1000))
-            resp2 = requests.post(TUYA_BASE_URL + path2, headers={
-                "client_id":    TUYA_CLIENT_ID,
-                "access_token": token,
-                "sign":         _tuya_sign(t2, token, "POST", path2, body2),
-                "t":            t2,
-                "sign_method":  "HMAC-SHA256",
-                "Content-Type": "application/json",
-            }, data=body2, timeout=10)
-            data2 = resp2.json()
-            if data2.get("success"):
-                print(f"[OK] Tuya {device_id} -> {action}")
-                return True
-            print(f"[ERR] Tuya {device_id} -> {action}: {data2.get('msg', data2)}")
-            return False
+        # Fallback endpoint cloud
+        path2 = f"/v1.0/devices/{device_id}/commands"
+        body2 = json.dumps({"commands": [{"code": "switch_1", "value": switch_on}]})
+        t2    = str(int(time.time() * 1000))
+        resp2 = requests.post(TUYA_BASE_URL + path2, headers={
+            "client_id":    TUYA_CLIENT_ID,
+            "access_token": token,
+            "sign":         _tuya_sign(t2, token, "POST", path2, body2),
+            "t":            t2,
+            "sign_method":  "HMAC-SHA256",
+            "Content-Type": "application/json",
+        }, data=body2, timeout=10)
+        data2 = resp2.json()
+        if data2.get("success"):
+            print(f"[OK] Tuya cloud {device_id} -> {action}")
+            return True
+        print(f"[WARN] Tuya cloud gagal ({data2.get('msg', data2)}), coba local...")
+        return execute_tuya_local(device_id, switch_on)
     except Exception as e:
-        print(f"[ERR] Tuya {device_id} -> {action}: {e}")
-        return False
+        print(f"[WARN] Tuya cloud error ({e}), coba local...")
+        return execute_tuya_local(device_id, switch_on)
 
 
 # ─── Router utama ─────────────────────────────────────────────────────────────
@@ -263,9 +291,58 @@ def execute(cfg: dict, device_id: str, switch_on: bool) -> bool:
         return execute_vidaa(tv_ip, switch_on)
     elif device_id.startswith("tuya:"):
         tuya_id = device_id[len("tuya:"):]
-        return execute_tuya(tuya_id, switch_on)
+        return execute_tuya_local(tuya_id, switch_on)
     else:
         return execute_adb(cfg.get("adb_path", "adb"), device_id, switch_on)
+
+
+# ─── Status Sync (Tuya local → Server) ───────────────────────────────────────
+
+def read_tuya_status_local() -> list:
+    """
+    Baca status ON/OFF semua device Tuya dari devices.json via lokal.
+    Return: [{"device_id": "abc", "on": True/False}, ...]
+    """
+    try:
+        import tinytuya
+    except ImportError:
+        return []
+
+    devices = {}
+    if os.path.exists(DEVICES_FILE):
+        with open(DEVICES_FILE) as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            devices = {d["id"]: d for d in data}
+
+    results = []
+    for device_id, info in devices.items():
+        ip  = info.get("ip", "")
+        key = info.get("key", "")
+        if not ip or not key:
+            continue
+        try:
+            d = tinytuya.OutletDevice(device_id, ip, key)
+            d.set_version(float(info.get("version", "3.5")))
+            d.set_socketTimeout(3)
+            status = d.status()
+            on = bool(status.get("dps", {}).get("1", False)) if isinstance(status, dict) else False
+            results.append({"device_id": device_id, "on": on})
+        except Exception as e:
+            print(f"[STATUS] gagal baca {device_id} ({ip}): {e}")
+    return results
+
+
+def push_status(cfg: dict, statuses: list):
+    if not statuses:
+        return
+    url = f"{cfg['server_url'].rstrip('/')}/api/tuya/status"
+    try:
+        resp = requests.post(url, json=statuses, params={"token": cfg["token"]}, timeout=10)
+        data = resp.json()
+        print(f"[STATUS] push {len(statuses)} device(s) -> updated={data.get('updated', '?')}")
+    except Exception as e:
+        print(f"[STATUS] gagal push ke server: {e}")
 
 
 # ─── Polling ──────────────────────────────────────────────────────────────────
@@ -300,7 +377,21 @@ def poll(cfg: dict):
             pass
 
 
+def _status_worker(cfg: dict):
+    """Thread terpisah untuk sync status — tidak blokir polling command."""
+    import threading
+    status_interval = cfg.get("status_interval", 30)
+    while True:
+        time.sleep(status_interval)
+        try:
+            statuses = read_tuya_status_local()
+            push_status(cfg, statuses)
+        except Exception as e:
+            print(f"[STATUS] error: {e}")
+
+
 if __name__ == "__main__":
+    import threading
     os.makedirs(VIDAA_DIR, exist_ok=True)
     cfg = load_config()
     print(f"Device Bridge aktif — polling {cfg['server_url']} tiap {cfg['poll_interval']}s")
@@ -308,6 +399,9 @@ if __name__ == "__main__":
     print(f"ADB path  : {cfg.get('adb_path', 'adb')}")
     print("Dukungan  : Android TV (ADB) + Hisense VIDAA + Samsung TV + Tuya Plug")
     print("Tekan Ctrl+C untuk berhenti.\n")
+
+    t = threading.Thread(target=_status_worker, args=(cfg,), daemon=True)
+    t.start()
 
     while True:
         poll(cfg)

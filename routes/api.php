@@ -21,6 +21,7 @@ Route::get('/health', fn () => response()->json(['ok' => true, 'message' => 'API
 // Tuya Bridge (pakai token statis, bukan Sanctum)
 Route::get('/tuya/commands', [TuyaBridgeController::class, 'pending']);
 Route::post('/tuya/commands/{id}/ack', [TuyaBridgeController::class, 'ack']);
+Route::post('/tuya/status', [TuyaBridgeController::class, 'updateStatus']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Protected (auth:sanctum)
