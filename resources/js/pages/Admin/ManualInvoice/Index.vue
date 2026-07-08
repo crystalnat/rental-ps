@@ -37,9 +37,15 @@ interface LineItem {
 }
 
 let nextId = 1
+
+// toISOString() memakai UTC (geser -7 jam di WIB). Ini kembalikan waktu LOKAL untuk input datetime-local & kode struk.
+function localDateTime(d = new Date()): string {
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
 const form = ref({
-    invoiceCode: 'MNL-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + String(Math.floor(Math.random() * 9000) + 1000),
-    date: new Date().toISOString().slice(0, 16),
+    invoiceCode: 'MNL-' + localDateTime().slice(0, 10).replace(/-/g, '') + '-' + String(Math.floor(Math.random() * 9000) + 1000),
+    date: localDateTime(),
     customerName: '',
     cashierName: props.cashierName,
     paymentMethod: 'Tunai',
@@ -122,8 +128,8 @@ function onItemNameInput(itemId: number, value: string) {
 }
 
 function resetForm() {
-    form.value.invoiceCode = 'MNL-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + String(Math.floor(Math.random() * 9000) + 1000)
-    form.value.date = new Date().toISOString().slice(0, 16)
+    form.value.invoiceCode = 'MNL-' + localDateTime().slice(0, 10).replace(/-/g, '') + '-' + String(Math.floor(Math.random() * 9000) + 1000)
+    form.value.date = localDateTime()
     form.value.customerName = ''
     form.value.cashierName = props.cashierName
     form.value.paymentMethod = 'Tunai'
