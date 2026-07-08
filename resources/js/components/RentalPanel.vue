@@ -549,7 +549,6 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
                                 </div>
                                 <div>
                                     <p class="font-bold">{{ selectedTable.name }}</p>
-                                    <p class="text-xs text-muted-foreground">{{ formatCurrency(selectedTable.rental_price_per_hour) }}/jam</p>
                                 </div>
                             </div>
                             <button type="button" class="rounded-lg p-1.5 hover:bg-muted" @click="closeUnitDetail">
