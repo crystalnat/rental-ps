@@ -1333,7 +1333,7 @@ const showQrOrAccount = computed(() => {
 
             <div
                 :class="[
-                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-all duration-300 md:static md:z-auto md:h-full md:shrink-0 md:translate-y-0 md:rounded-lg md:border md:bg-card md:p-3 md:shadow-none min-h-0 relative',
+                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-all duration-300 md:static md:z-auto md:h-full md:shrink-0 md:translate-y-0 md:bg-transparent md:p-0 md:shadow-none min-h-0 relative',
                     showMobileCart ? 'translate-y-0' : 'translate-y-full',
                     isCartCollapsed ? 'md:w-[60px] md:overflow-visible' : 'md:w-[400px] lg:w-[460px]'
                 ]"
