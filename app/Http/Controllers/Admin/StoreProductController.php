@@ -392,7 +392,8 @@ class StoreProductController extends Controller
         $slug = \Str::slug($name);
         $count = 1;
 
-        while (Product::where('slug', $slug)->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))->exists()) {
+        // withTrashed: unique index (brand_id, slug) tetap menghitung baris soft-deleted, jadi slug harus unik termasuk yang sudah dihapus.
+        while (Product::withTrashed()->where('slug', $slug)->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))->exists()) {
             $slug = \Str::slug($name) . '-' . $count++;
         }
 

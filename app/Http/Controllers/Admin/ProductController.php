@@ -407,8 +407,9 @@ class ProductController extends Controller
         $slug  = Str::slug($name);
         $count = 1;
 
+        // withTrashed: unique index (brand_id, slug) tetap menghitung baris soft-deleted, jadi slug harus unik termasuk yang sudah dihapus.
         while (
-            Product::where('slug', $slug)
+            Product::withTrashed()->where('slug', $slug)
                 ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
                 ->exists()
         ) {
