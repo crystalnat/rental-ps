@@ -245,9 +245,15 @@ class StoreProductController extends Controller
             'current_stock' => ['required_if:track_stock,true', 'numeric', 'min:0'],
             'min_stock'     => ['required_if:track_stock,true', 'numeric', 'min:0'],
             'image'         => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'is_rental_package'       => ['boolean'],
+            'rental_duration_minutes' => ['nullable', 'required_if:is_rental_package,true', 'integer', 'min:1'],
         ]);
 
-        DB::transaction(function () use ($store, $data, $request) {
+        // Paket rental tidak melacak stok: yang dijual adalah durasi, bukan unit fisik.
+        $isRental = $data['is_rental_package'] ?? false;
+        $trackStock = $isRental ? false : ($data['track_stock'] ?? true);
+
+        DB::transaction(function () use ($store, $data, $request, $isRental, $trackStock) {
             $slug = $this->generateUniqueSlug($data['name']);
 
             $imagePath = null;
@@ -263,9 +269,11 @@ class StoreProductController extends Controller
                 'sku'           => $data['sku'] ?? null,
                 'description'   => $data['description'] ?? null,
                 'unit'          => $data['unit'],
-                'track_stock'   => $data['track_stock'] ?? true,
+                'track_stock'   => $trackStock,
                 'is_available'  => $data['is_available'] ?? true,
                 'image'         => $imagePath,
+                'is_rental_package'       => $isRental,
+                'rental_duration_minutes' => $isRental ? $data['rental_duration_minutes'] : 0,
             ]);
 
             PriceLog::create([
@@ -277,7 +285,7 @@ class StoreProductController extends Controller
                 'created_by' => Auth::id(),
             ]);
 
-            if ($data['track_stock'] ?? true) {
+            if ($trackStock) {
                 StoreInventory::create([
                     'store_id'      => $store->id,
                     'product_id'    => $product->id,

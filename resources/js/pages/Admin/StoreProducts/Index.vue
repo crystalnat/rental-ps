@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
 import { useTableFeatures } from '@/composables/useTableFeatures'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import MoneyInput from '@/components/ui/input/MoneyInput.vue'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -176,6 +177,26 @@ const addForm = ref({
     is_available: true,
     current_stock: 0,
     min_stock: 0,
+    is_rental_package: false,
+    rental_duration_value: null as number | null,
+    rental_duration_unit: 'jam' as 'menit' | 'jam',
+})
+
+// Mode rental: satuan & HPP tidak relevan, isi otomatis biar form ringkas.
+watch(() => addForm.value.is_rental_package, (isRental) => {
+    if (isRental) {
+        addForm.value.unit = 'paket'
+        addForm.value.buy_price = 0
+    } else if (addForm.value.unit === 'paket') {
+        addForm.value.unit = 'pcs'
+    }
+})
+
+// Durasi disimpan ke DB dalam menit; input boleh menit atau jam.
+const addRentalMinutes = computed(() => {
+    const v = addForm.value.rental_duration_value
+    if (!v || v <= 0) return null
+    return addForm.value.rental_duration_unit === 'jam' ? Math.round(v * 60) : Math.round(v)
 })
 
 
@@ -361,6 +382,9 @@ function resetAddForm() {
         is_available: true,
         current_stock: 0,
         min_stock: 0,
+        is_rental_package: false,
+        rental_duration_value: null,
+        rental_duration_unit: 'jam',
     }
     addImageFile.value = null
     addImagePreview.value = null
@@ -388,6 +412,8 @@ function submitAdd() {
             is_available:  addForm.value.is_available,
             current_stock: Number(addForm.value.current_stock),
             min_stock:     Number(addForm.value.min_stock),
+            is_rental_package:       addForm.value.is_rental_package,
+            rental_duration_minutes: addForm.value.is_rental_package ? addRentalMinutes.value : null,
             image:         addImageFile.value ?? undefined,
         },
         {
@@ -1157,6 +1183,28 @@ function deleteProduct(product: Product) {
 
                 <div class="max-h-[60vh] overflow-y-auto -mx-6 px-6">
                     <div class="space-y-5 pb-2">
+                        <!-- Mode Produk -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                class="rounded-xl border-2 p-3 text-left transition-all"
+                                :class="!addForm.is_rental_package ? 'border-primary bg-primary/5' : 'border-input hover:border-primary/40'"
+                                @click="addForm.is_rental_package = false"
+                            >
+                                <p class="text-sm font-semibold">Produk Biasa</p>
+                                <p class="text-xs text-muted-foreground">Makanan, minuman, item satuan</p>
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-xl border-2 p-3 text-left transition-all"
+                                :class="addForm.is_rental_package ? 'border-primary bg-primary/5' : 'border-input hover:border-primary/40'"
+                                @click="addForm.is_rental_package = true"
+                            >
+                                <p class="text-sm font-semibold">Paket Rental PS</p>
+                                <p class="text-xs text-muted-foreground">Dijual per durasi main</p>
+                            </button>
+                        </div>
+
                         <!-- Identitas -->
                         <div class="rounded-xl border bg-muted/20 p-4 space-y-3">
                             <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Identitas Produk</p>
@@ -1219,7 +1267,7 @@ function deleteProduct(product: Product) {
                                         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div v-if="!addForm.is_rental_package">
                                     <Label for="add_unit" class="mb-1.5 block text-sm font-medium">Satuan *</Label>
                                     <Input id="add_unit" v-model="addForm.unit" placeholder="pcs, porsi, kg..." />
                                 </div>
@@ -1237,24 +1285,47 @@ function deleteProduct(product: Product) {
                         <!-- Harga -->
                         <div class="rounded-xl border bg-muted/20 p-4 space-y-3">
                             <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Harga</p>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <Label for="add_buy_price" class="mb-1.5 block text-sm font-medium">Harga Beli (Rp) *</Label>
-                                    <Input id="add_buy_price" v-model.number="addForm.buy_price" type="number" min="0" step="100" />
+                            <div class="grid gap-3" :class="addForm.is_rental_package ? 'grid-cols-1' : 'grid-cols-2'">
+                                <div v-if="!addForm.is_rental_package">
+                                    <Label for="add_buy_price" class="mb-1.5 block text-sm font-medium">Harga Beli *</Label>
+                                    <MoneyInput id="add_buy_price" v-model="addForm.buy_price" placeholder="0" />
                                 </div>
                                 <div>
-                                    <Label for="add_sell_price" class="mb-1.5 block text-sm font-medium">Harga Jual (Rp) *</Label>
-                                    <Input id="add_sell_price" v-model.number="addForm.sell_price" type="number" min="0" step="100" />
+                                    <Label for="add_sell_price" class="mb-1.5 block text-sm font-medium">{{ addForm.is_rental_package ? 'Harga Paket *' : 'Harga Jual *' }}</Label>
+                                    <MoneyInput id="add_sell_price" v-model="addForm.sell_price" placeholder="0" />
                                 </div>
                             </div>
-                            <div v-if="addForm.sell_price && addForm.buy_price" class="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2">
+                            <div v-if="!addForm.is_rental_package && addForm.sell_price && addForm.buy_price" class="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2">
                                 <span class="text-sm text-muted-foreground">Margin</span>
                                 <span class="font-semibold text-primary">{{ addMarginPercentage }}%</span>
                             </div>
                         </div>
 
+                        <!-- Durasi Paket Rental -->
+                        <div v-if="addForm.is_rental_package" class="rounded-xl border bg-muted/20 p-4 space-y-2">
+                            <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Durasi Paket *</Label>
+                            <div class="flex items-center gap-2">
+                                <Input
+                                    v-model.number="addForm.rental_duration_value"
+                                    type="number"
+                                    min="1"
+                                    step="any"
+                                    placeholder="Contoh: 1"
+                                    class="flex-1"
+                                />
+                                <select
+                                    v-model="addForm.rental_duration_unit"
+                                    class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                    <option value="jam">Jam</option>
+                                    <option value="menit">Menit</option>
+                                </select>
+                            </div>
+                            <p v-if="addRentalMinutes" class="text-xs font-semibold text-muted-foreground">= {{ addRentalMinutes }} menit</p>
+                        </div>
+
                         <!-- Stok -->
-                        <div class="rounded-xl border bg-muted/20 p-4 space-y-3">
+                        <div v-if="!addForm.is_rental_package" class="rounded-xl border bg-muted/20 p-4 space-y-3">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lacak Stok</p>
@@ -1287,7 +1358,7 @@ function deleteProduct(product: Product) {
 
                 <DialogFooter class="pt-2">
                     <Button variant="outline" @click="showAddDialog = false" :disabled="processing">Batal</Button>
-                    <Button @click="submitAdd" :disabled="processing || !addForm.name || !addForm.unit">
+                    <Button @click="submitAdd" :disabled="processing || !addForm.name || !addForm.unit || (addForm.is_rental_package && !addRentalMinutes)">
                         <Package class="h-4 w-4" />
                         Tambah Produk
                     </Button>
