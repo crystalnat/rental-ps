@@ -288,7 +288,8 @@ class CashierController extends Controller
                 'promo_id'        => $promoId,
                 'order_code'      => $orderCode,
                 'type'            => $data['type'],
-                'status'          => 'done',
+                // Rental yang sudah dibayar tetap "processing" selama sesi berjalan agar muncul sebagai sesi aktif + countdown di denah; stopRental yang menandai 'done'.
+                'status'          => ($hasRentalPackage ?? false) ? 'processing' : 'done',
                 'notes'           => $data['notes'] ?? null,
                 'subtotal'        => $subtotal,
                 'discount_amount' => $discountAmount,
@@ -300,7 +301,8 @@ class CashierController extends Controller
                 'cash_received'   => $requiresCash ? $cashReceived : null,
                 'change_amount'   => $changeAmount > 0 ? $changeAmount : null,
                 'paid_at'         => now(),
-                'completed_at'    => now(),
+                // Rental belum selesai saat dibayar; completed_at diisi stopRental. Non-rental langsung selesai.
+                'completed_at'    => ($hasRentalPackage ?? false) ? null : now(),
 
                 // Rental fields
                 'is_rental'       => $hasRentalPackage ?? false,
