@@ -956,6 +956,94 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
         </DialogContent>
     </Dialog>
 
+    <!-- ─── Extend (Tambah Waktu) Dialog ──────────────────────────── -->
+    <Dialog v-model:open="showExtendDialog">
+        <DialogContent class="max-w-lg">
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2">
+                    <Timer class="h-4 w-4 text-primary" />
+                    Tambah Waktu — {{ selectedTable?.name }}
+                </DialogTitle>
+                <DialogDescription>Pilih paket untuk menambah durasi rental yang sedang berjalan.</DialogDescription>
+            </DialogHeader>
+
+            <div class="max-h-[45vh] overflow-y-auto space-y-2 pr-1">
+                <div v-if="rentalPackages.length === 0" class="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+                    <Gamepad2 class="h-10 w-10 opacity-30" />
+                    <p class="text-sm">Belum ada paket rental.</p>
+                </div>
+                <button
+                    v-for="pkg in rentalPackages"
+                    :key="pkg.id"
+                    type="button"
+                    class="w-full rounded-xl border-2 p-4 text-left transition-all"
+                    :class="extendPackageId === pkg.id
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-input hover:border-primary/40 hover:bg-accent'"
+                    @click="extendPackageId = pkg.id"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold text-sm">{{ pkg.name }}</p>
+                            <p class="text-xs text-muted-foreground mt-0.5">
+                                {{ pkg.rental_duration_minutes! >= 60
+                                    ? Math.floor(pkg.rental_duration_minutes! / 60) + ' Jam' + (pkg.rental_duration_minutes! % 60 > 0 ? ' ' + pkg.rental_duration_minutes! % 60 + ' Menit' : '')
+                                    : pkg.rental_duration_minutes + ' Menit' }}
+                            </p>
+                        </div>
+                        <p class="shrink-0 text-base font-black text-primary">{{ formatCurrency(packagePrice(pkg)) }}</p>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Metode pembayaran -->
+            <div class="space-y-2">
+                <p class="text-xs font-semibold text-muted-foreground">Metode Pembayaran</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button
+                        v-for="m in props.paymentMethods"
+                        :key="m.id"
+                        type="button"
+                        class="rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all"
+                        :class="extendPaymentMethod === m.code
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-input hover:border-primary/40'"
+                        @click="extendPaymentMethod = m.code"
+                    >
+                        {{ m.name }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Input tunai jika diperlukan -->
+            <div v-if="extendRequiresCash" class="space-y-1.5">
+                <label class="text-xs font-semibold text-muted-foreground">Uang Diterima</label>
+                <input
+                    v-model="extendCashReceived"
+                    type="number"
+                    inputmode="numeric"
+                    class="w-full rounded-lg border-2 border-input px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                    :placeholder="String(extendFinalAmount)"
+                />
+                <p v-if="Number(extendCashReceived) >= extendFinalAmount" class="text-xs text-muted-foreground">
+                    Kembalian: <span class="font-semibold">{{ formatCurrency(Number(extendCashReceived) - extendFinalAmount) }}</span>
+                </p>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="showExtendDialog = false">Batal</Button>
+                <Button
+                    class="gap-2"
+                    :disabled="!canSubmitExtend"
+                    @click="submitExtend"
+                >
+                    <Timer class="h-4 w-4" />
+                    Bayar {{ extendFinalAmount > 0 ? formatCurrency(extendFinalAmount) : '' }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
     <!-- ─── Rental 10-min Warning Toasts (bottom-right) ──────────────── -->
     <Teleport to="body">
         <div class="pointer-events-none fixed bottom-4 right-4 z-[70] flex flex-col gap-2">
