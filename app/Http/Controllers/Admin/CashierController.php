@@ -412,8 +412,9 @@ class CashierController extends Controller
             return back()->with('error', 'Produk yang dipilih bukan paket rental.');
         }
 
+        $extensionId = null;
         try {
-            DB::transaction(function () use ($store, $order, $package, $data, $user) {
+            DB::transaction(function () use ($store, $order, $package, $data, $user, &$extensionId) {
                 $shift = \App\Models\CashierShift::where('store_id', $store->id)
                     ->where('user_id', $user->id)
                     ->where('status', 'open')
@@ -471,6 +472,7 @@ class CashierController extends Controller
                     'completed_at'    => now(),
                     'is_rental'       => false,
                 ]);
+                $extensionId = $extension->id;
 
                 OrderItem::create([
                     'order_id'        => $extension->id,
@@ -510,7 +512,9 @@ class CashierController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', "Waktu {$order->order_code} ditambah {$package->rental_duration_minutes} menit.");
+        return back()
+            ->with('success', "Waktu {$order->order_code} ditambah {$package->rental_duration_minutes} menit.")
+            ->with('last_order_id', $extensionId);
     }
 
     private function resolveCustomer(int $brandId, array $data): ?int
