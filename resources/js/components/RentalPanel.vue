@@ -89,11 +89,19 @@ interface Product {
     }>
 }
 
+interface PaymentMethod {
+    id: number
+    name: string
+    code: string
+    requires_cash_input: boolean
+}
+
 // ─── Props & Emits ─────────────────────────────────────────────────────────────
 const props = defineProps<{
     store: { id: number; name: string; slug: string }
     floorPlan: FloorData[]
     products: Product[]
+    paymentMethods: PaymentMethod[]
     cart: CartItem[]
     selectedTableId?: number | null
 }>()
@@ -137,12 +145,34 @@ const selectedPackageId = ref<number | null>(null)
 const showProductDialog = ref(false)
 const showUnitDetail = ref(false)
 
+// Extend (tambah waktu) dialog
+const showExtendDialog = ref(false)
+const extendOrderId = ref<number | null>(null)
+const extendPackageId = ref<number | null>(null)
+const extendPaymentMethod = ref<string>('')
+const extendCashReceived = ref<string>('')
+const extendProcessing = ref(false)
+
 // ─── Computed ──────────────────────────────────────────────────────────────────
 const rentalPackages = computed(() =>
     props.products.filter(p => p.is_rental_package && p.rental_duration_minutes)
 )
 const selectedPackage = computed(() =>
     rentalPackages.value.find(p => p.id === selectedPackageId.value) ?? null
+)
+const extendPackage = computed(() =>
+    rentalPackages.value.find(p => p.id === extendPackageId.value) ?? null
+)
+function packagePrice(pkg: Product): number {
+    return pkg.sell_price - Math.round(pkg.sell_price * (pkg.discount_percent / 100))
+}
+const extendRequiresCash = computed(() =>
+    props.paymentMethods.find(m => m.code === extendPaymentMethod.value)?.requires_cash_input ?? false
+)
+const extendFinalAmount = computed(() => extendPackage.value ? packagePrice(extendPackage.value) : 0)
+const canSubmitExtend = computed(() =>
+    !!extendPackage.value && !!extendPaymentMethod.value && !extendProcessing.value &&
+    (!extendRequiresCash.value || (Number(extendCashReceived.value) || 0) >= extendFinalAmount.value)
 )
 const currentFloor = computed(() => props.floorPlan[selectedFloorIndex.value] ?? null)
 
@@ -386,6 +416,34 @@ function stopThenNewRental(table: FloorTable) {
             showUnitDetail.value = true
         },
         onFinish: () => { stoppingRental.value[table.id] = false },
+    })
+}
+
+function openExtend(order: TableOrder) {
+    extendOrderId.value = order.id
+    extendPackageId.value = null
+    extendPaymentMethod.value = props.paymentMethods[0]?.code ?? ''
+    extendCashReceived.value = ''
+    showExtendDialog.value = true
+}
+
+// Prefill uang tunai = harga paket saat paket/metode berubah
+watch([extendPackageId, extendPaymentMethod], () => {
+    if (extendRequiresCash.value) extendCashReceived.value = String(extendFinalAmount.value)
+})
+
+function submitExtend() {
+    if (!canSubmitExtend.value || extendOrderId.value === null) return
+    extendProcessing.value = true
+    router.post(`/admin/cashier/rental/${extendOrderId.value}/extend`, {
+        store: props.store.id,
+        product_id: extendPackageId.value,
+        payment_method: extendPaymentMethod.value,
+        cash_received: extendRequiresCash.value ? (Number(extendCashReceived.value) || 0) : null,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { showExtendDialog.value = false; syncSelectedTable() },
+        onFinish: () => { extendProcessing.value = false },
     })
 }
 
@@ -686,6 +744,14 @@ function getUnitState(table: FloorTable): 'idle' | 'active' | 'expiring' | 'expi
 
                                     <!-- Normal active state actions -->
                                     <template v-else-if="ord.status !== 'ready'">
+                                        <Button
+                                            size="sm"
+                                            class="w-full gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                                            @click="openExtend(ord)"
+                                        >
+                                            <Timer class="h-3.5 w-3.5" />
+                                            Tambah Waktu
+                                        </Button>
                                         <Button
                                             variant="outline"
                                             size="sm"

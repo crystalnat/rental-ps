@@ -1213,6 +1213,7 @@ const showQrOrAccount = computed(() => {
                         :store="store"
                         :floor-plan="floor_plan ?? []"
                         :products="products"
+                        :payment-methods="payment_methods"
                         :cart="cart"
                         v-model:selected-table-id="selectedTableId"
                         @add-to-cart="addProductFromRental"

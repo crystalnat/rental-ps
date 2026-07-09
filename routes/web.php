@@ -50,6 +50,7 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
         Route::get('/cashier', [CashierController::class, 'index'])->name('admin.cashier.index');
         Route::post('/cashier', [CashierController::class, 'store'])->name('admin.cashier.store');
         Route::post('/cashier/check-promo', [CashierController::class, 'checkPromo'])->name('admin.cashier.check-promo');
+        Route::post('/cashier/rental/{order}/extend', [CashierController::class, 'extendRental'])->name('admin.cashier.extend-rental');
         Route::get('/cashier/pending-orders', [CashierController::class, 'pendingOrders'])->name('admin.cashier.pending-orders');
 
         // Shifts

@@ -372,6 +372,147 @@ class CashierController extends Controller
             ->with('last_order_id', $order->id);
     }
 
+    // Tambah waktu ke sesi rental yang sedang berjalan. Bayar dulu (transaksi/struk sendiri),
+    // baru jam sesi induk diperpanjang. Paket ekstensi memakai daftar paket yang sama.
+    public function extendRental(Order $order, Request $request): RedirectResponse
+    {
+        $user = Auth::user();
+
+        // Otorisasi sama seperti pay(): kasir hanya boleh toko sendiri.
+        if ($user->role !== 'owner' && $user->role !== 'admin') {
+            if ($order->store_id !== $user->store_id) {
+                abort(403);
+            }
+        } elseif ($order->store->brand_id !== $user->brand_id) {
+            abort(403);
+        }
+
+        if (! $order->is_rental || in_array($order->status, ['done', 'cancelled'])) {
+            return back()->with('error', 'Sesi rental tidak aktif, tidak bisa ditambah waktu.');
+        }
+
+        $store = $order->store;
+
+        $validCodes = PaymentMethod::where('brand_id', $store->brand_id)
+            ->where('is_active', true)
+            ->pluck('code')
+            ->toArray();
+
+        $data = $request->validate([
+            'product_id'     => ['required', 'exists:products,id'],
+            'payment_method' => ['required', Rule::in($validCodes)],
+            'cash_received'  => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $package = Product::where('id', $data['product_id'])
+            ->where('brand_id', $store->brand_id)
+            ->firstOrFail();
+
+        if (! $package->is_rental_package || ! $package->rental_duration_minutes) {
+            return back()->with('error', 'Produk yang dipilih bukan paket rental.');
+        }
+
+        try {
+            DB::transaction(function () use ($store, $order, $package, $data, $user) {
+                $shift = \App\Models\CashierShift::where('store_id', $store->id)
+                    ->where('user_id', $user->id)
+                    ->where('status', 'open')
+                    ->first();
+
+                if (! $shift) {
+                    throw new \RuntimeException('Anda tidak memiliki shift yang sedang buka. Buka shift terlebih dahulu.');
+                }
+
+                $priceLog = PriceLog::where('product_id', $package->id)
+                    ->where(fn ($q) => $q->where('store_id', $store->id)->orWhereNull('store_id'))
+                    ->whereNull('ended_at')
+                    ->latest('started_at')
+                    ->firstOrFail();
+
+                $unitPrice = (float) $priceLog->sell_price;
+                $discount = $package->discount_percent > 0
+                    ? round($unitPrice * ($package->discount_percent / 100))
+                    : 0;
+                $finalAmount = max(0, $unitPrice - $discount);
+
+                $paymentMethod = PaymentMethod::where('brand_id', $store->brand_id)
+                    ->where('code', $data['payment_method'])
+                    ->first();
+                $requiresCash = $paymentMethod?->requires_cash_input ?? ($data['payment_method'] === 'cash');
+                $cashReceived = $requiresCash ? (float) ($data['cash_received'] ?? $finalAmount) : $finalAmount;
+
+                if ($requiresCash && $cashReceived < $finalAmount) {
+                    throw new \RuntimeException('Jumlah tunai kurang dari total.');
+                }
+                $changeAmount = $requiresCash ? max(0, $cashReceived - $finalAmount) : 0;
+
+                // is_rental=false: ini penjualan tambahan, bukan sesi baru, agar tidak muncul countdown kedua.
+                // ponytail: included_items paket tidak diterbitkan ulang saat perpanjangan; hanya jual waktu.
+                $extension = Order::create([
+                    'store_id'        => $store->id,
+                    'shift_id'        => $shift->id,
+                    'table_id'        => $order->table_id,
+                    'customer_id'     => $order->customer_id,
+                    'cashier_id'      => $user->id,
+                    'order_code'      => $this->generateOrderCode($store->id),
+                    'type'            => $order->type,
+                    'status'          => 'done',
+                    'notes'           => "Tambah waktu untuk {$order->order_code}",
+                    'subtotal'        => $unitPrice,
+                    'discount_amount' => $discount,
+                    'tax_rate'        => 0,
+                    'tax_amount'      => 0,
+                    'final_amount'    => $finalAmount,
+                    'payment_method'  => $data['payment_method'],
+                    'payment_status'  => 'paid',
+                    'cash_received'   => $requiresCash ? $cashReceived : null,
+                    'change_amount'   => $changeAmount > 0 ? $changeAmount : null,
+                    'paid_at'         => now(),
+                    'completed_at'    => now(),
+                    'is_rental'       => false,
+                ]);
+
+                OrderItem::create([
+                    'order_id'        => $extension->id,
+                    'product_id'      => $package->id,
+                    'price_log_id'    => $priceLog->id,
+                    'product_name'    => $package->name,
+                    'quantity'        => 1,
+                    'unit'            => $package->unit,
+                    'unit_price'      => $unitPrice,
+                    'buy_price'       => (float) $priceLog->buy_price,
+                    'discount_amount' => $discount,
+                    'subtotal'        => $finalAmount,
+                    'notes'           => null,
+                ]);
+
+                // Perpanjang jam sesi induk. Kalau sudah lewat, hitung dari sekarang.
+                $base = ($order->rental_end_at && $order->rental_end_at->isFuture())
+                    ? $order->rental_end_at->copy()
+                    : now();
+                $order->update([
+                    'rental_end_at'           => $base->addMinutes($package->rental_duration_minutes),
+                    'rental_duration_minutes' => $order->rental_duration_minutes + $package->rental_duration_minutes,
+                ]);
+
+                // Pastikan PS menyala (berjaga kalau sempat mati/expired).
+                if ($order->table_id) {
+                    $table = DiningTable::find($order->table_id);
+                    if ($table) {
+                        $table->update(['tuya_status' => true]);
+                        if ($table->tuya_device_id) {
+                            app(\App\Services\TuyaService::class)->sendCommand($table->tuya_device_id, 'switch_1', true);
+                        }
+                    }
+                }
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Waktu {$order->order_code} ditambah {$package->rental_duration_minutes} menit.");
+    }
+
     private function resolveCustomer(int $brandId, array $data): ?int
     {
         $name = trim($data['customer_name'] ?? '');
