@@ -111,6 +111,7 @@ const emit = defineEmits<{
     (e: 'update:floor-plan', plan: FloorData[]): void
     (e: 'checkout'): void
     (e: 'pay-order', orderId: number): void
+    (e: 'extended', orderId: number): void
     (e: 'update:selectedTableId', id: number | null): void
 }>()
 
@@ -442,7 +443,12 @@ function submitExtend() {
         cash_received: extendRequiresCash.value ? (Number(extendCashReceived.value) || 0) : null,
     }, {
         preserveScroll: true,
-        onSuccess: () => { showExtendDialog.value = false; syncSelectedTable() },
+        onSuccess: (page) => {
+            showExtendDialog.value = false
+            syncSelectedTable()
+            const extId = (page?.props?.flash as { last_order_id?: number } | undefined)?.last_order_id
+            if (extId) emit('extended', extId)
+        },
         onFinish: () => { extendProcessing.value = false },
     })
 }

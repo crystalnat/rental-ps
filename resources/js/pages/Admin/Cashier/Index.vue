@@ -194,6 +194,12 @@ async function openPayModalForOrder(orderId: number) {
     }
 }
 
+function onRentalExtended(orderId: number) {
+    lastCreatedOrderId.value = orderId
+    currentFeedbackOrderId.value = orderId
+    showSuccessDialog.value = true
+}
+
 function printLastOrder() {
     if (lastCreatedOrderId.value) {
         showSuccessDialog.value = false
@@ -1219,6 +1225,7 @@ const showQrOrAccount = computed(() => {
                         @add-to-cart="addProductFromRental"
                         @checkout="openPaymentDialog"
                         @pay-order="openPayModalForOrder"
+                        @extended="onRentalExtended"
                     />
                 </div>
 
