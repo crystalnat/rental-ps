@@ -226,13 +226,13 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
             Route::delete('/stores/{store}/floor-plan/{floor}/elements/{element}', [FloorPlanController::class, 'removeElement'])->name('admin.stores.floor-plan.remove-element');
             Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/copy', [FloorPlanController::class, 'copyTable'])->name('admin.stores.floor-plan.copy-table');
             Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/update-meta', [FloorPlanController::class, 'updateMeta'])->name('admin.stores.floor-plan.update-meta');
-            Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/toggle-tuya', [FloorPlanController::class, 'toggleTuya'])->name('admin.stores.floor-plan.toggle-tuya');
             Route::post('/stores/{store}/floor-plan/{floor}/elements/{element}/copy', [FloorPlanController::class, 'copyElement'])->name('admin.stores.floor-plan.copy-element');
         });
 
     // Floor Plan rental actions (owner, admin, cashier)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
         Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/stop-rental', [FloorPlanController::class, 'stopRental'])->name('admin.stores.floor-plan.stop-rental');
+        Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/toggle-tuya', [FloorPlanController::class, 'toggleTuya'])->name('admin.stores.floor-plan.toggle-tuya');
     });
 
     // Notifications
