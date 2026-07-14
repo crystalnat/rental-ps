@@ -22,6 +22,7 @@ Pairing:
 import json
 import os
 import subprocess
+import threading
 import time
 import requests
 
@@ -216,6 +217,13 @@ def execute_tuya_local(device_id: str, switch_on: bool) -> bool:
         if not info or not info.get("ip") or not info.get("key"):
             print(f"[ERR] Tuya local: device '{device_id}' tidak ada di devices.json atau IP/key kosong")
             return False
+        import socket
+        try:
+            s = socket.create_connection((info["ip"], 6668), timeout=1)
+            s.close()
+        except OSError:
+            print(f"[SKIP] Tuya {device_id} ({info['ip']}) tidak bisa dijangkau")
+            return False
         d = tinytuya.OutletDevice(device_id, info["ip"], info["key"])
         d.set_version(float(info.get("version", "3.5")))
         d.set_socketTimeout(2)
@@ -291,7 +299,7 @@ def execute(cfg: dict, device_id: str, switch_on: bool) -> bool:
         return execute_vidaa(tv_ip, switch_on)
     elif device_id.startswith("tuya:"):
         tuya_id = device_id[len("tuya:"):]
-        return execute_tuya_local(tuya_id, switch_on)
+        return execute_tuya(tuya_id, switch_on)
     else:
         return execute_adb(cfg.get("adb_path", "adb"), device_id, switch_on)
 
@@ -333,6 +341,50 @@ def read_tuya_status_local() -> list:
     return results
 
 
+def read_tuya_status_cloud() -> list:
+    """
+    Baca status ON/OFF semua device Tuya dari Tuya Cloud API.
+    Return: [{"device_id": "abc", "on": True/False}, ...]
+    """
+    devices = []
+    if os.path.exists(DEVICES_FILE):
+        with open(DEVICES_FILE) as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            devices = [d["id"] for d in data if d.get("id")]
+
+    if not devices:
+        return []
+
+    results = []
+    try:
+        import time
+        token = _tuya_get_token()
+        for device_id in devices:
+            try:
+                t    = str(int(time.time() * 1000))
+                path = f"/v1.0/devices/{device_id}/status"
+                resp = requests.get(TUYA_BASE_URL + path, headers={
+                    "client_id":    TUYA_CLIENT_ID,
+                    "access_token": token,
+                    "sign":         _tuya_sign(t, token, "GET", path),
+                    "t":            t,
+                    "sign_method":  "HMAC-SHA256",
+                }, timeout=10)
+                data = resp.json()
+                if data.get("success"):
+                    dps = {item["code"]: item["value"] for item in data.get("result", [])}
+                    on  = bool(dps.get("switch_1", dps.get("switch", False)))
+                    results.append({"device_id": device_id, "on": on})
+                else:
+                    print(f"[STATUS] cloud gagal {device_id}: {data.get('msg')}")
+            except Exception as e:
+                print(f"[STATUS] cloud error {device_id}: {e}")
+    except Exception as e:
+        print(f"[STATUS] cloud token error: {e}")
+    return results
+
+
 def push_status(cfg: dict, statuses: list):
     if not statuses:
         return
@@ -365,7 +417,7 @@ def poll(cfg: dict):
     if not commands:
         return
 
-    for cmd in commands:
+    def _run(cmd):
         ok = execute(cfg, cmd["device_id"], cmd["switch"])
         try:
             requests.post(
@@ -376,6 +428,12 @@ def poll(cfg: dict):
         except Exception:
             pass
 
+    threads = [threading.Thread(target=_run, args=(cmd,), daemon=True) for cmd in commands]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=8)
+
 
 def _status_worker(cfg: dict):
     """Thread terpisah untuk sync status — tidak blokir polling command."""
@@ -384,7 +442,10 @@ def _status_worker(cfg: dict):
     while True:
         time.sleep(status_interval)
         try:
-            statuses = read_tuya_status_local()
+            statuses = read_tuya_status_cloud()
+            if not statuses:
+                print("[STATUS] cloud kosong, fallback ke local...")
+                statuses = read_tuya_status_local()
             push_status(cfg, statuses)
         except Exception as e:
             print(f"[STATUS] error: {e}")

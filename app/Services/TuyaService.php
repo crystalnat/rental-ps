@@ -27,7 +27,18 @@ class TuyaService
      */
     public function sendCommand(string $deviceId, string $code, $value): bool
     {
-        // Skip cloud — langsung queue ke bridge lokal
+        // Tuya device → coba cloud dulu, fallback ke bridge jika gagal
+        $isTuya = str_starts_with($deviceId, 'tuya:')
+            || (!str_contains($deviceId, ':') && !filter_var($deviceId, FILTER_VALIDATE_IP));
+
+        if ($isTuya) {
+            $bareId = str_starts_with($deviceId, 'tuya:') ? substr($deviceId, 5) : $deviceId;
+            if ($this->sendTuyaCloud($bareId, $code, $value)) {
+                return true;
+            }
+            Log::warning("Tuya Cloud gagal untuk {$bareId}, fallback ke bridge...");
+        }
+
         return $this->queueCommand($deviceId, $value);
     }
 

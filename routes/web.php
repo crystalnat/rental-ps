@@ -231,8 +231,9 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
 
     // Floor Plan rental actions (owner, admin, cashier)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier')->group(function () {
-        Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/stop-rental', [FloorPlanController::class, 'stopRental'])->name('admin.stores.floor-plan.stop-rental');
         Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/toggle-tuya', [FloorPlanController::class, 'toggleTuya'])->name('admin.stores.floor-plan.toggle-tuya');
+        Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/start-rental', [FloorPlanController::class, 'startRental'])->name('admin.stores.floor-plan.start-rental');
+        Route::post('/stores/{store}/floor-plan/{floor}/tables/{table}/stop-rental', [FloorPlanController::class, 'stopRental'])->name('admin.stores.floor-plan.stop-rental');
     });
 
     // Notifications
