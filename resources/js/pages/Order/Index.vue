@@ -65,13 +65,42 @@ interface CartItem {
     notes?: string
 }
 
+interface PlacedOrderItem {
+    name: string
+    quantity: number
+    subtotal: number
+}
+
+interface PlacedOrder {
+    id: number
+    order_code: string
+    status: string
+    payment_status: string
+    payment_method: string | null
+    final_amount: number
+    created_at: string
+    items: PlacedOrderItem[]
+}
+
 const props = defineProps<{
     store: { id: number; name: string; slug: string }
     table: { id: number; name: string }
     products: Product[]
     categories: Category[]
+    orders: PlacedOrder[]
     qris_payment?: { name: string; qrcode_image: string | null } | null
 }>()
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+    pending: 'Menunggu diproses',
+    processing: 'Sedang disiapkan',
+    ready: 'Siap disajikan',
+    done: 'Selesai',
+}
+
+function orderStatusLabel(status: string) {
+    return ORDER_STATUS_LABELS[status] ?? status
+}
 
 const page = usePage()
 const flashSuccess = computed(() => page.props.flash?.success as string | undefined)
@@ -214,6 +243,39 @@ function submitOrder() {
                 <p class="text-xs text-muted-foreground">{{ formatCurrency(flashOrderFinalAmount) }}</p>
             </div>
         </div>
+
+        <!-- Pesanan yang sudah masuk (bertahan setelah refresh) -->
+        <section v-if="orders.length > 0" class="mx-4 mt-3 space-y-2">
+            <h2 class="text-sm font-semibold">Pesanan Anda</h2>
+            <div
+                v-for="ord in orders"
+                :key="ord.id"
+                class="rounded-lg border bg-card p-3 text-sm"
+            >
+                <div class="flex items-center justify-between gap-2">
+                    <span class="font-medium">{{ ord.order_code }}</span>
+                    <span class="text-xs text-muted-foreground">{{ ord.created_at }}</span>
+                </div>
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                    {{ orderStatusLabel(ord.status) }} &middot;
+                    {{ ord.payment_status === 'paid' ? 'Lunas' : 'Belum dibayar' }}
+                </p>
+                <ul class="mt-2 space-y-0.5">
+                    <li
+                        v-for="(item, idx) in ord.items"
+                        :key="idx"
+                        class="flex justify-between gap-2 text-xs"
+                    >
+                        <span>{{ item.quantity }}x {{ item.name }}</span>
+                        <span>{{ formatCurrency(item.subtotal) }}</span>
+                    </li>
+                </ul>
+                <div class="mt-2 flex justify-between border-t pt-2 font-semibold">
+                    <span>Total</span>
+                    <span>{{ formatCurrency(ord.final_amount) }}</span>
+                </div>
+            </div>
+        </section>
 
         <!-- Search & Category filter -->
         <div class="sticky top-14 z-10 space-y-2 border-b bg-background px-4 py-2">

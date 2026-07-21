@@ -64,6 +64,7 @@ class CustomerOrderController extends Controller
             ],
             'products'   => $products,
             'categories' => $categories,
+            'orders'     => $this->getTableOrders($table),
             'qris_payment' => $qrisPayment ? [
                 'name'         => $qrisPayment->name,
                 'qrcode_image' => $qrisPayment->qrcode_image ? \Storage::disk('public')->url($qrisPayment->qrcode_image) : null,
@@ -210,6 +211,34 @@ class CustomerOrderController extends Controller
             ->with('success', $successMsg)
             ->with('order_payment_method', $data['payment_method'])
             ->with('order_final_amount', (float) $order->final_amount);
+    }
+
+    /**
+     * Pesanan meja ini hari ini, supaya customer tetap melihatnya setelah refresh.
+     */
+    private function getTableOrders(DiningTable $table): array
+    {
+        return Order::with('items')
+            ->where('table_id', $table->id)
+            ->whereDate('created_at', today())
+            ->where('status', '!=', 'cancelled')
+            ->latest('id')
+            ->get()
+            ->map(fn (Order $order) => [
+                'id'             => $order->id,
+                'order_code'     => $order->order_code,
+                'status'         => $order->status,
+                'payment_status' => $order->payment_status,
+                'payment_method' => $order->payment_method,
+                'final_amount'   => (float) $order->final_amount,
+                'created_at'     => $order->created_at->format('H:i'),
+                'items'          => $order->items->map(fn (OrderItem $item) => [
+                    'name'     => $item->product_name,
+                    'quantity' => (float) $item->quantity,
+                    'subtotal' => (float) $item->subtotal,
+                ]),
+            ])
+            ->toArray();
     }
 
     private function getProductsForStore(Store $store): array
