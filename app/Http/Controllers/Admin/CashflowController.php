@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DailyExpense;
 use App\Models\Order;
+use App\Models\Refund;
 use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -65,6 +66,10 @@ class CashflowController extends Controller
             ->whereDate('expense_date', '>=', $dateFrom)
             ->whereDate('expense_date', '<=', $dateTo)
             ->sum('amount');
+
+        // Refund adalah kas keluar → masuk ke pengeluaran agar omzet bersih terpotong.
+        $refunds = Refund::sumFor($store->id, $dateFrom, $dateTo);
+        $expenses = (float) $expenses + $refunds;
 
         $net = (float) $income - (float) $expenses;
         $orderCount = Order::where('store_id', $store->id)
@@ -144,6 +149,15 @@ class CashflowController extends Controller
             ->get()
             ->keyBy(fn ($r) => \Carbon\Carbon::parse($r->date)->format('Y-m-d'));
 
+        $refundsByDay = Refund::where('store_id', $storeId)
+            ->where('status', 'completed')
+            ->whereDate('created_at', '>=', $dateFrom)
+            ->whereDate('created_at', '<=', $dateTo)
+            ->selectRaw('DATE(created_at) as date, SUM(refund_amount) as total')
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
+
         $dates = collect();
         $start = \Carbon\Carbon::parse($dateFrom);
         $end = \Carbon\Carbon::parse($dateTo);
@@ -153,7 +167,8 @@ class CashflowController extends Controller
 
         $labels = $dates->map(fn ($d) => \Carbon\Carbon::parse($d)->format('d M'))->values()->toArray();
         $incomeData = $dates->map(fn ($d) => (float) ($incomeByDay->get($d)?->total ?? 0))->values()->toArray();
-        $expenseData = $dates->map(fn ($d) => (float) ($expensesByDay->get($d)?->total ?? 0))->values()->toArray();
+        $expenseData = $dates->map(fn ($d) => (float) ($expensesByDay->get($d)?->total ?? 0)
+            + (float) ($refundsByDay->get($d)?->total ?? 0))->values()->toArray();
 
         return [
             'labels' => $labels,
@@ -238,6 +253,36 @@ class CashflowController extends Controller
                     'amount'        => (float) $e->amount,
                     'detail'        => $e->creator?->name,
                     'expense_id'    => $e->id,
+                ]);
+            }
+        }
+
+        // Refund = kas keluar, tampil sebagai pengeluaran di buku kas.
+        if (($typeFilter === 'all' || $typeFilter === 'expense')
+            && ($categoryFilter === 'all' || $categoryFilter === 'refund')) {
+            $refundQuery = Refund::with(['user', 'order'])
+                ->where('store_id', $storeId)
+                ->where('status', 'completed')
+                ->whereDate('created_at', '>=', $dateFrom)
+                ->whereDate('created_at', '<=', $dateTo);
+
+            if ($search !== '') {
+                $refundQuery->where(fn ($q) => $q->where('refund_code', 'like', '%' . $search . '%')
+                    ->orWhereHas('order', fn ($oq) => $oq->where('order_code', 'like', '%' . $search . '%')));
+            }
+
+            foreach ($refundQuery->orderByDesc('created_at')->get() as $r) {
+                $items->push([
+                    'id'            => 'rf-' . $r->id,
+                    'type'          => 'expense',
+                    'date'          => $r->created_at->format('d M Y H:i'),
+                    'date_sort'     => $r->created_at->format('Y-m-d H:i:s'),
+                    'description'   => $r->refund_code . ' (' . ($r->order?->order_code ?? '—') . ')',
+                    'category'      => 'refund',
+                    'category_label'=> 'Refund',
+                    'amount'        => (float) $r->refund_amount,
+                    'detail'        => $r->user?->name,
+                    'refund_id'     => $r->id,
                 ]);
             }
         }

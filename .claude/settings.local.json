@@ -6,7 +6,8 @@
       "Bash(git -C C:/laragon/www/rental-ps log --oneline --all)",
       "Bash(git -C C:/laragon/www/rental-ps log --oneline --diff-filter=M -- \"*/Categories*\" \"*/CategoryController*\")",
       "Bash(*)",
-      "Bash(git -C C:/laragon/www/rental-ps show 0b26ac8 --stat)"
+      "Bash(git -C C:/laragon/www/rental-ps show 0b26ac8 --stat)",
+      "PowerShell($env:Path += \";C:\\\\laragon\\\\bin\\\\php\"; $files = @\\(\"app/Models/Refund.php\",\"app/Http/Controllers/Admin/CashflowController.php\",\"app/Http/Controllers/Admin/ReportController.php\",\"app/Http/Controllers/Admin/DashboardController.php\",\"app/Http/Controllers/Admin/OrderController.php\"\\); foreach \\($f in $files\\) { $php = \\(Get-ChildItem C:\\\\laragon\\\\bin\\\\php -Recurse -Filter php.exe | Select-Object -First 1\\).FullName; & $php -l $f })"
     ]
   }
 }

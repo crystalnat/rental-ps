@@ -472,6 +472,13 @@ class OrderController extends Controller
             return back()->with('error', 'Pesanan yang sudah dibayar tidak dapat dibatalkan.');
         }
 
+        // Sudah dibatalkan → hapus dari daftar (soft delete). Belum → batalkan dulu.
+        if ($order->status === 'cancelled') {
+            $order->delete();
+
+            return back()->with('success', "Pesanan {$order->order_code} dihapus.");
+        }
+
         $order->update([
             'status'             => 'cancelled',
             'cancelled_at'       => now(),

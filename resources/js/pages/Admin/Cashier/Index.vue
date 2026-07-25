@@ -249,6 +249,9 @@ const newOrderNotification = ref<{ order_code: string; table_name?: string; amou
 
 // Multi-cart state management
 const cartStates = ref<Record<string, any>>({})
+// Keranjang cuma di memori → hilang tiap denah kirim router.post (remount). Simpan ke sessionStorage.
+const cartStorageKey = `cashier_cart_${props.store?.id ?? 'x'}`
+let restoring = false
 const currentCartKey = computed(() => {
     if (orderType.value === 'dine_in' && selectedTableId.value) {
         return `table-${selectedTableId.value}`
@@ -258,7 +261,7 @@ const currentCartKey = computed(() => {
 
 watch(currentCartKey, (newKey, oldKey) => {
     // Save previous state
-    if (oldKey) {
+    if (oldKey && !restoring) {
         cartStates.value[oldKey] = {
             cart: [...cart.value],
             notes: notes.value,
@@ -292,6 +295,60 @@ watch(currentCartKey, (newKey, oldKey) => {
     customerPhone.value = state.customerPhone
     customerEmail.value = state.customerEmail
 }, { immediate: true })
+
+function persistCart() {
+    if (restoring) return
+    const states = { ...cartStates.value }
+    states[currentCartKey.value] = {
+        cart: cart.value,
+        notes: notes.value,
+        discountAmount: discountAmount.value,
+        activePromo: activePromo.value,
+        promoCodeInput: promoCodeInput.value,
+        customerName: customerName.value,
+        customerPhone: customerPhone.value,
+        customerEmail: customerEmail.value,
+    }
+    try {
+        sessionStorage.setItem(cartStorageKey, JSON.stringify({
+            states,
+            orderType: orderType.value,
+            selectedTableId: selectedTableId.value,
+        }))
+    } catch { /* storage penuh/diblokir → abaikan */ }
+}
+
+function restoreCart() {
+    let raw: string | null = null
+    try { raw = sessionStorage.getItem(cartStorageKey) } catch { return }
+    if (!raw) return
+    restoring = true
+    try {
+        const s = JSON.parse(raw)
+        cartStates.value = s.states ?? {}
+        orderType.value = s.orderType ?? 'walk_in'
+        selectedTableId.value = s.selectedTableId ?? null
+        const active = cartStates.value[currentCartKey.value]
+        if (active) {
+            cart.value = [...(active.cart ?? [])]
+            notes.value = active.notes ?? ''
+            discountAmount.value = active.discountAmount ?? ''
+            activePromo.value = active.activePromo ?? null
+            promoCodeInput.value = active.promoCodeInput ?? ''
+            customerName.value = active.customerName ?? ''
+            customerPhone.value = active.customerPhone ?? ''
+            customerEmail.value = active.customerEmail ?? ''
+        }
+    } catch { /* data rusak → abaikan */ } finally {
+        restoring = false
+    }
+}
+
+watch(
+    [cart, cartStates, orderType, selectedTableId, notes, discountAmount, activePromo, promoCodeInput, customerName, customerPhone, customerEmail],
+    persistCart,
+    { deep: true },
+)
 
 watch(selectedTableId, (newVal) => {
     if (newVal) {
@@ -784,7 +841,7 @@ async function checkPendingOrders() {
 }
 
 onMounted(() => {
-    console.log('Cashier Categories:', props.categories)
+    restoreCart()
     sessionStorage.setItem('cashier_pending_count', String(props.pending_orders_count ?? 0))
     void checkPendingOrders()
     pendingOrdersPollInterval = setInterval(checkPendingOrders, 15000)
@@ -1032,10 +1089,13 @@ function submitOrder() {
     showPaymentDialog.value = false // Close immediately
     showMobileCart.value = false
 
+    // Hapus dulu supaya keranjang yang sudah terjual tidak muncul lagi saat halaman remount.
+    try { sessionStorage.removeItem(cartStorageKey) } catch { /* abaikan */ }
     router.post('/admin/cashier', { ...payload, store: props.store.id }, {
         preserveScroll: true,
         onError: () => {
              showPaymentDialog.value = true // Re-open on error
+             persistCart() // gagal bayar → simpan lagi keranjangnya
         },
         onSuccess: () => {
             cart.value = []

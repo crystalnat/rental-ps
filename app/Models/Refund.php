@@ -37,6 +37,25 @@ class Refund extends Model
         return $this->hasMany(RefundItem::class);
     }
 
+    /**
+     * Total refund (completed) untuk satu/kumpulan toko dalam rentang tanggal.
+     * Dipakai pembukuan agar omzet terpotong refund.
+     *
+     * @param  int|array|\Illuminate\Support\Collection  $storeIds
+     */
+    public static function sumFor($storeIds, string $dateFrom, string $dateTo): float
+    {
+        $ids = $storeIds instanceof \Illuminate\Support\Collection
+            ? $storeIds->all()
+            : (array) $storeIds;
+
+        return (float) static::whereIn('store_id', $ids)
+            ->where('status', 'completed')
+            ->whereDate('created_at', '>=', $dateFrom)
+            ->whereDate('created_at', '<=', $dateTo)
+            ->sum('refund_amount');
+    }
+
     protected function casts(): array
     {
         return [

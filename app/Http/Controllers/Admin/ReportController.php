@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DailyExpense;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Refund;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -63,13 +64,16 @@ class ReportController extends Controller
                 'name'       => $store->name,
                 'slug'       => $store->slug,
                 'income'     => (float) Order::where('store_id', $store->id)->where('payment_status', 'paid')
-                    ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->sum('final_amount'),
+                    ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->sum('final_amount')
+                    - Refund::sumFor($store->id, $dateFrom, $dateTo),
+                'refunds'    => Refund::sumFor($store->id, $dateFrom, $dateTo),
                 'expenses'   => (float) DailyExpense::where('store_id', $store->id)
                     ->whereDate('expense_date', '>=', $dateFrom)->whereDate('expense_date', '<=', $dateTo)->sum('amount'),
                 'order_count'=> Order::where('store_id', $store->id)->where('payment_status', 'paid')
                     ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->count(),
                 'hpp'          => $this->hppForStores(collect([$store->id]), $dateFrom, $dateTo),
-                'gross_profit'=> $this->grossProfitForStores(collect([$store->id]), $dateFrom, $dateTo),
+                'gross_profit'=> $this->grossProfitForStores(collect([$store->id]), $dateFrom, $dateTo)
+                    - Refund::sumFor($store->id, $dateFrom, $dateTo),
                 'chart_sales' => $this->buildChartSales($store->id, $dateFrom, $dateTo),
                 'chart_expense_by_category' => $this->buildChartExpenseByCategory($store->id, $dateFrom, $dateTo),
                 'top_products' => $this->buildTopProducts($store->id, $dateFrom, $dateTo, 15),
@@ -109,17 +113,21 @@ class ReportController extends Controller
             return $this->emptyOverall();
         }
 
-        $income = (float) Order::whereIn('store_id', $storeIds)->where('payment_status', 'paid')
+        $grossIncome = (float) Order::whereIn('store_id', $storeIds)->where('payment_status', 'paid')
             ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->sum('final_amount');
+        $refunds = Refund::sumFor($storeIds, $dateFrom, $dateTo);
+        $income = $grossIncome - $refunds; // omzet bersih setelah refund
         $expenses = (float) DailyExpense::whereIn('store_id', $storeIds)
             ->whereDate('expense_date', '>=', $dateFrom)->whereDate('expense_date', '<=', $dateTo)->sum('amount');
         $orderCount = Order::whereIn('store_id', $storeIds)->where('payment_status', 'paid')
             ->whereDate('created_at', '>=', $dateFrom)->whereDate('created_at', '<=', $dateTo)->count();
-        $grossProfit = $this->grossProfitForStores($storeIds, $dateFrom, $dateTo);
+        // ponytail: refund kurangi laba kotor pakai nilai refund; hpp barang restock diabaikan (approx cukup untuk laporan)
+        $grossProfit = $this->grossProfitForStores($storeIds, $dateFrom, $dateTo) - $refunds;
         $hpp = $this->hppForStores($storeIds, $dateFrom, $dateTo);
 
         return [
             'income'       => $income,
+            'refunds'      => $refunds,
             'hpp'          => $hpp,
             'expenses'     => $expenses,
             'net'          => $income - $expenses,
@@ -142,6 +150,7 @@ class ReportController extends Controller
     {
         return [
             'income'       => 0,
+            'refunds'      => 0,
             'hpp'          => 0,
             'expenses'     => 0,
             'net'          => 0,

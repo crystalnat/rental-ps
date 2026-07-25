@@ -8,6 +8,7 @@ use App\Models\DailyExpense;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Refund;
 use App\Models\Store;
 use App\Models\StoreInventory;
 use App\Models\User;
@@ -115,7 +116,8 @@ class DashboardController extends Controller
         $todayRevenue = (float) Order::whereIn('store_id', $storeIds)
             ->whereDate('created_at', $today)
             ->where('payment_status', 'paid')
-            ->sum('final_amount');
+            ->sum('final_amount')
+            - Refund::sumFor($storeIds, $today, $today); // omzet bersih setelah refund
 
         $todayOrders = Order::whereIn('store_id', $storeIds)
             ->whereDate('created_at', $today)
@@ -134,7 +136,8 @@ class DashboardController extends Controller
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->where('payment_status', 'paid')
-            ->sum('final_amount');
+            ->sum('final_amount')
+            - Refund::sumFor($storeIds, now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString());
 
         $monthOrders = Order::whereIn('store_id', $storeIds)
             ->whereMonth('created_at', now()->month)
@@ -326,7 +329,8 @@ class DashboardController extends Controller
             $revenue = (float) Order::where('store_id', $store->id)
                 ->where('payment_status', 'paid')
                 ->whereDate('created_at', $today)
-                ->sum('final_amount');
+                ->sum('final_amount')
+                - Refund::sumFor($store->id, $today, $today);
             $orders = Order::where('store_id', $store->id)
                 ->where('payment_status', 'paid')
                 ->whereDate('created_at', $today)

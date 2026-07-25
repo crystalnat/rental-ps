@@ -216,7 +216,10 @@ function updateStatus(order: Order, newStatus: string) {
 
 function cancelOrder(order: Order) {
     if (order.payment_status === 'paid') return
-    if (!confirm(`Batalkan pesanan ${order.order_code}?`)) return
+    const msg = order.status === 'cancelled'
+        ? `Hapus pesanan ${order.order_code}?`
+        : `Batalkan pesanan ${order.order_code}?`
+    if (!confirm(msg)) return
     cancellingOrderId.value = order.id
     router.delete(`/admin/orders/${order.id}`, {
         preserveScroll: true,
