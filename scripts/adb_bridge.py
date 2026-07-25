@@ -409,7 +409,14 @@ def poll(cfg: dict):
         if resp.status_code == 401:
             print("[ERR] Token salah. Cek config.json dan TUYA_BRIDGE_TOKEN di .env server.")
             return
-        commands = resp.json()
+        if not resp.text.strip():
+            print(f"[ERR] Server response kosong (HTTP {resp.status_code})")
+            return
+        try:
+            commands = resp.json()
+        except Exception:
+            print(f"[ERR] Server tidak return JSON (HTTP {resp.status_code}): {resp.text[:200]}")
+            return
     except Exception as e:
         print(f"[ERR] Tidak bisa reach server: {e}")
         return
