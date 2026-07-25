@@ -427,6 +427,11 @@ def poll(cfg: dict):
             )
         except Exception:
             pass
+        # Langsung kabarin server status terbaru setelah command dieksekusi
+        # Kalau gagal (device tidak bisa dijangkau), kirim on=False ke kasir
+        raw_id  = cmd["device_id"]
+        tuya_id = raw_id[len("tuya:"):] if raw_id.startswith("tuya:") else raw_id
+        push_status(cfg, [{"device_id": tuya_id, "on": bool(cmd["switch"]) if ok else False}])
 
     threads = [threading.Thread(target=_run, args=(cmd,), daemon=True) for cmd in commands]
     for t in threads:

@@ -1,9 +1,65 @@
 [
-  {
-    "id": "a34e6cef962d8dcb708db0",
-    "name": "T34-Smart Plug+",
-    "key": "8ZbBprc./!p@kim`",
-    "ip": "192.168.1.53",
-    "version": "3.5"
-  }
+    {
+        "name": "PS-01 (Tv 1)",
+        "id": "a3872dee7163d23891maxc",
+        "key": "/N<Iy)ir5+P7SzBe",
+        "ip": "192.168.18.35",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-02 (Tv 2)",
+        "id": "a352156730ec47fac3k5ra",
+        "key": "cU0dLcUqPU|);#2:",
+        "ip": "192.168.18.31",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-03 (Tv 3)",
+        "id": "a32948d442c4c275ecdf2l",
+        "key": "Ta'zAK}8:|/ky|xt",
+        "ip": "192.168.18.37",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-04 (Tv 4)",
+        "id": "a38f9f9a619c509501yuaw",
+        "key": "I]>4!Q;(q];K$<4U",
+        "ip": "192.168.18.38",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-05 VIP (Tv 5)",
+        "id": "a375820766567ff87bwk0j",
+        "key": "eELP-++<X7/Pxn/t",
+        "ip": "192.168.18.41",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-06 VIP (Tv 6)",
+        "id": "a3fc18e38c3f39052ectju",
+        "key": "wuzt?}O*`^?X3oA_",
+        "ip": "192.168.18.39",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-07 VIP (Tv 7)",
+        "id": "a3b70869560d433ae4qfim",
+        "key": "Gq7wX;&uh+JOwBrI",
+        "ip": "192.168.18.40",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-08 (Tv 8)",
+        "id": "a3bfb87987b59ddbf5cspv",
+        "key": "GCwn<sbvWiNrwEr^",
+        "ip": "192.168.18.36",
+        "version": "3.5"
+    },
+    {
+        "name": "PS-09 (Tv 9)",
+        "id": "a3741c4cf1f13d5ff2bkbr",
+        "key": ".[><b@.DpxQ*1v?o",
+        "ip": "192.168.18.42",
+        "version": "3.5"
+    }
 ]

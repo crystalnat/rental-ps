@@ -22,8 +22,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $brand = Brand::create([
-            'name'     => 'Crystal Rental PS',
-            'slug'     => 'crystal-rental-ps',
+            'name'     => 'Spot Duren Tiga',
+            'slug'     => 'spot-duren-tiga',
             'timezone' => 'Asia/Jakarta',
             'currency' => 'IDR',
             'tax_rate' => 0.00,
@@ -52,8 +52,8 @@ class DatabaseSeeder extends Seeder
         $owner = User::create([
             'brand_id'  => $brand->id,
             'store_id'  => null,
-            'name'      => 'Owner Crystal',
-            'email'     => 'owner@crystalrental.id',
+            'name'      => 'Owner Spot Duren Tiga',
+            'email'     => 'owner@spotdurentiga.com',
             'password'  => Hash::make('password'),
             'role'      => 'owner',
             'is_active' => true,
@@ -61,8 +61,8 @@ class DatabaseSeeder extends Seeder
 
         $store = Store::create([
             'brand_id'  => $brand->id,
-            'name'      => 'Crystal Rental PS - Pusat',
-            'slug'      => 'crystal-rental-pusat',
+            'name'      => 'Spot Duren Tiga - Pusat',
+            'slug'      => 'spot-duren-tiga-pusat',
             'city'      => 'Jakarta',
             'province'  => 'DKI Jakarta',
             'phone'     => '081234567890',
@@ -72,8 +72,8 @@ class DatabaseSeeder extends Seeder
         User::create([
             'brand_id'  => $brand->id,
             'store_id'  => $store->id,
-            'name'      => 'Admin Crystal',
-            'email'     => 'admin@crystalrental.id',
+            'name'      => 'Admin Spot Duren Tiga',
+            'email'     => 'admin@spotdurentiga.com',
             'password'  => Hash::make('password'),
             'role'      => 'admin',
             'is_active' => true,
@@ -83,7 +83,7 @@ class DatabaseSeeder extends Seeder
             'brand_id'  => $brand->id,
             'store_id'  => $store->id,
             'name'      => 'Kasir 1',
-            'email'     => 'kasir1@crystalrental.id',
+            'email'     => 'kasir1@spotdurentiga.com',
             'password'  => Hash::make('password'),
             'role'      => 'cashier',
             'is_active' => true,

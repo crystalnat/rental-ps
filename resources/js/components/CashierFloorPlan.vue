@@ -142,15 +142,21 @@ function close() {
 
 const now = ref(new Date())
 let timerInterval: any = null
+let statusPollInterval: any = null
 
 onMounted(() => {
     timerInterval = setInterval(() => {
         now.value = new Date()
     }, 1000)
+    // Poll status Tuya tiap 2 detik supaya kasir otomatis update ON/OFF
+    statusPollInterval = setInterval(() => {
+        router.reload({ only: ['floor_plan'] })
+    }, 2000)
 })
 
 onBeforeUnmount(() => {
     if (timerInterval) clearInterval(timerInterval)
+    if (statusPollInterval) clearInterval(statusPollInterval)
 })
 
 function getRemainingTime(order: TableOrder) {
