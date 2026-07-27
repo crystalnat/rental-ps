@@ -558,10 +558,10 @@ function deleteProduct(product: Product) {
 <template>
     <AdminLayout :title="`Kelola Produk — ${store.name}`">
         <div class="mb-4">
-            <Link :href="`/admin/stores`">
+            <Link href="/admin/dashboard">
                 <Button variant="outline" size="sm" class="cursor-pointer">
                     <ArrowLeft class="h-4 w-4" />
-                    Kembali ke daftar toko
+                    Kembali
                 </Button>
             </Link>
         </div>
@@ -882,7 +882,7 @@ function deleteProduct(product: Product) {
                                 <div class="flex flex-col items-center gap-3 text-muted-foreground">
                                     <Package class="h-10 w-10 opacity-30" />
                                     <p class="font-medium">Tidak ada produk ditemukan</p>
-                                    <p v-if="search" class="text-sm">Coba kata kunci lain atau hapus filter</p>
+                                    <p v-if="searchQuery" class="text-sm">Coba kata kunci lain atau hapus filter</p>
                                     <Button v-else variant="outline" size="sm" @click="openAddDialog">
                                         <Package class="h-4 w-4" />
                                         Tambah Produk Pertama
@@ -901,7 +901,7 @@ function deleteProduct(product: Product) {
             <div v-if="filteredProducts.length === 0" class="flex flex-col items-center gap-3 rounded-2xl border border-dashed py-20 text-muted-foreground">
                 <Package class="h-12 w-12 opacity-30" />
                 <p class="font-medium">Tidak ada produk ditemukan</p>
-                <p v-if="search" class="text-sm">Coba kata kunci lain atau hapus filter</p>
+                <p v-if="searchQuery" class="text-sm">Coba kata kunci lain atau hapus filter</p>
                 <Button v-else variant="outline" size="sm" @click="openAddDialog">
                     <Package class="h-4 w-4" />
                     Tambah Produk Pertama

@@ -19,7 +19,8 @@ function getNestedValue(obj: unknown, path: string): unknown {
     return path.split('.').reduce((o: unknown, k) => (o as Record<string, unknown>)?.[k], obj)
 }
 
-export function useTableFeatures<T extends Record<string, unknown>>(
+// ponytail: `object` not `Record<string, unknown>` — interfaces lack an index signature and won't satisfy the latter
+export function useTableFeatures<T extends object>(
     items: Ref<T[]>,
     options: UseTableFeaturesOptions<T> = {},
 ) {

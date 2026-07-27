@@ -64,7 +64,7 @@ const navigationGroups = computed((): NavGroup[] => {
             }
             : {
                 label: 'Denah Unit PS',
-                href: '/admin/stores',
+                href: '/admin/dashboard',
                 icon: Gamepad2,
                 roles: ['owner', 'admin'],
             }

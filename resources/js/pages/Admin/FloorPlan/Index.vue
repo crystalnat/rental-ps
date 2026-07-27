@@ -93,7 +93,7 @@ function deleteFloor(floor: Floor) {
 <template>
     <AdminLayout :title="`Rental PS — ${store.name}`">
         <template #headerActions>
-            <Link :href="`/admin/stores`">
+            <Link href="/admin/dashboard">
                 <Button variant="outline" size="sm">
                     <ArrowLeft class="h-4 w-4" />
                     Kembali
