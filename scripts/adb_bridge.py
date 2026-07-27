@@ -409,7 +409,14 @@ def poll(cfg: dict):
         if resp.status_code == 401:
             print("[ERR] Token salah. Cek config.json dan TUYA_BRIDGE_TOKEN di .env server.")
             return
-        commands = resp.json()
+        if not resp.text.strip():
+            print(f"[ERR] Server response kosong (HTTP {resp.status_code})")
+            return
+        try:
+            commands = resp.json()
+        except Exception:
+            print(f"[ERR] Server tidak return JSON (HTTP {resp.status_code}): {resp.text[:200]}")
+            return
     except Exception as e:
         print(f"[ERR] Tidak bisa reach server: {e}")
         return
@@ -427,6 +434,11 @@ def poll(cfg: dict):
             )
         except Exception:
             pass
+        # Langsung kabarin server status terbaru setelah command dieksekusi
+        # Kalau gagal (device tidak bisa dijangkau), kirim on=False ke kasir
+        raw_id  = cmd["device_id"]
+        tuya_id = raw_id[len("tuya:"):] if raw_id.startswith("tuya:") else raw_id
+        push_status(cfg, [{"device_id": tuya_id, "on": bool(cmd["switch"]) if ok else False}])
 
     threads = [threading.Thread(target=_run, args=(cmd,), daemon=True) for cmd in commands]
     for t in threads:

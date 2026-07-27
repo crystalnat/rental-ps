@@ -1,2 +1,2 @@
 @echo off
-start "" pythonw.exe "%~dp0adb_bridge.py"
+wscript //nologo "%~dp0start_bridge_silent.vbs"

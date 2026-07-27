@@ -1,39 +1,103 @@
 {
-    "timestamp": 1775373532.3507369,
+    "timestamp": 1783331925.8360035,
     "devices": [
         {
             "id": "a34e6cef962d8dcb708db0",
-            "ip": "10.32.168.237",
+            "ip": "192.168.1.53",
             "active": 2,
             "encrypt": true,
             "productKey": "keyjnuy4s3kre7m7",
             "token": true,
             "wf_cfg": true,
             "clientLink": 2,
-            "name": "T34-Smart Plug+",
-            "key": "8ZbBprc./!p@kim`",
+            "name": "",
+            "key": "",
             "mac": "",
             "ability": 0,
             "dev_type": "default",
-            "err": "",
-            "type": "default",
-            "dps": {
-                "dps": {
-                    "1": false,
-                    "9": 0,
-                    "21": 0,
-                    "22": 0,
-                    "23": 2343,
-                    "24": 1,
-                    "29": 0,
-                    "38": "memory",
-                    "42": "",
-                    "43": "",
-                    "44": "AAAC"
-                }
-            },
             "origin": "broadcast",
             "ver": "3.5"
+        },
+        {
+            "id": "a3872dee7163d23891maxc",
+            "name": "PS-01 (Tv 1)",
+            "key": "/N<Iy)ir5+P7SzBe",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a352156730ec47fac3k5ra",
+            "name": "PS-02 (Tv 2)",
+            "key": "cU0dLcUqPU|);#2:",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a36a4ee71601bf8ee13fgx",
+            "name": "PS-03 (Tv 3)",
+            "key": "qAyGMj[+*rx/2`YG",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a38f9f9a619c509501yuaw",
+            "name": "PS-04 (Tv 4)",
+            "key": "I]>4!Q;(q];K$<4U",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a375820766567ff87bwk0j",
+            "name": "PS-05 VIP (Tv 5)",
+            "key": "eELP-++<X7/Pxn/t",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a3fc18e38c3f39052ectju",
+            "name": "PS-06 VIP (Tv 6)",
+            "key": "wuzt?}O*`^?X3oA_",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a3b70869560d433ae4qfim",
+            "name": "PS-07 VIP (Tv 7)",
+            "key": "Gq7wX;&uh+JOwBrI",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a3251604593289f48bq0x4",
+            "name": "PS-08 (Tv 8)",
+            "key": "dbtMd5'i~d*$Op2<",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
+        },
+        {
+            "id": "a3741c4cf1f13d5ff2bkbr",
+            "name": "PS-09 (Tv 9)",
+            "key": ".[><b@.DpxQ*1v?o",
+            "ip": "",
+            "origin": "cloud",
+            "ver": "3.5",
+            "mac": ""
         }
     ]
 }

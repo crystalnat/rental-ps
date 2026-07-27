@@ -61,7 +61,10 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const selectedFloorIndex = ref(0)
-const selectedTable = ref<FloorTable | null>(null)
+const selectedTableId = ref<number | null>(null)
+const selectedTable = computed(() =>
+    currentFloor.value?.tables.find(t => t.id === selectedTableId.value) ?? null
+)
 const viewportRef = ref<HTMLElement | null>(null)
 const { width: viewportW, height: viewportH } = useElementSize(viewportRef)
 
@@ -114,7 +117,7 @@ function zoomFit() {
 }
 
 function selectTable(table: FloorTable) {
-    selectedTable.value = selectedTable.value?.id === table.id ? null : table
+    selectedTableId.value = selectedTableId.value === table.id ? null : table.id
 }
 
 function toggleTuya(table: FloorTable) {
@@ -136,21 +139,27 @@ function stopRental(table: FloorTable) {
 
 function close() {
     emit('update:open', false)
-    selectedTable.value = null
+    selectedTableId.value = null
     selectedOrderDetail.value = null
 }
 
 const now = ref(new Date())
 let timerInterval: any = null
+let statusPollInterval: any = null
 
 onMounted(() => {
     timerInterval = setInterval(() => {
         now.value = new Date()
     }, 1000)
+    // Poll status Tuya tiap 2 detik supaya kasir otomatis update ON/OFF
+    statusPollInterval = setInterval(() => {
+        router.reload({ only: ['floor_plan'] })
+    }, 2000)
 })
 
 onBeforeUnmount(() => {
     if (timerInterval) clearInterval(timerInterval)
+    if (statusPollInterval) clearInterval(statusPollInterval)
 })
 
 function getRemainingTime(order: TableOrder) {
@@ -309,7 +318,7 @@ const statusLabels: Record<string, string> = {
                             :key="f.id"
                             :variant="selectedFloorIndex === i ? 'default' : 'outline'"
                             size="sm"
-                            @click="selectedFloorIndex = i; selectedTable = null"
+                            @click="selectedFloorIndex = i; selectedTableId = null"
                         >
                             {{ f.name }}
                         </Button>

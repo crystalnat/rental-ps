@@ -1,5 +1,5 @@
 {
-  "server_url": "http://192.168.1.85:8000",
+  "server_url": "https://spodurentiga.com",
   "store_id": "1",
   "token": "rental123secret",
   "poll_interval": 2,
