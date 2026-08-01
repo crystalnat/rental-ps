@@ -28,7 +28,6 @@ import {
     TrendingDown,
     Wallet,
     Package,
-    Calendar,
     Search,
     Store,
     ChevronDown,
@@ -459,26 +458,20 @@ function exportPdf() {
                 <CardContent class="p-4 md:p-6 pt-0">
                     <div class="flex flex-col lg:flex-row lg:items-end gap-4">
                         <div class="w-full lg:w-auto space-y-1.5">
-                            <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            <Label class="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 Periode Laporan
                                 <span v-if="isLoading" class="ml-2 normal-case text-primary">memuat...</span>
                             </Label>
                             <div class="flex items-center gap-2">
-                                <div class="relative flex-1 lg:w-40 group">
-                                    <Calendar class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                    <Input v-model="filterState.date_from" type="date" class="h-10 pl-9 font-medium" @change="applyFilters" />
-                                </div>
+                                <Input v-model="filterState.date_from" type="date" class="h-10 flex-1 lg:w-36 font-medium" @change="applyFilters" />
                                 <span class="text-muted-foreground font-black">/</span>
-                                <div class="relative flex-1 lg:w-40 group">
-                                    <Calendar class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                    <Input v-model="filterState.date_to" type="date" class="h-10 pl-9 font-medium" @change="applyFilters" />
-                                </div>
+                                <Input v-model="filterState.date_to" type="date" class="h-10 flex-1 lg:w-36 font-medium" @change="applyFilters" />
                             </div>
                         </div>
 
                         <div class="flex flex-wrap items-end gap-4 lg:ml-auto">
                             <div class="space-y-1.5" v-if="hasData">
-                                <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unduh Excel</Label>
+                                <Label class="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unduh Excel</Label>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel lengkap">
                                         <FileSpreadsheet class="h-4 w-4 mr-2" /> Lengkap
@@ -498,11 +491,12 @@ function exportPdf() {
                             </div>
 
                             <div class="space-y-1.5" v-if="hasData">
-                                <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cetak</Label>
-
-                                <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">
-                                    <Printer class="h-4 w-4 mr-2" /> PDF
-                                </Button>
+                                <Label class="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cetak</Label>
+                                <div class="flex items-center gap-2">
+                                    <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">
+                                        <Printer class="h-4 w-4 mr-2" /> PDF
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
