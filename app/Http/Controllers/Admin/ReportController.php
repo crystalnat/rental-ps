@@ -57,8 +57,9 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'slug']);
 
-        $dateFrom = $request->date_from ?? now()->startOfMonth()->toDateString();
-        $dateTo = $request->date_to ?? now()->toDateString();
+        // filled() dipakai agar input tanggal kosong tidak lolos sebagai string kosong ke query
+        $dateFrom = $request->filled('date_from') ? $request->date_from : now()->startOfMonth()->toDateString();
+        $dateTo = $request->filled('date_to') ? $request->date_to : now()->toDateString();
 
         // === RINGKASAN KESELURUHAN ===
         $overall = $this->buildOverallSummary($storeIds, $dateFrom, $dateTo);

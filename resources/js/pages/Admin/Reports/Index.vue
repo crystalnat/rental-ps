@@ -261,7 +261,7 @@ function applyFilters() {
     router.get('/admin/reports', {
         date_from: filterState.value.date_from || undefined,
         date_to: filterState.value.date_to || undefined,
-    }, { preserveState: true })
+    }, { preserveScroll: true })
 }
 
 function viewCashier(cashierId: number | null) {
