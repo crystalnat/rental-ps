@@ -321,15 +321,111 @@ function withDetail(callback: () => void) {
     })
 }
 
+// xlsx-js-style: fork SheetJS dengan dukungan styling, API-nya identik
 function withXlsx(callback: () => void) {
     if (!(window as any).XLSX) {
         const script = document.createElement('script')
-        script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+        script.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js'
         script.onload = () => callback()
         document.head.appendChild(script)
     } else {
         callback()
     }
+}
+
+const SHEET_ACCENTS: Record<string, string> = {
+    default: '166534',
+    rental: '1D4ED8',
+    fnb: 'B45309',
+}
+
+const CURRENCY_FORMAT = '"Rp"#,##0'
+const THIN_BORDER = { style: 'thin', color: { rgb: 'D9D9D9' } }
+
+interface SheetStyleOptions {
+    accent?: string
+    titleRows?: number[]
+    headerRows?: number[]
+    boldRows?: number[]
+    currencyColumns?: number[]
+}
+
+/**
+ * Susun worksheet sekaligus styling-nya. Struktur kolom dan baris tidak diubah,
+ * hanya tampilan: warna header, format rupiah, lebar kolom, dan garis tabel.
+ */
+function makeStyledSheet(rows: any[][], options: SheetStyleOptions = {}) {
+    const XLSX = (window as any).XLSX
+    const accent = options.accent ?? SHEET_ACCENTS.default
+    const titleRows = options.titleRows ?? []
+    const headerRows = options.headerRows ?? []
+    const boldRows = options.boldRows ?? []
+    const currencyColumns = options.currencyColumns ?? []
+
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    const columnCount = Math.max(...rows.map(r => r.length), 1)
+
+    ws['!cols'] = Array.from({ length: columnCount }, (_, col) => {
+        const longest = rows.reduce((max, row) => {
+            const value = row[col]
+            const length = value === null || value === undefined ? 0 : String(value).length
+            return Math.max(max, length)
+        }, 10)
+        return { wch: Math.min(longest + 4, 42) }
+    })
+
+    rows.forEach((row, rowIndex) => {
+        for (let col = 0; col < columnCount; col++) {
+            const address = XLSX.utils.encode_cell({ r: rowIndex, c: col })
+            const cell = ws[address]
+            if (!cell) continue
+
+            if (titleRows.includes(rowIndex)) {
+                cell.s = { font: { bold: true, sz: 13, color: { rgb: accent } } }
+                continue
+            }
+
+            if (headerRows.includes(rowIndex)) {
+                cell.s = {
+                    font: { bold: true, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: accent } },
+                    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                    border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
+                }
+                continue
+            }
+
+            const isNumeric = typeof cell.v === 'number'
+            cell.s = {
+                font: { bold: boldRows.includes(rowIndex) },
+                fill: boldRows.includes(rowIndex) ? { fgColor: { rgb: 'F2F2F2' } } : undefined,
+                alignment: { horizontal: isNumeric ? 'right' : 'left', vertical: 'center' },
+                border: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
+            }
+            if (isNumeric && currencyColumns.includes(col)) {
+                cell.z = CURRENCY_FORMAT
+            } else if (isNumeric) {
+                cell.z = '#,##0'
+            }
+        }
+    })
+
+    // Header dibekukan agar tetap terlihat saat menggulir daftar transaksi yang panjang
+    const firstHeaderRow = headerRows.length ? Math.min(...headerRows) : -1
+    if (firstHeaderRow >= 0) {
+        ws['!freeze'] = { xSplit: 0, ySplit: firstHeaderRow + 1 }
+        // Autofilter hanya untuk sheet berisi satu tabel, bukan sheet multi-bagian
+        if (headerRows.length === 1) {
+            ws['!autofilter'] = {
+                ref: XLSX.utils.encode_range(
+                    { r: firstHeaderRow, c: 0 },
+                    { r: rows.length - 1, c: columnCount - 1 },
+                ),
+            }
+        }
+    }
+
+    return ws
 }
 
 function buildSegmentXlsx(segmentKey: string) {
@@ -348,20 +444,34 @@ function buildSegmentXlsx(segmentKey: string) {
         ["Item Terjual (Qty)", segment.qty],
         ["Jumlah Transaksi", segment.order_count],
     ]
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Ringkasan")
+    const accent = SHEET_ACCENTS[segment.key] ?? SHEET_ACCENTS.default
+    XLSX.utils.book_append_sheet(wb, makeStyledSheet(summaryData, {
+        accent,
+        titleRows: [0],
+        boldRows: [2, 3, 4],
+        currencyColumns: [1],
+    }), "Ringkasan")
 
     const productData: any[][] = [["Nama Produk", "Kategori", "Terjual (Qty)", "Omzet", "HPP", "Laba Kotor"]]
     segment.products.forEach(p => productData.push([
         p.product_name, p.category_name, p.total_qty, p.total_amount, p.total_hpp, p.gross_profit,
     ]))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(productData), "Kinerja Produk")
+    XLSX.utils.book_append_sheet(wb, makeStyledSheet(productData, {
+        accent,
+        headerRows: [0],
+        currencyColumns: [3, 4, 5],
+    }), "Kinerja Produk")
 
     const detailData: any[][] = [["Kode Order", "Tanggal & Waktu", "Toko", "Kasir", "Kategori", "Produk", "Qty", "Harga Satuan", "Subtotal"]]
     segment.orders.forEach(o => detailData.push([
         o.order_code, o.created_at, o.store_name, o.cashier_name || '-', o.category_name,
         o.product_name, o.quantity, o.unit_price, o.subtotal,
     ]))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailData), "Rincian Penjualan")
+    XLSX.utils.book_append_sheet(wb, makeStyledSheet(detailData, {
+        accent,
+        headerRows: [0],
+        currencyColumns: [7, 8],
+    }), "Rincian Penjualan")
 
     XLSX.writeFile(wb, `laporan-${segmentKey}-${props.date_from}-sd-${props.date_to}.xlsx`)
 }
@@ -378,7 +488,12 @@ function buildXlsx() {
         ["Total Keseluruhan", props.overall.income, props.overall.hpp, props.overall.gross_profit, props.overall.expenses, props.overall.net, props.overall.order_count]
     ]
     props.per_store.forEach(s => ws1_data.push([s.name, s.income, s.hpp, s.gross_profit, s.expenses, s.net, s.order_count]))
-    const ws1 = XLSX.utils.aoa_to_sheet(ws1_data)
+    const ws1 = makeStyledSheet(ws1_data, {
+        titleRows: [0],
+        headerRows: [2],
+        boldRows: [3],
+        currencyColumns: [1, 2, 3, 4, 5],
+    })
     XLSX.utils.book_append_sheet(wb, ws1, "Ringkasan Toko")
 
     // 2. Penjualan Harian (Daily Sales)
@@ -386,13 +501,13 @@ function buildXlsx() {
     props.overall.chart_sales.labels.forEach((label, i) => {
         wsDaily_data.push([label, props.overall.chart_sales.data[i]])
     })
-    const wsDaily = XLSX.utils.aoa_to_sheet(wsDaily_data)
+    const wsDaily = makeStyledSheet(wsDaily_data, { headerRows: [0], currencyColumns: [1] })
     XLSX.utils.book_append_sheet(wb, wsDaily, "Penjualan Harian")
 
     // 3. Kinerja Produk (Top Products)
     const ws2_data: any[][] = [["Nama Produk", "Terjual (Qty)", "Total Omzet"]]
     props.overall.top_products.forEach(p => ws2_data.push([p.product_name, p.total_qty, p.total_amount]))
-    const ws2 = XLSX.utils.aoa_to_sheet(ws2_data)
+    const ws2 = makeStyledSheet(ws2_data, { headerRows: [0], currencyColumns: [2] })
     XLSX.utils.book_append_sheet(wb, ws2, "Kinerja Produk")
 
     // 4. Breakdown Tipe & Pembayaran
@@ -402,11 +517,16 @@ function buildXlsx() {
     ]
     props.overall.sales_by_type.forEach(t => wsBreakdown_data.push([t.label, t.count, t.total]))
     wsBreakdown_data.push([""])
+    const paymentTitleRow = wsBreakdown_data.length
     wsBreakdown_data.push(["RINGKASAN METODE PEMBAYARAN"])
     wsBreakdown_data.push(["Metode", "Total Transaksi", "Total Pendapatan"])
     props.overall.sales_by_payment.forEach(p => wsBreakdown_data.push([p.label, p.count, p.total]))
-    
-    const wsBreakdown = XLSX.utils.aoa_to_sheet(wsBreakdown_data)
+
+    const wsBreakdown = makeStyledSheet(wsBreakdown_data, {
+        titleRows: [0, paymentTitleRow],
+        headerRows: [1, paymentTitleRow + 1],
+        currencyColumns: [2],
+    })
     XLSX.utils.book_append_sheet(wb, wsBreakdown, "Rincian Transaksi")
 
     // 5. Daftar Transaksi (Itemized Orders with Date/Time)
@@ -426,7 +546,11 @@ function buildXlsx() {
             o.final_amount
         ])
     })
-    const wsOrders = XLSX.utils.aoa_to_sheet(wsOrders_data)
+    const wsOrders = makeStyledSheet(wsOrders_data, {
+        titleRows: [0],
+        headerRows: [2],
+        currencyColumns: [6],
+    })
     XLSX.utils.book_append_sheet(wb, wsOrders, "Daftar Transaksi")
 
     XLSX.writeFile(wb, `laporan-pos-lengkap-${new Date().toISOString().slice(0, 10)}.xlsx`)
