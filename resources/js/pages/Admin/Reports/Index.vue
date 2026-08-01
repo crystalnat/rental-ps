@@ -73,6 +73,39 @@ interface SalesByPayment {
     total: number
 }
 
+interface SegmentProduct {
+    product_name: string
+    category_name: string
+    total_qty: number
+    total_amount: number
+    total_hpp: number
+    gross_profit: number
+}
+
+interface SegmentOrderItem {
+    order_code: string
+    created_at: string
+    store_name: string
+    cashier_name: string | null
+    category_name: string
+    product_name: string
+    quantity: number
+    unit_price: number
+    subtotal: number
+}
+
+interface SalesSegment {
+    key: string
+    label: string
+    qty: number
+    income: number
+    hpp: number
+    gross_profit: number
+    order_count: number
+    products: SegmentProduct[]
+    orders: SegmentOrderItem[]
+}
+
 interface ExpenseCategoryDetail {
     category: string
     category_label: string
@@ -114,6 +147,7 @@ interface OverallReport {
     sales_by_type: SalesByType[]
     sales_by_payment: SalesByPayment[]
     expense_by_category_detail: ExpenseCategoryDetail[]
+    segments: SalesSegment[]
     orders: Array<{
         order_code: string
         store_name: string
@@ -247,14 +281,56 @@ const hasData = computed(() =>
 
 
 function exportXlsx() {
+    withXlsx(buildXlsx)
+}
+
+function exportSegmentXlsx(segmentKey: string) {
+    withXlsx(() => buildSegmentXlsx(segmentKey))
+}
+
+function withXlsx(callback: () => void) {
     if (!(window as any).XLSX) {
         const script = document.createElement('script')
         script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
-        script.onload = () => buildXlsx()
+        script.onload = () => callback()
         document.head.appendChild(script)
     } else {
-        buildXlsx()
+        callback()
     }
+}
+
+function buildSegmentXlsx(segmentKey: string) {
+    const segment = props.overall.segments?.find(s => s.key === segmentKey)
+    if (!segment) return
+
+    const XLSX = (window as any).XLSX
+    const wb = XLSX.utils.book_new()
+
+    const summaryData: any[][] = [
+        [`LAPORAN ${segment.label.toUpperCase()}`, `Periode: ${props.date_from} s/d ${props.date_to}`],
+        [""],
+        ["Total Omzet", segment.income],
+        ["Total HPP (Modal)", segment.hpp],
+        ["Laba Kotor", segment.gross_profit],
+        ["Item Terjual (Qty)", segment.qty],
+        ["Jumlah Transaksi", segment.order_count],
+    ]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Ringkasan")
+
+    const productData: any[][] = [["Nama Produk", "Kategori", "Terjual (Qty)", "Omzet", "HPP", "Laba Kotor"]]
+    segment.products.forEach(p => productData.push([
+        p.product_name, p.category_name, p.total_qty, p.total_amount, p.total_hpp, p.gross_profit,
+    ]))
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(productData), "Kinerja Produk")
+
+    const detailData: any[][] = [["Kode Order", "Tanggal & Waktu", "Toko", "Kasir", "Kategori", "Produk", "Qty", "Harga Satuan", "Subtotal"]]
+    segment.orders.forEach(o => detailData.push([
+        o.order_code, o.created_at, o.store_name, o.cashier_name || '-', o.category_name,
+        o.product_name, o.quantity, o.unit_price, o.subtotal,
+    ]))
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailData), "Rincian Penjualan")
+
+    XLSX.writeFile(wb, `laporan-${segmentKey}-${props.date_from}-sd-${props.date_to}.xlsx`)
 }
 
 function buildXlsx() {
@@ -371,6 +447,17 @@ function exportPdf() {
                             <div class="flex items-center gap-2 border-l pl-2 ml-1" v-if="hasData">
                                 <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel">
                                     <FileSpreadsheet class="h-4 w-4 mr-2" /> XLSX
+                                </Button>
+
+                                <Button
+                                    v-for="segment in overall.segments"
+                                    :key="segment.key"
+                                    variant="outline"
+                                    class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
+                                    :title="`Export Excel ${segment.label}`"
+                                    @click="exportSegmentXlsx(segment.key)"
+                                >
+                                    <FileSpreadsheet class="h-4 w-4 mr-2" /> {{ segment.label }}
                                 </Button>
 
                                 <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">

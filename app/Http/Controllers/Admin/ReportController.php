@@ -17,6 +17,16 @@ use Inertia\Response;
 
 class ReportController extends Controller
 {
+    private const SEGMENT_RENTAL = 'rental';
+    private const SEGMENT_FNB = 'fnb';
+
+    private const SEGMENT_LABELS = [
+        self::SEGMENT_RENTAL => 'Rental PS',
+        self::SEGMENT_FNB    => 'Makanan & Minuman',
+    ];
+
+    private const RENTAL_CATEGORY_KEYWORDS = ['rental', 'sewa', 'ps', 'playstation', 'billing', 'konsol'];
+
     private const EXPENSE_CATEGORY_LABELS = [
         'purchase'    => 'Pembelian',
         'supplies'    => 'Perlengkapan',
@@ -143,6 +153,7 @@ class ReportController extends Controller
             'sales_by_payment' => $this->buildSalesByPaymentForStores($storeIds, $dateFrom, $dateTo),
             'expense_by_category_detail' => $this->buildExpenseByCategoryDetail($storeIds, $dateFrom, $dateTo),
             'orders' => $this->buildOrderList($storeIds, $dateFrom, $dateTo),
+            'segments' => $this->buildSegmentSales($storeIds, $dateFrom, $dateTo),
         ];
     }
 
@@ -166,7 +177,144 @@ class ReportController extends Controller
             'sales_by_payment' => [],
             'expense_by_category_detail' => [],
             'orders' => [],
+            'segments' => $this->emptySegments(),
         ];
+    }
+
+    private function emptySegments(): array
+    {
+        return collect(self::SEGMENT_LABELS)->map(fn ($label, $key) => [
+            'key'          => $key,
+            'label'        => $label,
+            'qty'          => 0.0,
+            'income'       => 0.0,
+            'hpp'          => 0.0,
+            'gross_profit' => 0.0,
+            'order_count'  => 0,
+            'products'     => [],
+            'orders'       => [],
+        ])->values()->toArray();
+    }
+
+    /**
+     * Pisahkan penjualan jadi dua segmen: rental PS dan makanan/minuman.
+     * Klasifikasi dari flag paket rental atau nama kategori, supaya owner
+     * tidak perlu mengatur apa pun sebelum laporan bisa dipakai.
+     */
+    private function buildSegmentSales(Collection $storeIds, string $dateFrom, string $dateTo): array
+    {
+        if ($storeIds->isEmpty()) {
+            return $this->emptySegments();
+        }
+
+        $rows = OrderItem::query()
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->leftJoin('stores', 'orders.store_id', '=', 'stores.id')
+            ->leftJoin('users', 'orders.cashier_id', '=', 'users.id')
+            ->whereIn('orders.store_id', $storeIds)
+            ->where('orders.payment_status', 'paid')
+            ->whereDate('orders.created_at', '>=', $dateFrom)
+            ->whereDate('orders.created_at', '<=', $dateTo)
+            ->orderBy('orders.created_at', 'desc')
+            ->select([
+                'order_items.product_name',
+                'order_items.quantity',
+                'order_items.subtotal',
+                'order_items.unit_price',
+                'order_items.buy_price',
+                'order_items.discount_amount',
+                'products.is_rental_package',
+                'categories.name as category_name',
+                'orders.id as order_id',
+                'orders.order_code',
+                'orders.created_at as order_created_at',
+                'stores.name as store_name',
+                'users.name as cashier_name',
+            ])
+            ->get();
+
+        $segments = [];
+        foreach (self::SEGMENT_LABELS as $key => $label) {
+            $segments[$key] = [
+                'key'          => $key,
+                'label'        => $label,
+                'qty'          => 0.0,
+                'income'       => 0.0,
+                'hpp'          => 0.0,
+                'gross_profit' => 0.0,
+                'order_ids'    => [],
+                'products'     => [],
+                'orders'       => [],
+            ];
+        }
+
+        foreach ($rows as $row) {
+            $key = $this->segmentKeyFor($row);
+            $segment = &$segments[$key];
+
+            $qty       = (float) $row->quantity;
+            $subtotal  = (float) $row->subtotal;
+            $hpp       = (float) $row->buy_price * $qty;
+            $profit    = ((float) $row->unit_price - (float) $row->buy_price) * $qty - (float) ($row->discount_amount ?? 0);
+
+            $segment['qty']          += $qty;
+            $segment['income']       += $subtotal;
+            $segment['hpp']          += $hpp;
+            $segment['gross_profit'] += $profit;
+            $segment['order_ids'][$row->order_id] = true;
+
+            $productKey = $row->product_name;
+            if (! isset($segment['products'][$productKey])) {
+                $segment['products'][$productKey] = [
+                    'product_name'  => $row->product_name,
+                    'category_name' => $row->category_name ?? 'Tanpa Kategori',
+                    'total_qty'     => 0.0,
+                    'total_amount'  => 0.0,
+                    'total_hpp'     => 0.0,
+                    'gross_profit'  => 0.0,
+                ];
+            }
+            $segment['products'][$productKey]['total_qty']    += $qty;
+            $segment['products'][$productKey]['total_amount'] += $subtotal;
+            $segment['products'][$productKey]['total_hpp']    += $hpp;
+            $segment['products'][$productKey]['gross_profit'] += $profit;
+
+            $segment['orders'][] = [
+                'order_code'    => $row->order_code,
+                'created_at'    => \Carbon\Carbon::parse($row->order_created_at)->format('Y-m-d H:i:s'),
+                'store_name'    => $row->store_name,
+                'cashier_name'  => $row->cashier_name,
+                'category_name' => $row->category_name ?? 'Tanpa Kategori',
+                'product_name'  => $row->product_name,
+                'quantity'      => $qty,
+                'unit_price'    => (float) $row->unit_price,
+                'subtotal'      => $subtotal,
+            ];
+            unset($segment);
+        }
+
+        return collect($segments)->map(function (array $segment) {
+            $segment['order_count'] = count($segment['order_ids']);
+            $segment['products'] = collect($segment['products'])->sortByDesc('total_qty')->values()->toArray();
+            unset($segment['order_ids']);
+            return $segment;
+        })->values()->toArray();
+    }
+
+    private function segmentKeyFor($row): string
+    {
+        if ($row->is_rental_package) {
+            return self::SEGMENT_RENTAL;
+        }
+        $category = strtolower((string) $row->category_name);
+        foreach (self::RENTAL_CATEGORY_KEYWORDS as $keyword) {
+            if ($category !== '' && str_contains($category, $keyword)) {
+                return self::SEGMENT_RENTAL;
+            }
+        }
+        return self::SEGMENT_FNB;
     }
 
     private function grossProfitForStores(Collection $storeIds, string $dateFrom, string $dateTo): float
