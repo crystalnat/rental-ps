@@ -148,6 +148,7 @@ interface OverallReport {
     sales_by_payment: SalesByPayment[]
     expense_by_category_detail: ExpenseCategoryDetail[]
     segments: SalesSegment[]
+    has_detail: boolean
     orders: Array<{
         order_code: string
         store_name: string
@@ -166,8 +167,6 @@ const props = defineProps<{
     overall: OverallReport
     per_store: StoreReport[]
 }>()
-
-const FILTER_DEBOUNCE_MS = 500
 
 const filterState = ref({
     date_from: props.date_from ?? '',
@@ -259,20 +258,24 @@ function makeChartByStoreConfig(labels: string[], data: number[], color: string)
     }
 }
 
+const isLoading = ref(false)
+
+// preserveState menjaga input tanggal tidak di-remount, supaya date picker tidak tertutup paksa
 function applyFilters() {
+    if (filterState.value.date_from === props.date_from && filterState.value.date_to === props.date_to) {
+        return
+    }
     router.get('/admin/reports', {
         date_from: filterState.value.date_from || undefined,
         date_to: filterState.value.date_to || undefined,
-    }, { preserveScroll: true })
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onStart: () => { isLoading.value = true },
+        onFinish: () => { isLoading.value = false },
+    })
 }
-
-// Debounce agar mengganti tanggal awal lalu tanggal akhir hanya memicu satu request
-let filterTimer: ReturnType<typeof setTimeout> | undefined
-watch(() => [filterState.value.date_from, filterState.value.date_to], ([from, to]) => {
-    if (from === props.date_from && to === props.date_to) return
-    clearTimeout(filterTimer)
-    filterTimer = setTimeout(applyFilters, FILTER_DEBOUNCE_MS)
-})
 
 function viewCashier(cashierId: number | null) {
     if (cashierId) router.visit(`/admin/users/${cashierId}`)
@@ -291,11 +294,32 @@ const hasData = computed(() =>
 
 
 function exportXlsx() {
-    withXlsx(buildXlsx)
+    withDetail(() => withXlsx(buildXlsx))
 }
 
 function exportSegmentXlsx(segmentKey: string) {
-    withXlsx(() => buildSegmentXlsx(segmentKey))
+    withDetail(() => withXlsx(() => buildSegmentXlsx(segmentKey)))
+}
+
+// Rincian per item tidak ikut saat halaman dimuat, jadi diambil dulu sebelum menyusun file
+function withDetail(callback: () => void) {
+    if (props.overall.has_detail) {
+        callback()
+        return
+    }
+    isLoading.value = true
+    router.reload({
+        data: {
+            date_from: filterState.value.date_from || undefined,
+            date_to: filterState.value.date_to || undefined,
+            detail: 1,
+        },
+        only: ['overall'],
+        preserveState: true,
+        preserveScroll: true,
+        onSuccess: () => callback(),
+        onFinish: () => { isLoading.value = false },
+    })
 }
 
 function withXlsx(callback: () => void) {
@@ -433,37 +457,48 @@ function exportPdf() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="p-4 md:p-6 pt-0">
-                    <div class="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
-                        <div class="flex-1 space-y-1.5">
-                            <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Periode Laporan</Label>
+                    <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+                        <div class="w-full lg:w-auto space-y-1.5">
+                            <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                Periode Laporan
+                                <span v-if="isLoading" class="ml-2 normal-case text-primary">memuat...</span>
+                            </Label>
                             <div class="flex items-center gap-2">
-                                <div class="relative flex-1 group">
+                                <div class="relative flex-1 lg:w-40 group">
                                     <Calendar class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                    <Input v-model="filterState.date_from" type="date" class="h-10 pl-9 font-medium" />
+                                    <Input v-model="filterState.date_from" type="date" class="h-10 pl-9 font-medium" @change="applyFilters" />
                                 </div>
                                 <span class="text-muted-foreground font-black">/</span>
-                                <div class="relative flex-1 group">
+                                <div class="relative flex-1 lg:w-40 group">
                                     <Calendar class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                    <Input v-model="filterState.date_to" type="date" class="h-10 pl-9 font-medium" />
+                                    <Input v-model="filterState.date_to" type="date" class="h-10 pl-9 font-medium" @change="applyFilters" />
                                 </div>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                            <div class="flex items-center gap-2" v-if="hasData">
-                                <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel">
-                                    <FileSpreadsheet class="h-4 w-4 mr-2" /> XLSX
-                                </Button>
 
-                                <Button
-                                    v-for="segment in overall.segments"
-                                    :key="segment.key"
-                                    variant="outline"
-                                    class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                    :title="`Export Excel ${segment.label}`"
-                                    @click="exportSegmentXlsx(segment.key)"
-                                >
-                                    <FileSpreadsheet class="h-4 w-4 mr-2" /> {{ segment.label }}
-                                </Button>
+                        <div class="flex flex-wrap items-end gap-4 lg:ml-auto">
+                            <div class="space-y-1.5" v-if="hasData">
+                                <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unduh Excel</Label>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel lengkap">
+                                        <FileSpreadsheet class="h-4 w-4 mr-2" /> Lengkap
+                                    </Button>
+
+                                    <Button
+                                        v-for="segment in overall.segments"
+                                        :key="segment.key"
+                                        variant="outline"
+                                        class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
+                                        :title="`Export Excel ${segment.label}`"
+                                        @click="exportSegmentXlsx(segment.key)"
+                                    >
+                                        <FileSpreadsheet class="h-4 w-4 mr-2" /> {{ segment.label }}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-1.5" v-if="hasData">
+                                <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cetak</Label>
 
                                 <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">
                                     <Printer class="h-4 w-4 mr-2" /> PDF

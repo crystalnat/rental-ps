@@ -38,15 +38,16 @@ class ReportController extends Controller
 
     public function index(Request $request): Response
     {
-        return Inertia::render('Admin/Reports/Index', $this->getReportData($request));
+        // Rincian per item hanya dikirim saat diminta (klik export), payload halaman jadi ringan
+        return Inertia::render('Admin/Reports/Index', $this->getReportData($request, $request->boolean('detail')));
     }
 
     public function print(Request $request): Response
     {
-        return Inertia::render('Admin/Reports/Print', $this->getReportData($request));
+        return Inertia::render('Admin/Reports/Print', $this->getReportData($request, true));
     }
 
-    private function getReportData(Request $request): array
+    private function getReportData(Request $request, bool $withDetail = true): array
     {
         $user = Auth::user();
         $storeIds = $this->getStoreIds($user);
@@ -62,7 +63,7 @@ class ReportController extends Controller
         $dateTo = $request->filled('date_to') ? $request->date_to : now()->toDateString();
 
         // === RINGKASAN KESELURUHAN ===
-        $overall = $this->buildOverallSummary($storeIds, $dateFrom, $dateTo);
+        $overall = $this->buildOverallSummary($storeIds, $dateFrom, $dateTo, $withDetail);
 
         // === PER TOKO ===
         $perStore = [];
@@ -118,7 +119,7 @@ class ReportController extends Controller
         return $base->pluck('id');
     }
 
-    private function buildOverallSummary(Collection $storeIds, string $dateFrom, string $dateTo): array
+    private function buildOverallSummary(Collection $storeIds, string $dateFrom, string $dateTo, bool $withDetail = true): array
     {
         if ($storeIds->isEmpty()) {
             return $this->emptyOverall();
@@ -153,8 +154,9 @@ class ReportController extends Controller
             'sales_by_type' => $this->buildSalesByTypeForStores($storeIds, $dateFrom, $dateTo),
             'sales_by_payment' => $this->buildSalesByPaymentForStores($storeIds, $dateFrom, $dateTo),
             'expense_by_category_detail' => $this->buildExpenseByCategoryDetail($storeIds, $dateFrom, $dateTo),
-            'orders' => $this->buildOrderList($storeIds, $dateFrom, $dateTo),
-            'segments' => $this->buildSegmentSales($storeIds, $dateFrom, $dateTo),
+            'orders' => $withDetail ? $this->buildOrderList($storeIds, $dateFrom, $dateTo) : [],
+            'segments' => $this->buildSegmentSales($storeIds, $dateFrom, $dateTo, $withDetail),
+            'has_detail' => $withDetail,
         ];
     }
 
@@ -179,6 +181,7 @@ class ReportController extends Controller
             'expense_by_category_detail' => [],
             'orders' => [],
             'segments' => $this->emptySegments(),
+            'has_detail' => true,
         ];
     }
 
@@ -202,39 +205,46 @@ class ReportController extends Controller
      * Klasifikasi dari flag paket rental atau nama kategori, supaya owner
      * tidak perlu mengatur apa pun sebelum laporan bisa dipakai.
      */
-    private function buildSegmentSales(Collection $storeIds, string $dateFrom, string $dateTo): array
+    private function buildSegmentSales(Collection $storeIds, string $dateFrom, string $dateTo, bool $withDetail = true): array
     {
         if ($storeIds->isEmpty()) {
             return $this->emptySegments();
         }
 
-        $rows = OrderItem::query()
+        $columns = [
+            'order_items.product_name',
+            'order_items.quantity',
+            'order_items.subtotal',
+            'order_items.unit_price',
+            'order_items.buy_price',
+            'order_items.discount_amount',
+            'products.is_rental_package',
+            'categories.name as category_name',
+            'orders.id as order_id',
+        ];
+
+        $query = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('products', 'order_items.product_id', '=', 'products.id')
             ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
-            ->leftJoin('stores', 'orders.store_id', '=', 'stores.id')
-            ->leftJoin('users', 'orders.cashier_id', '=', 'users.id')
             ->whereIn('orders.store_id', $storeIds)
             ->where('orders.payment_status', 'paid')
             ->whereDate('orders.created_at', '>=', $dateFrom)
-            ->whereDate('orders.created_at', '<=', $dateTo)
-            ->orderBy('orders.created_at', 'desc')
-            ->select([
-                'order_items.product_name',
-                'order_items.quantity',
-                'order_items.subtotal',
-                'order_items.unit_price',
-                'order_items.buy_price',
-                'order_items.discount_amount',
-                'products.is_rental_package',
-                'categories.name as category_name',
-                'orders.id as order_id',
+            ->whereDate('orders.created_at', '<=', $dateTo);
+
+        if ($withDetail) {
+            $query->leftJoin('stores', 'orders.store_id', '=', 'stores.id')
+                ->leftJoin('users', 'orders.cashier_id', '=', 'users.id')
+                ->orderBy('orders.created_at', 'desc');
+            $columns = array_merge($columns, [
                 'orders.order_code',
                 'orders.created_at as order_created_at',
                 'stores.name as store_name',
                 'users.name as cashier_name',
-            ])
-            ->get();
+            ]);
+        }
+
+        $rows = $query->select($columns)->get();
 
         $segments = [];
         foreach (self::SEGMENT_LABELS as $key => $label) {
@@ -281,6 +291,11 @@ class ReportController extends Controller
             $segment['products'][$productKey]['total_amount'] += $subtotal;
             $segment['products'][$productKey]['total_hpp']    += $hpp;
             $segment['products'][$productKey]['gross_profit'] += $profit;
+
+            if (! $withDetail) {
+                unset($segment);
+                continue;
+            }
 
             $segment['orders'][] = [
                 'order_code'    => $row->order_code,
