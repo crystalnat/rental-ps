@@ -167,6 +167,8 @@ const props = defineProps<{
     per_store: StoreReport[]
 }>()
 
+const FILTER_DEBOUNCE_MS = 500
+
 const filterState = ref({
     date_from: props.date_from ?? '',
     date_to: props.date_to ?? '',
@@ -263,6 +265,14 @@ function applyFilters() {
         date_to: filterState.value.date_to || undefined,
     }, { preserveScroll: true })
 }
+
+// Debounce agar mengganti tanggal awal lalu tanggal akhir hanya memicu satu request
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => [filterState.value.date_from, filterState.value.date_to], ([from, to]) => {
+    if (from === props.date_from && to === props.date_to) return
+    clearTimeout(filterTimer)
+    filterTimer = setTimeout(applyFilters, FILTER_DEBOUNCE_MS)
+})
 
 function viewCashier(cashierId: number | null) {
     if (cashierId) router.visit(`/admin/users/${cashierId}`)
@@ -439,12 +449,7 @@ function exportPdf() {
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                            <Button class="h-10 font-bold px-4" @click="applyFilters">
-                                <Search class="mr-2 h-4 w-4" />
-                                Cari Data
-                            </Button>
-                            
-                            <div class="flex items-center gap-2 border-l pl-2 ml-1" v-if="hasData">
+                            <div class="flex items-center gap-2" v-if="hasData">
                                 <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel">
                                     <FileSpreadsheet class="h-4 w-4 mr-2" /> XLSX
                                 </Button>
