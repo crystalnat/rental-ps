@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button'
 import TableToolbar from '@/components/TableToolbar.vue'
 import FilterSelect from '@/components/FilterSelect.vue'
 import { TableHeadSortable } from '@/components/ui/table'
-import { Bar, Line } from 'vue-chartjs'
+import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
     BarElement,
+    ArcElement,
     PointElement,
     LineElement,
     Title,
@@ -43,7 +44,7 @@ import {
     Gamepad2,
 } from 'lucide-vue-next'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
 interface StoreItem {
     id: number
@@ -121,6 +122,10 @@ const props = defineProps<{
     per_store_summary: PerStoreSummary[]
     recent_orders: RecentOrder[]
     top_units_by_sales: TopUnit[]
+    chart_expense_by_category: { labels: string[]; amounts: number[] }
+    chart_hourly_sales: { labels: string[]; data: number[]; counts: number[] }
+    chart_payment_mix: { labels: string[]; amounts: number[] }
+    monthly_trend: { labels: string[]; income: number[]; expenses: number[]; net: number[] }
 }>()
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
@@ -197,6 +202,94 @@ const chartIncomeExpenseConfig = computed(() => ({
         },
     ],
 }))
+
+const DONUT_COLORS = [
+    'rgba(239, 68, 68, 0.85)', 'rgba(249, 115, 22, 0.85)', 'rgba(234, 179, 8, 0.85)',
+    'rgba(34, 197, 94, 0.85)', 'rgba(59, 130, 246, 0.85)', 'rgba(139, 92, 246, 0.85)',
+]
+
+const chartExpenseCategoryConfig = computed(() => ({
+    labels: props.chart_expense_by_category.labels,
+    datasets: [{
+        data: props.chart_expense_by_category.amounts,
+        backgroundColor: DONUT_COLORS.slice(0, props.chart_expense_by_category.labels.length),
+        borderWidth: 0,
+    }],
+}))
+
+const chartPaymentMixConfig = computed(() => ({
+    labels: props.chart_payment_mix.labels,
+    datasets: [{
+        data: props.chart_payment_mix.amounts,
+        backgroundColor: DONUT_COLORS.slice(0, props.chart_payment_mix.labels.length),
+        borderWidth: 0,
+    }],
+}))
+
+const chartHourlyConfig = computed(() => ({
+    labels: props.chart_hourly_sales.labels,
+    datasets: [{
+        label: 'Omzet',
+        data: props.chart_hourly_sales.data,
+        backgroundColor: 'rgba(59, 130, 246, 0.6)',
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 1,
+    }],
+}))
+
+const chartMonthlyTrendConfig = computed(() => ({
+    labels: props.monthly_trend.labels,
+    datasets: [
+        {
+            label: 'Pemasukan',
+            data: props.monthly_trend.income,
+            borderColor: 'rgb(16, 185, 129)',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.3,
+        },
+        {
+            label: 'Pengeluaran',
+            data: props.monthly_trend.expenses,
+            borderColor: 'rgb(239, 68, 68)',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.3,
+        },
+        {
+            label: 'Laba Bersih',
+            data: props.monthly_trend.net,
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.3,
+        },
+    ],
+}))
+
+const donutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { position: 'right' as const },
+        tooltip: {
+            callbacks: {
+                label: (ctx: { label: string; raw: number }) => `${ctx.label}: ${formatCurrency(ctx.raw)}`,
+            },
+        },
+    },
+}
+
+const busiestHour = computed(() => {
+    const data = props.chart_hourly_sales.data
+    if (!data.some(v => v > 0)) return null
+    const peakIndex = data.indexOf(Math.max(...data))
+    return {
+        label: props.chart_hourly_sales.labels[peakIndex],
+        amount: data[peakIndex],
+        orders: props.chart_hourly_sales.counts[peakIndex],
+    }
+})
+
+const hasExpenseBreakdown = computed(() => props.chart_expense_by_category.labels.length > 0)
+const hasPaymentMix = computed(() => props.chart_payment_mix.labels.length > 0)
 
 const chartOptions = {
     responsive: true,
@@ -426,6 +519,71 @@ const isCashier = computed(() => usePage().props.auth.user.role === 'cashier')
                     <CardContent>
                         <div class="h-[280px]">
                             <Line :data="chartIncomeExpenseConfig" :options="chartOptions" />
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </section>
+
+        <!-- Analitik lanjutan (Hidden for Cashier) -->
+        <section v-if="!isCashier" class="mb-6">
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground">Analitik</h2>
+            <div class="grid gap-6 lg:grid-cols-2">
+                <Card variant="elevated">
+                    <CardHeader>
+                        <CardTitle>Jam Sibuk</CardTitle>
+                        <CardDescription>
+                            Omzet per jam, 7 hari terakhir
+                            <template v-if="busiestHour">
+                                &middot; puncak {{ busiestHour.label }} ({{ busiestHour.orders }} transaksi)
+                            </template>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="h-[280px]">
+                            <Bar :data="chartHourlyConfig" :options="chartOptions" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card variant="elevated">
+                    <CardHeader>
+                        <CardTitle>Tren 6 Bulan</CardTitle>
+                        <CardDescription>Pemasukan, pengeluaran, dan laba bersih per bulan</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="h-[280px]">
+                            <Line :data="chartMonthlyTrendConfig" :options="chartOptions" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card variant="elevated">
+                    <CardHeader>
+                        <CardTitle>Pengeluaran per Kategori</CardTitle>
+                        <CardDescription>Bulan berjalan</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="h-[280px]">
+                            <Doughnut v-if="hasExpenseBreakdown" :data="chartExpenseCategoryConfig" :options="donutOptions" />
+                            <p v-else class="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                Belum ada pengeluaran bulan ini
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card variant="elevated">
+                    <CardHeader>
+                        <CardTitle>Metode Pembayaran</CardTitle>
+                        <CardDescription>7 hari terakhir</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="h-[280px]">
+                            <Doughnut v-if="hasPaymentMix" :data="chartPaymentMixConfig" :options="donutOptions" />
+                            <p v-else class="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                Belum ada transaksi
+                            </p>
                         </div>
                     </CardContent>
                 </Card>

@@ -155,6 +155,7 @@ class ReportController extends Controller
             'sales_by_payment' => $this->buildSalesByPaymentForStores($storeIds, $dateFrom, $dateTo),
             'expense_by_category_detail' => $this->buildExpenseByCategoryDetail($storeIds, $dateFrom, $dateTo),
             'orders' => $withDetail ? $this->buildOrderList($storeIds, $dateFrom, $dateTo) : [],
+            'expense_list' => $withDetail ? $this->buildExpenseList($storeIds, $dateFrom, $dateTo) : [],
             'segments' => $this->buildSegmentSales($storeIds, $dateFrom, $dateTo, $withDetail),
             'has_detail' => $withDetail,
         ];
@@ -179,6 +180,7 @@ class ReportController extends Controller
             'sales_by_type' => [],
             'sales_by_payment' => [],
             'expense_by_category_detail' => [],
+            'expense_list' => [],
             'orders' => [],
             'segments' => $this->emptySegments(),
             'has_detail' => true,
@@ -610,6 +612,32 @@ class ReportController extends Controller
             'count'  => (int) $r->count,
             'total'  => (float) $r->total,
         ])->values()->toArray();
+    }
+
+    /**
+     * Daftar pengeluaran per baris, sejajar dengan daftar transaksi supaya
+     * setiap keterangan pengeluaran bisa ditelusuri satu per satu di Excel.
+     */
+    private function buildExpenseList(Collection $storeIds, string $dateFrom, string $dateTo): array
+    {
+        return DailyExpense::with(['store', 'creator'])
+            ->whereIn('store_id', $storeIds)
+            ->whereDate('expense_date', '>=', $dateFrom)
+            ->whereDate('expense_date', '<=', $dateTo)
+            ->orderByDesc('expense_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($e) => [
+                'expense_date'   => $e->expense_date?->format('Y-m-d'),
+                'created_at'     => $e->created_at?->format('Y-m-d H:i:s'),
+                'store_name'     => $e->store?->name,
+                'category'       => $e->category,
+                'category_label' => self::EXPENSE_CATEGORY_LABELS[$e->category] ?? $e->category,
+                'description'    => $e->description,
+                'amount'         => (float) $e->amount,
+                'created_by_name'=> $e->creator?->name,
+                'has_receipt'    => (bool) $e->receipt_image,
+            ])->toArray();
     }
 
     private function buildOrderList(Collection $storeIds, string $dateFrom, string $dateTo): array

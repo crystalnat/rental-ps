@@ -14,6 +14,7 @@ use App\Models\StoreInventory;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -66,6 +67,10 @@ class DashboardController extends Controller
             'per_store_summary' => $perStoreSummary,
             'recent_orders' => $recentOrders,
             'top_units_by_sales' => $this->buildTopUnitsBySales($storeIds, $today),
+            'chart_expense_by_category' => $this->buildChartExpenseByCategoryMonth($storeIds),
+            'chart_hourly_sales' => $this->buildChartHourlySales($storeIds, $weekStart, $today),
+            'chart_payment_mix' => $this->buildChartPaymentMix($storeIds, $weekStart, $today),
+            'monthly_trend' => $this->buildMonthlyTrend($storeIds, 6),
         ]);
     }
 
@@ -233,6 +238,139 @@ class DashboardController extends Controller
             'labels'  => $dates->map(fn ($d) => \Carbon\Carbon::parse($d)->format('d M'))->values()->toArray(),
             'income'  => $dates->map(fn ($d) => (float) ($incomeByDay->get($d)?->total ?? 0))->values()->toArray(),
             'expenses'=> $dates->map(fn ($d) => (float) ($expenseByDay->get($d)?->total ?? 0))->values()->toArray(),
+        ];
+    }
+
+    private const EXPENSE_CATEGORY_LABELS = [
+        'purchase'    => 'Pembelian',
+        'supplies'    => 'Perlengkapan',
+        'utilities'   => 'Listrik/Utilities',
+        'maintenance' => 'Pemeliharaan',
+        'salary'      => 'Gaji',
+        'other'       => 'Lainnya',
+    ];
+
+    /**
+     * SQLite (dev) tidak punya HOUR/DATE_FORMAT seperti MySQL (produksi),
+     * jadi ekspresi tanggal dipilih sesuai driver koneksi aktif.
+     */
+    private function sqlHour(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "CAST(strftime('%H', $column) AS INTEGER)"
+            : "HOUR($column)";
+    }
+
+    private function sqlYearMonth(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', $column)"
+            : "DATE_FORMAT($column, '%Y-%m')";
+    }
+
+    private function buildChartExpenseByCategoryMonth(Collection $storeIds): array
+    {
+        $rows = DailyExpense::whereIn('store_id', $storeIds)
+            ->whereMonth('expense_date', now()->month)
+            ->whereYear('expense_date', now()->year)
+            ->selectRaw('category, SUM(amount) as total')
+            ->groupBy('category')
+            ->orderByDesc('total')
+            ->get();
+
+        return [
+            'labels'  => $rows->map(fn ($r) => self::EXPENSE_CATEGORY_LABELS[$r->category] ?? $r->category)->values()->toArray(),
+            'amounts' => $rows->map(fn ($r) => (float) $r->total)->values()->toArray(),
+        ];
+    }
+
+    /**
+     * Distribusi omzet per jam supaya jam sibuk rental terlihat
+     * dan penjadwalan shift bisa mengikuti pola nyata.
+     */
+    private function buildChartHourlySales(Collection $storeIds, string $from, string $to): array
+    {
+        $rows = Order::whereIn('store_id', $storeIds)
+            ->where('payment_status', 'paid')
+            ->whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->selectRaw($this->sqlHour('created_at') . ' as hour, SUM(final_amount) as total, COUNT(*) as count')
+            ->groupBy('hour')
+            ->get()
+            ->keyBy(fn ($r) => (int) $r->hour);
+
+        $hours = range(0, 23);
+
+        return [
+            'labels'  => array_map(fn ($h) => sprintf('%02d:00', $h), $hours),
+            'data'    => array_map(fn ($h) => (float) ($rows->get($h)?->total ?? 0), $hours),
+            'counts'  => array_map(fn ($h) => (int) ($rows->get($h)?->count ?? 0), $hours),
+        ];
+    }
+
+    private function buildChartPaymentMix(Collection $storeIds, string $from, string $to): array
+    {
+        $methodLabels = ['cash' => 'Tunai', 'qris' => 'QRIS', 'bank_transfer' => 'Transfer Bank', 'e_wallet' => 'E-Wallet', 'other' => 'Lainnya'];
+
+        $rows = Order::whereIn('store_id', $storeIds)
+            ->where('payment_status', 'paid')
+            ->whereDate('created_at', '>=', $from)
+            ->whereDate('created_at', '<=', $to)
+            ->selectRaw('payment_method, SUM(final_amount) as total')
+            ->groupBy('payment_method')
+            ->orderByDesc('total')
+            ->get();
+
+        return [
+            'labels'  => $rows->map(fn ($r) => $methodLabels[$r->payment_method ?? ''] ?? ($r->payment_method ?? 'Lainnya'))->values()->toArray(),
+            'amounts' => $rows->map(fn ($r) => (float) $r->total)->values()->toArray(),
+        ];
+    }
+
+    /**
+     * Tren enam bulan terakhir untuk melihat arah pertumbuhan, bukan hanya harian.
+     */
+    private function buildMonthlyTrend(Collection $storeIds, int $months): array
+    {
+        $start = now()->startOfMonth()->subMonths($months - 1);
+
+        $income = Order::whereIn('store_id', $storeIds)
+            ->where('payment_status', 'paid')
+            ->where('created_at', '>=', $start)
+            ->selectRaw($this->sqlYearMonth('created_at') . ' as period, SUM(final_amount) as total')
+            ->groupBy('period')
+            ->get()
+            ->keyBy('period');
+
+        $expenses = DailyExpense::whereIn('store_id', $storeIds)
+            ->where('expense_date', '>=', $start)
+            ->selectRaw($this->sqlYearMonth('expense_date') . ' as period, SUM(amount) as total')
+            ->groupBy('period')
+            ->get()
+            ->keyBy('period');
+
+        $labels = [];
+        $incomeData = [];
+        $expenseData = [];
+        $netData = [];
+
+        for ($i = 0; $i < $months; $i++) {
+            $month = $start->copy()->addMonths($i);
+            $key = $month->format('Y-m');
+            $monthIncome = (float) ($income->get($key)?->total ?? 0);
+            $monthExpense = (float) ($expenses->get($key)?->total ?? 0);
+
+            $labels[] = $month->translatedFormat('M Y');
+            $incomeData[] = $monthIncome;
+            $expenseData[] = $monthExpense;
+            $netData[] = $monthIncome - $monthExpense;
+        }
+
+        return [
+            'labels'   => $labels,
+            'income'   => $incomeData,
+            'expenses' => $expenseData,
+            'net'      => $netData,
         ];
     }
 

@@ -112,6 +112,18 @@ interface ExpenseCategoryDetail {
     count: number
 }
 
+interface ExpenseRow {
+    expense_date: string
+    created_at: string
+    store_name: string
+    category: string
+    category_label: string
+    description: string | null
+    amount: number
+    created_by_name: string | null
+    has_receipt: boolean
+}
+
 interface StoreReport {
     id: number
     name: string
@@ -146,6 +158,7 @@ interface OverallReport {
     sales_by_type: SalesByType[]
     sales_by_payment: SalesByPayment[]
     expense_by_category_detail: ExpenseCategoryDetail[]
+    expense_list: ExpenseRow[]
     segments: SalesSegment[]
     has_detail: boolean
     orders: Array<{
@@ -337,6 +350,7 @@ const SHEET_ACCENTS: Record<string, string> = {
     default: '166534',
     rental: '1D4ED8',
     fnb: 'B45309',
+    expense: 'B91C1C',
 }
 
 const CURRENCY_FORMAT = '"Rp"#,##0'
@@ -552,6 +566,66 @@ function buildXlsx() {
         currencyColumns: [6],
     })
     XLSX.utils.book_append_sheet(wb, wsOrders, "Daftar Transaksi")
+
+    // 6. Rekap Pengeluaran per Kategori
+    const wsExpenseRecap_data: any[][] = [
+        ["REKAP PENGELUARAN PER KATEGORI", `Periode: ${props.date_from} s/d ${props.date_to}`],
+        [""],
+        ["Kategori", "Jumlah Entri", "Total Pengeluaran", "Porsi (%)"],
+    ]
+    const expenseTotal = props.overall.expenses || 0
+    props.overall.expense_by_category_detail.forEach(c => {
+        wsExpenseRecap_data.push([
+            c.category_label,
+            c.count,
+            c.total,
+            expenseTotal ? `${(Math.round((c.total / expenseTotal) * 1000) / 10).toFixed(1)}%` : '0%',
+        ])
+    })
+    const expenseRecapTotalRow = wsExpenseRecap_data.length
+    wsExpenseRecap_data.push([
+        "Total Keseluruhan",
+        props.overall.expense_by_category_detail.reduce((sum, c) => sum + c.count, 0),
+        expenseTotal,
+        expenseTotal ? '100.0%' : '0%',
+    ])
+    const wsExpenseRecap = makeStyledSheet(wsExpenseRecap_data, {
+        accent: SHEET_ACCENTS.expense,
+        titleRows: [0],
+        headerRows: [2],
+        boldRows: [expenseRecapTotalRow],
+        currencyColumns: [2],
+    })
+    XLSX.utils.book_append_sheet(wb, wsExpenseRecap, "Rekap Pengeluaran")
+
+    // 7. Daftar Pengeluaran per baris, disusun sama seperti daftar transaksi
+    const wsExpenses_data: any[][] = [
+        ["DAFTAR PENGELUARAN DETAIL", `Periode: ${props.date_from} s/d ${props.date_to}`],
+        [""],
+        ["Tanggal", "Waktu Input", "Toko", "Kategori", "Keterangan", "Dicatat Oleh", "Bukti", "Jumlah"],
+    ]
+    props.overall.expense_list.forEach(e => {
+        wsExpenses_data.push([
+            e.expense_date,
+            e.created_at,
+            e.store_name,
+            e.category_label,
+            e.description || '-',
+            e.created_by_name || '-',
+            e.has_receipt ? 'Ada' : 'Tidak ada',
+            e.amount,
+        ])
+    })
+    const expenseTotalRow = wsExpenses_data.length
+    wsExpenses_data.push(["Total", "", "", "", "", "", "", expenseTotal])
+    const wsExpenses = makeStyledSheet(wsExpenses_data, {
+        accent: SHEET_ACCENTS.expense,
+        titleRows: [0],
+        headerRows: [2],
+        boldRows: [expenseTotalRow],
+        currencyColumns: [7],
+    })
+    XLSX.utils.book_append_sheet(wb, wsExpenses, "Daftar Pengeluaran")
 
     XLSX.writeFile(wb, `laporan-pos-lengkap-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
