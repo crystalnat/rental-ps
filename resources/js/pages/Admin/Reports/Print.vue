@@ -9,6 +9,10 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
+// Label grafik disamakan dengan font dokumen agar hasil cetak terlihat satu kesatuan
+ChartJS.defaults.font.family = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+ChartJS.defaults.color = '#4b5563'
+
 interface TopProduct { product_name: string; total_qty: number; total_amount: number }
 interface SalesByCashier { cashier_id: number | null; cashier_name: string; order_count: number; total_amount: number }
 interface SalesByType { type: string; label: string; count: number; total: number }
@@ -359,7 +363,7 @@ onMounted(() => {
             <tbody><tr><td class="sec-body-cell">
 
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:500px">
-                    <p style="font-size:12px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:8px;margin-bottom:100px">Lembar Pengesahan</p>
+                    <p class="sig-title">Lembar Pengesahan</p>
                     <div style="display:flex;gap:200px">
                         <div style="text-align:center">
                             <p class="sig-l">Disiapkan Oleh</p>
@@ -387,12 +391,25 @@ onMounted(() => {
    otomatis repeat di setiap halaman print
    ============================================== */
 
+/* Font dipakai yang sudah terpasang di sistem: dokumen cetak tidak boleh
+   bergantung pada unduhan font, kalau gagal muat hasil cetak berubah bentuk.
+   Serif untuk judul (formal, sesuai laporan resmi), sans untuk angka dan tabel. */
+:root {
+    --font-heading: 'Georgia', 'Cambria', 'Times New Roman', serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
 #rpt {
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-body);
     color: #1e293b;
     font-size: 10px;
     background: #f1f5f9;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
 }
+
+/* Angka pada laporan keuangan wajib rata kolom, jadi tabular-nums dipaksa global */
+#rpt table, #rpt td, #rpt th { font-variant-numeric: tabular-nums; }
 
 /* --- SECTIONS = A4 pages, kini pakai display:table --- */
 .sec {
@@ -436,8 +453,8 @@ onMounted(() => {
     padding-bottom: 12px;
     margin-bottom: 24px;
 }
-.sec-hdr-l { font-size: 14px; font-weight: 900; color: #dc2626; letter-spacing: -0.3px; }
-.sec-hdr-r { font-size: 9px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px; }
+.sec-hdr-l { font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: #dc2626; letter-spacing: 0.5px; }
+.sec-hdr-r { font-size: 8.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; }
 
 /* --- FOOTER (in-flow, part of content) --- */
 .sec-ftr {
@@ -445,8 +462,8 @@ onMounted(() => {
     padding-top: 10px;
     border-top: 2px solid #e5e7eb;
     font-size: 8px;
-    font-weight: 700;
-    color: #d1d5db;
+    font-weight: 600;
+    color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 1px;
     text-align: center;
@@ -454,11 +471,11 @@ onMounted(() => {
 
 /* --- COVER --- */
 .cover { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 6px solid #dc2626; padding-bottom: 28px; margin-bottom: 32px; }
-.cover-t { font-size: 40px; font-weight: 900; color: #dc2626; letter-spacing: -2px; line-height: 1; }
-.cover-s { font-size: 11px; color: #6b7280; font-weight: 800; text-transform: uppercase; letter-spacing: 3px; margin-top: 12px; border-left: 4px solid #dc2626; padding-left: 10px; }
-.cover-badge { background: #dc2626; color: white; padding: 8px 20px; font-weight: 900; font-size: 12px; border-radius: 6px; display: inline-block; margin-bottom: 8px; }
-.cover-dt { font-size: 22px; font-weight: 900; color: #1e293b; letter-spacing: -1px; }
-.cover-m { font-size: 9px; color: #9ca3af; font-weight: 700; margin-top: 4px; }
+.cover-t { font-family: var(--font-heading); font-size: 36px; font-weight: 700; color: #dc2626; letter-spacing: -0.5px; line-height: 1.1; }
+.cover-s { font-size: 10px; color: #4b5563; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; margin-top: 12px; border-left: 4px solid #dc2626; padding-left: 10px; }
+.cover-badge { background: #dc2626; color: white; padding: 7px 18px; font-weight: 700; font-size: 11px; letter-spacing: 1px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+.cover-dt { font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: #1e293b; letter-spacing: 0; }
+.cover-m { font-size: 9px; color: #6b7280; font-weight: 600; margin-top: 4px; }
 
 /* --- KPI --- */
 .kpi { border: 2px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; }
@@ -466,9 +483,9 @@ onMounted(() => {
 .kpi-muted { border-color: #e5e7eb; background: #f9fafb; }
 .kpi-dark { border-color: #d1d5db; background: #f3f4f6; }
 .kpi-result { border-color: #a7f3d0; background: #ecfdf5; }
-.kpi-l { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px; }
-.kpi-v { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
-.kpi-n { font-size: 7px; font-weight: 700; color: #9ca3af; margin-top: 4px; }
+.kpi-l { font-size: 7.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #6b7280; margin-bottom: 5px; }
+.kpi-v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.2px; }
+.kpi-n { font-size: 7px; font-weight: 500; color: #9ca3af; margin-top: 4px; }
 
 /* --- COLORS --- */
 .cv-accent { color: #dc2626; }
@@ -478,43 +495,44 @@ onMounted(() => {
 
 /* --- INFO CARDS --- */
 .info-card { border: 2px solid #f3f4f6; border-radius: 8px; padding: 8px 10px; background: #fafafa; }
-.info-lbl { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 2px; }
-.info-val { font-size: 14px; font-weight: 900; font-variant-numeric: tabular-nums; }
-.info-sub { font-size: 7px; font-weight: 700; color: #9ca3af; margin-top: 2px; }
+.info-lbl { font-size: 7.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #6b7280; margin-bottom: 3px; }
+.info-val { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.info-sub { font-size: 7px; font-weight: 500; color: #9ca3af; margin-top: 2px; }
 
 /* --- CHARTS --- */
 .cht { border: 2px dashed #e5e7eb; border-radius: 12px; padding: 10px; background: #fafafa; }
-.cht-t { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af; text-align: center; margin-bottom: 8px; }
+.cht-t { font-size: 7.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #6b7280; text-align: center; margin-bottom: 8px; }
 .cht-a { height: 180px; }
 .cht-a-s { height: 140px; }
 
 /* --- BADGE TITLES --- */
-.badge { font-size: 13px; font-weight: 900; color: white; background: #dc2626; display: inline-block; padding: 5px 14px; border-radius: 5px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+.badge { font-family: var(--font-heading); font-size: 12px; font-weight: 700; color: white; background: #dc2626; display: inline-block; padding: 5px 14px; border-radius: 4px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
 .badge-dark { background: #374151; }
 
 /* --- SUB HEADS --- */
-.sh { font-size: 9px; font-weight: 900; color: #374151; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 8px; }
+.sh { font-size: 8.5px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1.5px solid #d1d5db; padding-bottom: 5px; margin-bottom: 8px; }
 
 /* --- TABLES --- */
 .tb { width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; }
 .tb thead tr { background: #374151; color: #f9fafb; }
-.tb thead th { padding: 7px 10px; font-size: 7px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; text-align: right; border: 1px solid #4b5563; }
-.tb tbody td { padding: 6px 10px; border: 1px solid #f3f4f6; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.tb thead th { padding: 7px 10px; font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; text-align: right; border: 1px solid #4b5563; }
+.tb tbody td { padding: 6px 10px; border: 1px solid #e5e7eb; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
 .tb tbody tr:nth-child(even) { background: #f9fafb; }
-.tb-total td { background: #dc2626 !important; color: white !important; font-weight: 900 !important; }
+.tb-total td { background: #dc2626 !important; color: white !important; font-weight: 700 !important; }
 .tbs thead th { padding: 4px 8px; }
-.tbs tbody td { padding: 3px 8px; font-size: 9px; }
+.tbs tbody td { padding: 4px 8px; font-size: 8.5px; line-height: 1.4; }
 
 /* --- STORE HEADER --- */
 .store-hd { border-bottom: 5px solid #374151; padding-bottom: 14px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
-.store-pre { font-size: 9px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 3px; }
-.store-nm { font-size: 24px; font-weight: 900; color: #dc2626; text-transform: uppercase; letter-spacing: -1px; margin-top: 4px; }
-.store-id { font-size: 9px; font-weight: 800; color: #d1d5db; }
+.store-pre { font-size: 8.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 2.5px; }
+.store-nm { font-family: var(--font-heading); font-size: 22px; font-weight: 700; color: #dc2626; letter-spacing: 0; margin-top: 4px; }
+.store-id { font-size: 8.5px; font-weight: 600; color: #9ca3af; }
 
 /* --- SIGNATURE --- */
-.sig-l { font-size: 9px; font-weight: 800; color: #d1d5db; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 100px; }
-.sig-line { border-bottom: 3px solid #374151; width: 180px; margin: 0 auto 10px; }
-.sig-n { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #374151; }
+.sig-title { font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 5px; margin-bottom: 100px; }
+.sig-l { font-size: 8.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 100px; }
+.sig-line { border-bottom: 1.5px solid #374151; width: 180px; margin: 0 auto 10px; }
+.sig-n { font-family: var(--font-heading); font-size: 10px; font-weight: 700; color: #374151; }
 
 /* --- GRIDS --- */
 .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
