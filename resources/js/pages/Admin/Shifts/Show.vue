@@ -12,7 +12,7 @@ import {
     DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
-import { ArrowLeft, Clock, DollarSign, ShoppingCart, TrendingUp, TrendingDown, AlertCircle, Wallet, CreditCard } from 'lucide-vue-next'
+import { ArrowLeft, Clock, ShoppingCart, TrendingUp, TrendingDown, AlertCircle, Wallet, CreditCard } from 'lucide-vue-next'
 
 interface ShiftDetail {
     id: number
@@ -125,12 +125,12 @@ const paymentMethodLabels: Record<string, string> = {
     <AdminLayout :title="`Shift - ${shift.user_name}`">
         <div class="space-y-6">
             <!-- Header -->
-            <div class="flex items-center justify-between gap-4">
-                <Button variant="ghost" size="sm" @click="goBack">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <Button variant="ghost" size="sm" class="self-start" @click="goBack">
                     <ArrowLeft class="mr-2 h-4 w-4" />
                     Kembali
                 </Button>
-                <Button v-if="shift.status === 'open'" variant="destructive" @click="openCloseDialog">
+                <Button v-if="shift.status === 'open'" variant="destructive" class="w-full sm:w-auto" @click="openCloseDialog">
                     <Clock class="mr-2 h-4 w-4" />
                     Tutup Shift
                 </Button>
@@ -139,52 +139,52 @@ const paymentMethodLabels: Record<string, string> = {
             <!-- Shift Info -->
             <Card>
                 <CardHeader>
-                    <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
                         <CardTitle class="flex items-center gap-2">
-                            <Clock class="h-5 w-5 text-primary" />
+                            <Clock class="h-5 w-5 shrink-0 text-primary" />
                             Detail Shift
                         </CardTitle>
-                        <Badge :variant="shift.status === 'open' ? 'default' : 'secondary'" class="text-sm">
-                            {{ shift.status === 'open' ? '🟢 Masih Buka' : '🔴 Sudah Ditutup' }}
+                        <Badge :variant="shift.status === 'open' ? 'default' : 'secondary'" class="shrink-0 whitespace-nowrap text-sm">
+                            {{ shift.status === 'open' ? 'Masih Buka' : 'Sudah Ditutup' }}
                         </Badge>
                     </div>
-                    <CardDescription>
+                    <CardDescription class="break-words">
                         {{ shift.store_name }} · {{ shift.user_name }}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="rounded-lg border p-4">
-                            <p class="text-xs text-muted-foreground mb-1">Buka</p>
-                            <p class="font-semibold text-sm">{{ shift.opened_at }}</p>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+                        <div class="min-w-0 rounded-lg border p-3 sm:p-4">
+                            <p class="mb-1 text-xs text-muted-foreground">Buka</p>
+                            <p class="text-sm font-semibold break-words">{{ shift.opened_at }}</p>
                         </div>
-                        <div class="rounded-lg border p-4">
-                            <p class="text-xs text-muted-foreground mb-1">Tutup</p>
-                            <p class="font-semibold text-sm">{{ shift.closed_at ?? '— (Masih buka)' }}</p>
+                        <div class="min-w-0 rounded-lg border p-3 sm:p-4">
+                            <p class="mb-1 text-xs text-muted-foreground">Tutup</p>
+                            <p class="text-sm font-semibold break-words">{{ shift.closed_at ?? '— (Masih buka)' }}</p>
                         </div>
-                        <div v-if="shift.scheduled_start" class="rounded-lg border p-4">
-                            <p class="text-xs text-muted-foreground mb-1">Jadwal Shift</p>
-                            <p class="font-semibold text-sm">{{ shift.scheduled_start }} — {{ shift.scheduled_end }}</p>
+                        <div v-if="shift.scheduled_start" class="min-w-0 rounded-lg border p-3 sm:p-4">
+                            <p class="mb-1 text-xs text-muted-foreground">Jadwal Shift</p>
+                            <p class="text-sm font-semibold break-words">{{ shift.scheduled_start }} — {{ shift.scheduled_end }}</p>
                         </div>
-                        <div class="rounded-lg border p-4">
-                            <p class="text-xs text-muted-foreground mb-1">Kas Awal</p>
-                            <p class="font-semibold text-sm">{{ formatCurrency(shift.opening_cash) }}</p>
+                        <div class="min-w-0 rounded-lg border p-3 sm:p-4">
+                            <p class="mb-1 text-xs text-muted-foreground">Kas Awal</p>
+                            <p class="text-sm font-semibold tabular-nums break-words">{{ formatCurrency(shift.opening_cash) }}</p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
             <!-- Financial Summary (only if closed) -->
-            <div v-if="shift.status === 'closed'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div v-if="shift.status === 'closed'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
                 <Card>
                     <CardContent class="pt-6">
                         <div class="flex items-center gap-3">
-                            <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+                            <div class="shrink-0 rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
                                 <TrendingUp class="h-5 w-5 text-green-600" />
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <p class="text-xs text-muted-foreground">Total Penjualan</p>
-                                <p class="text-lg font-bold">{{ formatCurrency(shift.total_sales ?? 0) }}</p>
+                                <p class="text-lg font-bold tabular-nums break-words">{{ formatCurrency(shift.total_sales ?? 0) }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -192,12 +192,12 @@ const paymentMethodLabels: Record<string, string> = {
                 <Card>
                     <CardContent class="pt-6">
                         <div class="flex items-center gap-3">
-                            <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+                            <div class="shrink-0 rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                                 <ShoppingCart class="h-5 w-5 text-blue-600" />
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <p class="text-xs text-muted-foreground">Total Order</p>
-                                <p class="text-lg font-bold">{{ shift.total_orders ?? 0 }}</p>
+                                <p class="text-lg font-bold tabular-nums">{{ shift.total_orders ?? 0 }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -205,12 +205,12 @@ const paymentMethodLabels: Record<string, string> = {
                 <Card>
                     <CardContent class="pt-6">
                         <div class="flex items-center gap-3">
-                            <div class="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
+                            <div class="shrink-0 rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
                                 <TrendingDown class="h-5 w-5 text-orange-600" />
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <p class="text-xs text-muted-foreground">Total Pengeluaran</p>
-                                <p class="text-lg font-bold">{{ formatCurrency(shift.total_expenses ?? 0) }}</p>
+                                <p class="text-lg font-bold tabular-nums break-words">{{ formatCurrency(shift.total_expenses ?? 0) }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -219,7 +219,7 @@ const paymentMethodLabels: Record<string, string> = {
                     <CardContent class="pt-6">
                         <div class="flex items-center gap-3">
                             <div
-                                class="rounded-lg p-2"
+                                class="shrink-0 rounded-lg p-2"
                                 :class="(shift.cash_difference ?? 0) >= 0
                                     ? 'bg-green-100 dark:bg-green-900/30'
                                     : 'bg-red-100 dark:bg-red-900/30'"
@@ -229,10 +229,10 @@ const paymentMethodLabels: Record<string, string> = {
                                     :class="(shift.cash_difference ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
                                 />
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <p class="text-xs text-muted-foreground">Selisih Kas</p>
                                 <p
-                                    class="text-lg font-bold"
+                                    class="text-lg font-bold tabular-nums break-words"
                                     :class="(shift.cash_difference ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
                                 >
                                     {{ (shift.cash_difference ?? 0) >= 0 ? '+' : '' }}{{ formatCurrency(shift.cash_difference ?? 0) }}
@@ -252,64 +252,64 @@ const paymentMethodLabels: Record<string, string> = {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-3">
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-muted-foreground">Kas Awal</span>
-                                <span class="font-medium">{{ formatCurrency(shift.opening_cash) }}</span>
+                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <div class="space-y-3 text-sm sm:text-base">
+                            <div class="flex justify-between gap-3 border-b py-2">
+                                <span class="min-w-0 text-muted-foreground">Kas Awal</span>
+                                <span class="shrink-0 font-medium tabular-nums whitespace-nowrap">{{ formatCurrency(shift.opening_cash) }}</span>
                             </div>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-muted-foreground">+ Penjualan Tunai</span>
-                                <span class="font-medium text-green-600">{{ formatCurrency(shift.total_cash_sales ?? 0) }}</span>
+                            <div class="flex justify-between gap-3 border-b py-2">
+                                <span class="min-w-0 text-muted-foreground">+ Penjualan Tunai</span>
+                                <span class="shrink-0 font-medium text-green-600 tabular-nums whitespace-nowrap">{{ formatCurrency(shift.total_cash_sales ?? 0) }}</span>
                             </div>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-muted-foreground">− Pengeluaran</span>
-                                <span class="font-medium text-red-600">-{{ formatCurrency(shift.total_expenses ?? 0) }}</span>
+                            <div class="flex justify-between gap-3 border-b py-2">
+                                <span class="min-w-0 text-muted-foreground">− Pengeluaran</span>
+                                <span class="shrink-0 font-medium text-red-600 tabular-nums whitespace-nowrap">-{{ formatCurrency(shift.total_expenses ?? 0) }}</span>
                             </div>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-muted-foreground">− Refund Tunai</span>
-                                <span class="font-medium text-red-600">-{{ formatCurrency(shift.total_refunds ?? 0) }}</span>
+                            <div class="flex justify-between gap-3 border-b py-2">
+                                <span class="min-w-0 text-muted-foreground">− Refund Tunai</span>
+                                <span class="shrink-0 font-medium text-red-600 tabular-nums whitespace-nowrap">-{{ formatCurrency(shift.total_refunds ?? 0) }}</span>
                             </div>
-                            <div class="flex justify-between py-2 border-b-2 border-foreground font-bold text-base">
-                                <span>Kas Seharusnya</span>
-                                <span>{{ formatCurrency(shift.expected_cash ?? 0) }}</span>
+                            <div class="flex justify-between gap-3 border-b-2 border-foreground py-2 text-base font-bold">
+                                <span class="min-w-0">Kas Seharusnya</span>
+                                <span class="shrink-0 tabular-nums whitespace-nowrap">{{ formatCurrency(shift.expected_cash ?? 0) }}</span>
                             </div>
-                            <div class="flex justify-between py-2">
-                                <span class="text-muted-foreground">Kas Aktual (dihitung)</span>
-                                <span class="font-bold text-lg">{{ formatCurrency(shift.actual_cash ?? 0) }}</span>
+                            <div class="flex justify-between gap-3 py-2">
+                                <span class="min-w-0 text-muted-foreground">Kas Aktual (dihitung)</span>
+                                <span class="shrink-0 text-lg font-bold tabular-nums whitespace-nowrap">{{ formatCurrency(shift.actual_cash ?? 0) }}</span>
                             </div>
-                            <div class="flex justify-between py-2 rounded-lg bg-muted/50 px-3">
-                                <span class="font-medium">Selisih</span>
+                            <div class="flex justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2">
+                                <span class="min-w-0 font-medium">Selisih</span>
                                 <span
-                                    class="font-bold text-lg"
+                                    class="shrink-0 text-lg font-bold tabular-nums whitespace-nowrap"
                                     :class="(shift.cash_difference ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'"
                                 >
                                     {{ (shift.cash_difference ?? 0) >= 0 ? '+' : '' }}{{ formatCurrency(shift.cash_difference ?? 0) }}
                                 </span>
                             </div>
                         </div>
-                        <div class="space-y-3">
-                            <h4 class="font-medium text-sm text-muted-foreground mb-2">Penjualan Non-Tunai</h4>
-                            <div class="flex justify-between py-2 border-b">
-                                <span class="text-muted-foreground">Total Non-Tunai</span>
-                                <span class="font-medium">{{ formatCurrency(shift.total_non_cash_sales ?? 0) }}</span>
+                        <div class="space-y-3 text-sm sm:text-base">
+                            <h4 class="mb-2 text-sm font-medium text-muted-foreground">Penjualan Non-Tunai</h4>
+                            <div class="flex justify-between gap-3 border-b py-2">
+                                <span class="min-w-0 text-muted-foreground">Total Non-Tunai</span>
+                                <span class="shrink-0 font-medium tabular-nums whitespace-nowrap">{{ formatCurrency(shift.total_non_cash_sales ?? 0) }}</span>
                             </div>
-                            <h4 class="font-medium text-sm text-muted-foreground mt-4 mb-2">Per Metode Pembayaran</h4>
+                            <h4 class="mb-2 mt-4 text-sm font-medium text-muted-foreground">Per Metode Pembayaran</h4>
                             <div
                                 v-for="pb in payment_breakdown"
                                 :key="pb.method"
-                                class="flex justify-between py-2 border-b"
+                                class="flex justify-between gap-3 border-b py-2"
                             >
-                                <span class="flex items-center gap-2">
-                                    <CreditCard class="h-4 w-4 text-muted-foreground" />
-                                    {{ paymentMethodLabels[pb.method] ?? pb.method }}
-                                    <Badge variant="secondary" class="text-xs">{{ pb.count }}×</Badge>
+                                <span class="flex min-w-0 flex-wrap items-center gap-2">
+                                    <CreditCard class="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span class="min-w-0 break-words">{{ paymentMethodLabels[pb.method] ?? pb.method }}</span>
+                                    <Badge variant="secondary" class="shrink-0 text-xs">{{ pb.count }}×</Badge>
                                 </span>
-                                <span class="font-medium">{{ formatCurrency(pb.total) }}</span>
+                                <span class="shrink-0 font-medium tabular-nums whitespace-nowrap">{{ formatCurrency(pb.total) }}</span>
                             </div>
                             <div v-if="shift.notes" class="mt-4 rounded-lg bg-muted/50 p-3">
-                                <p class="text-xs text-muted-foreground mb-1">Catatan</p>
-                                <p class="text-sm">{{ shift.notes }}</p>
+                                <p class="mb-1 text-xs text-muted-foreground">Catatan</p>
+                                <p class="text-sm break-words">{{ shift.notes }}</p>
                             </div>
                         </div>
                     </div>
@@ -331,38 +331,38 @@ const paymentMethodLabels: Record<string, string> = {
                     </div>
 
                     <!-- Desktop: tabel -->
-                    <div v-else class="hidden sm:block overflow-x-auto">
+                    <div v-else class="hidden md:block">
                         <table class="w-full text-sm">
-                            <thead class="text-left text-muted-foreground border-b">
+                            <thead class="border-b text-left text-muted-foreground">
                                 <tr>
                                     <th class="py-2 pr-3 font-medium">Waktu</th>
-                                    <th class="py-2 px-3 font-medium">Keterangan</th>
-                                    <th class="py-2 px-3 font-medium text-right">Masuk</th>
-                                    <th class="py-2 px-3 font-medium text-right">Keluar</th>
-                                    <th class="py-2 pl-3 font-medium text-right">Saldo</th>
+                                    <th class="px-3 py-2 font-medium">Keterangan</th>
+                                    <th class="px-3 py-2 text-right font-medium">Masuk</th>
+                                    <th class="px-3 py-2 text-right font-medium">Keluar</th>
+                                    <th class="py-2 pl-3 text-right font-medium">Saldo</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y">
                                 <tr v-for="(m, i) in cash_movements" :key="i" class="hover:bg-muted/40">
                                     <td class="py-2 pr-3 whitespace-nowrap text-muted-foreground">{{ m.time }}</td>
-                                    <td class="py-2 px-3">
+                                    <td class="px-3 py-2 break-words">
                                         {{ m.label }}
                                         <span v-if="m.ref" class="font-mono text-xs text-muted-foreground">· {{ m.ref }}</span>
                                     </td>
-                                    <td class="py-2 px-3 text-right text-green-600 font-medium whitespace-nowrap">
+                                    <td class="px-3 py-2 text-right font-medium text-green-600 tabular-nums whitespace-nowrap">
                                         {{ m.type === 'in' ? formatCurrency(m.amount) : '—' }}
                                     </td>
-                                    <td class="py-2 px-3 text-right text-red-600 font-medium whitespace-nowrap">
+                                    <td class="px-3 py-2 text-right font-medium text-red-600 tabular-nums whitespace-nowrap">
                                         {{ m.type === 'out' ? '-' + formatCurrency(m.amount) : '—' }}
                                     </td>
-                                    <td class="py-2 pl-3 text-right font-semibold whitespace-nowrap">{{ formatCurrency(m.balance) }}</td>
+                                    <td class="py-2 pl-3 text-right font-semibold tabular-nums whitespace-nowrap">{{ formatCurrency(m.balance) }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <!-- Mobile: list -->
-                    <div v-if="cash_movements.length > 0" class="sm:hidden space-y-2">
+                    <!-- Kartu vertikal untuk layar sempit -->
+                    <div v-if="cash_movements.length > 0" class="space-y-2 md:hidden">
                         <div
                             v-for="(m, i) in cash_movements"
                             :key="i"
@@ -370,21 +370,21 @@ const paymentMethodLabels: Record<string, string> = {
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <p class="text-sm font-medium truncate">{{ m.label }}</p>
-                                    <p class="text-xs text-muted-foreground">
+                                    <p class="truncate text-sm font-medium">{{ m.label }}</p>
+                                    <p class="text-xs text-muted-foreground break-all">
                                         {{ m.time }}<span v-if="m.ref" class="font-mono"> · {{ m.ref }}</span>
                                     </p>
                                 </div>
                                 <span
-                                    class="text-sm font-semibold whitespace-nowrap"
+                                    class="shrink-0 text-sm font-semibold tabular-nums whitespace-nowrap"
                                     :class="m.type === 'in' ? 'text-green-600' : 'text-red-600'"
                                 >
                                     {{ m.type === 'in' ? '+' : '-' }}{{ formatCurrency(m.amount) }}
                                 </span>
                             </div>
-                            <div class="mt-1 flex justify-between text-xs text-muted-foreground">
+                            <div class="mt-1 flex justify-between gap-3 text-xs text-muted-foreground">
                                 <span>Saldo laci</span>
-                                <span class="font-medium text-foreground">{{ formatCurrency(m.balance) }}</span>
+                                <span class="font-medium text-foreground tabular-nums whitespace-nowrap">{{ formatCurrency(m.balance) }}</span>
                             </div>
                         </div>
                     </div>
@@ -408,16 +408,16 @@ const paymentMethodLabels: Record<string, string> = {
                         <div
                             v-for="order in orders"
                             :key="order.id"
-                            class="flex items-center justify-between rounded-lg border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                            class="flex cursor-pointer items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
                             @click="viewOrder(order)"
                         >
-                            <div>
-                                <p class="font-mono text-sm font-medium">{{ order.order_code }}</p>
-                                <p class="text-xs text-muted-foreground">
+                            <div class="min-w-0">
+                                <p class="font-mono text-sm font-medium break-all">{{ order.order_code }}</p>
+                                <p class="text-xs text-muted-foreground break-words">
                                     {{ order.paid_at }} · {{ paymentMethodLabels[order.payment_method] ?? order.payment_method }}
                                 </p>
                             </div>
-                            <span class="font-semibold">{{ formatCurrency(order.final_amount) }}</span>
+                            <span class="shrink-0 font-semibold tabular-nums whitespace-nowrap">{{ formatCurrency(order.final_amount) }}</span>
                         </div>
                     </div>
                 </CardContent>
@@ -426,10 +426,10 @@ const paymentMethodLabels: Record<string, string> = {
 
         <!-- Close Shift Dialog -->
         <Dialog v-model:open="showCloseDialog">
-            <DialogContent class="max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
-                        <Clock class="h-5 w-5 text-destructive" />
+                        <Clock class="h-5 w-5 shrink-0 text-destructive" />
                         Tutup Shift
                     </DialogTitle>
                     <DialogDescription>
@@ -461,9 +461,9 @@ const paymentMethodLabels: Record<string, string> = {
                             class="mt-1"
                         />
                     </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" @click="showCloseDialog = false">Batal</Button>
-                        <Button type="submit" variant="destructive" :disabled="closeProcessing">
+                    <DialogFooter class="flex-col gap-2 sm:flex-row">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" @click="showCloseDialog = false">Batal</Button>
+                        <Button type="submit" variant="destructive" class="w-full sm:w-auto" :disabled="closeProcessing">
                             {{ closeProcessing ? 'Menutup...' : 'Tutup Shift' }}
                         </Button>
                     </DialogFooter>
@@ -473,13 +473,13 @@ const paymentMethodLabels: Record<string, string> = {
 
         <!-- Order Detail Dialog -->
         <Dialog v-model:open="showOrderDialog">
-            <DialogContent class="max-w-md" v-if="selectedOrder">
+            <DialogContent class="w-[95vw] max-w-md" v-if="selectedOrder">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
-                        <ShoppingCart class="h-5 w-5" />
+                        <ShoppingCart class="h-5 w-5 shrink-0" />
                         Detail Transaksi
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription class="break-words">
                         {{ selectedOrder.order_code }} · {{ selectedOrder.paid_at }} · {{ paymentMethodLabels[selectedOrder.payment_method] ?? selectedOrder.payment_method }}
                     </DialogDescription>
                 </DialogHeader>
@@ -495,23 +495,26 @@ const paymentMethodLabels: Record<string, string> = {
                             </thead>
                             <tbody class="divide-y">
                                 <tr v-for="(item, idx) in selectedOrder.items" :key="idx">
-                                    <td class="p-2">{{ item.product_name }}</td>
-                                    <td class="p-2 text-center">{{ item.quantity }} {{ item.unit }}</td>
-                                    <td class="p-2 text-right">{{ formatCurrency(item.subtotal) }}</td>
+                                    <td class="p-2 break-words">{{ item.product_name }}</td>
+                                    <td class="p-2 text-center tabular-nums whitespace-nowrap">{{ item.quantity }} {{ item.unit }}</td>
+                                    <td class="p-2 text-right tabular-nums whitespace-nowrap">{{ formatCurrency(item.subtotal) }}</td>
+                                </tr>
+                                <tr v-if="!selectedOrder.items.length">
+                                    <td colspan="3" class="p-4 text-center text-muted-foreground">Belum ada item.</td>
                                 </tr>
                             </tbody>
-                            <tfoot class="bg-muted/30 font-bold border-t">
+                            <tfoot class="border-t bg-muted/30 font-bold">
                                 <tr>
                                     <td colspan="2" class="p-2">TOTAL</td>
-                                    <td class="p-2 text-right">{{ formatCurrency(selectedOrder.final_amount) }}</td>
+                                    <td class="p-2 text-right tabular-nums whitespace-nowrap">{{ formatCurrency(selectedOrder.final_amount) }}</td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" @click="showOrderDialog = false">Tutup</Button>
-                    <Button @click="router.visit(`/admin/orders/${selectedOrder.id}`)">Buka Halaman Pesanan</Button>
+                <DialogFooter class="flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="showOrderDialog = false">Tutup</Button>
+                    <Button class="w-full sm:w-auto" @click="router.visit(`/admin/orders/${selectedOrder.id}`)">Buka Halaman Pesanan</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -14,7 +14,7 @@ const sidebarOpen = ref(false)
         <!-- Sidebar (desktop always visible, mobile overlay) -->
         <div
             :class="[
-                'fixed inset-0 z-30 bg-black/50 transition-opacity lg:hidden',
+                'fixed inset-0 z-[55] bg-black/50 transition-opacity lg:hidden',
                 sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
             ]"
             @click="sidebarOpen = false"
@@ -22,7 +22,7 @@ const sidebarOpen = ref(false)
 
         <div
             :class="[
-                'fixed inset-y-0 left-0 z-40 transition-transform duration-300 lg:static lg:translate-x-0 print:hidden',
+                'fixed inset-y-0 left-0 z-[60] transition-transform duration-300 lg:static lg:translate-x-0 print:hidden',
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full',
             ]"
         >

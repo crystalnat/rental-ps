@@ -26,7 +26,7 @@ interface ActivityItem {
     link: string | null
 }
 
-const props = defineProps<{
+defineProps<{
     user: UserData
     activities: ActivityItem[]
 }>()
@@ -41,7 +41,7 @@ const roleLabels: Record<string, string> = {
 <template>
     <AdminLayout :title="`Karyawan: ${user.name}`">
         <template #headerActions>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <Link :href="route('admin.users.edit', user.id)">
                     <Button variant="outline" size="sm">
                         <Pencil class="h-4 w-4" />
@@ -61,13 +61,13 @@ const roleLabels: Record<string, string> = {
             <!-- User Info -->
             <Card>
                 <CardHeader>
-                    <div class="flex items-center gap-4">
-                        <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                            <Users class="h-7 w-7" />
+                    <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary sm:h-14 sm:w-14">
+                            <Users class="h-6 w-6 sm:h-7 sm:w-7" />
                         </div>
-                        <div>
-                            <CardTitle class="text-xl">{{ user.name }}</CardTitle>
-                            <CardDescription>
+                        <div class="min-w-0">
+                            <CardTitle class="text-lg break-words sm:text-xl">{{ user.name }}</CardTitle>
+                            <CardDescription class="break-all">
                                 {{ user.email }}
                                 <span v-if="user.phone"> · {{ user.phone }}</span>
                             </CardDescription>
@@ -92,14 +92,38 @@ const roleLabels: Record<string, string> = {
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="p-0">
-                    <div class="overflow-x-auto">
+                    <!-- Kartu vertikal untuk layar sempit -->
+                    <div class="divide-y md:hidden">
+                        <div v-for="(act, idx) in activities" :key="`card-${idx}`" class="p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="min-w-0 text-sm font-medium break-words">{{ act.description }}</p>
+                                <Badge variant="outline" class="shrink-0 whitespace-nowrap font-normal">
+                                    {{ act.type_label }}
+                                </Badge>
+                            </div>
+                            <p class="mt-1 text-xs text-muted-foreground break-words">{{ act.detail }}</p>
+                            <div class="mt-2 flex items-center justify-between gap-3">
+                                <span class="text-xs text-muted-foreground">{{ act.date }}</span>
+                                <Link v-if="act.link" :href="act.link">
+                                    <Button variant="ghost" size="sm" class="h-7 text-xs">
+                                        Detail
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                        <p v-if="activities.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
+                            Belum ada aktivitas tercatat
+                        </p>
+                    </div>
+
+                    <div class="hidden md:block">
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b bg-muted/50 text-left">
                                     <th class="px-4 py-3 font-medium text-muted-foreground">Waktu</th>
                                     <th class="px-4 py-3 font-medium text-muted-foreground">Jenis</th>
                                     <th class="px-4 py-3 font-medium text-muted-foreground">Keterangan</th>
-                                    <th class="px-4 py-3 font-medium text-muted-foreground">Detail</th>
+                                    <th class="hidden px-4 py-3 font-medium text-muted-foreground lg:table-cell">Detail</th>
                                     <th class="w-20 px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -109,14 +133,18 @@ const roleLabels: Record<string, string> = {
                                     :key="idx"
                                     class="border-b transition-colors last:border-0 hover:bg-muted/30"
                                 >
-                                    <td class="px-4 py-3 text-muted-foreground">{{ act.date }}</td>
+                                    <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">{{ act.date }}</td>
                                     <td class="px-4 py-3">
-                                        <Badge variant="outline" class="font-normal">
+                                        <Badge variant="outline" class="whitespace-nowrap font-normal">
                                             {{ act.type_label }}
                                         </Badge>
                                     </td>
-                                    <td class="px-4 py-3 font-medium">{{ act.description }}</td>
-                                    <td class="px-4 py-3 text-muted-foreground text-xs">{{ act.detail }}</td>
+                                    <td class="px-4 py-3 font-medium break-words">
+                                        {{ act.description }}
+                                        <!-- Detail ikut di kolom keterangan saat kolomnya disembunyikan -->
+                                        <span class="mt-0.5 block text-xs font-normal text-muted-foreground lg:hidden">{{ act.detail }}</span>
+                                    </td>
+                                    <td class="hidden px-4 py-3 text-xs text-muted-foreground break-words lg:table-cell">{{ act.detail }}</td>
                                     <td class="px-4 py-3">
                                         <Link
                                             v-if="act.link"

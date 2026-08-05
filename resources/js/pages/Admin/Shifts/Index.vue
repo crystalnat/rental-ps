@@ -118,25 +118,25 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
         <div class="space-y-6">
             <!-- Header -->
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        <Clock class="h-6 w-6 text-primary" />
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+                        <Clock class="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
                         Shift Kasir
                     </h1>
                     <p class="text-sm text-muted-foreground mt-1">
                         Kelola buka/tutup shift dan rekonsiliasi kas
                     </p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-2">
                     <select
                         v-if="stores.length > 1"
                         :value="store?.id"
-                        class="filter-select flex h-9 rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
+                        class="filter-select flex h-9 w-full sm:w-auto rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
                         @change="changeStore(Number(($event.target as HTMLSelectElement).value))"
                     >
                         <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
                     </select>
-                    <Button v-if="store && !hasOpenShift" @click="openShiftDialog">
+                    <Button v-if="store && !hasOpenShift" class="w-full sm:w-auto" @click="openShiftDialog">
                         <Clock class="mr-2 h-4 w-4" />
                         Buka Shift
                     </Button>
@@ -145,9 +145,10 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
 
             <!-- Filters -->
             <Card>
-                <CardContent class="pt-4 pb-4">
-                    <div class="flex flex-wrap items-end gap-3">
-                        <div class="flex-1 min-w-[120px]">
+                <CardContent class="p-3 sm:p-5">
+                    <!-- Grid 2 kolom di HP agar filter tetap terbaca di layar 320px -->
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-3">
+                        <div class="sm:flex-1 sm:min-w-[120px]">
                             <Label class="text-xs text-muted-foreground">Status</Label>
                             <select
                                 v-model="filterStatus"
@@ -158,7 +159,7 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                                 <option value="closed">Tutup</option>
                             </select>
                         </div>
-                        <div v-if="users && users.length > 1" class="flex-1 min-w-[140px]">
+                        <div v-if="users && users.length > 1" class="sm:flex-1 sm:min-w-[140px]">
                             <Label class="text-xs text-muted-foreground">Kasir</Label>
                             <select
                                 v-model="filterUserId"
@@ -168,25 +169,25 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                                 <option v-for="u in users" :key="u.value" :value="u.value">{{ u.label }}</option>
                             </select>
                         </div>
-                        <div class="flex-1 min-w-[140px]">
+                        <div class="sm:flex-1 sm:min-w-[140px]">
                             <Label class="text-xs text-muted-foreground">Dari Tanggal</Label>
                             <Input v-model="filterDateFrom" type="date" class="mt-1 h-9 w-full" />
                         </div>
-                        <div class="flex-1 min-w-[140px]">
+                        <div class="sm:flex-1 sm:min-w-[140px]">
                             <Label class="text-xs text-muted-foreground">Sampai Tanggal</Label>
                             <Input v-model="filterDateTo" type="date" class="mt-1 h-9 w-full" />
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div class="col-span-2 flex items-center gap-2 sm:shrink-0">
                             <Button
                                 v-if="filterStatus !== 'all' || filterDateFrom || filterDateTo || filterUserId !== 'all'"
                                 variant="ghost"
                                 size="sm"
-                                class="text-muted-foreground"
+                                class="flex-1 text-muted-foreground sm:flex-none"
                                 @click="filterStatus = 'all'; filterDateFrom = ''; filterDateTo = ''; filterUserId = 'all'; applyFilters()"
                             >
                                 Reset
                             </Button>
-                            <Button @click="applyFilters">
+                            <Button class="flex-1 sm:flex-none" @click="applyFilters">
                                 Terapkan
                             </Button>
                         </div>
@@ -196,13 +197,13 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
 
             <!-- Shifts Table -->
             <Card>
-                <CardHeader>
+                <CardHeader class="p-4 sm:p-6">
                     <CardTitle>Riwayat Shift</CardTitle>
-                    <CardDescription v-if="store">
+                    <CardDescription v-if="store" class="break-words">
                         Toko: {{ store.name }} · Total: {{ shifts.total }} shift
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent class="p-3 pt-0 sm:p-6 sm:pt-0">
                     <div v-if="!store" class="py-12 text-center text-muted-foreground">
                         Pilih toko terlebih dahulu.
                     </div>
@@ -216,13 +217,13 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                             <thead>
                                 <tr class="border-b">
                                     <th v-if="!is_cashier" class="py-3 px-4 text-left font-medium text-muted-foreground">Kasir</th>
-                                    <th class="py-3 px-4 text-left font-medium text-muted-foreground">Jadwal</th>
+                                    <th class="hidden xl:table-cell py-3 px-4 text-left font-medium text-muted-foreground">Jadwal</th>
                                     <th class="py-3 px-4 text-left font-medium text-muted-foreground">Buka</th>
-                                    <th class="py-3 px-4 text-left font-medium text-muted-foreground">Tutup</th>
-                                    <th class="py-3 px-4 text-right font-medium text-muted-foreground">Kas Awal</th>
+                                    <th class="hidden lg:table-cell py-3 px-4 text-left font-medium text-muted-foreground">Tutup</th>
+                                    <th class="hidden xl:table-cell py-3 px-4 text-right font-medium text-muted-foreground">Kas Awal</th>
                                     <th class="py-3 px-4 text-right font-medium text-muted-foreground">Penjualan</th>
-                                    <th class="py-3 px-4 text-center font-medium text-muted-foreground">Order</th>
-                                    <th class="py-3 px-4 text-right font-medium text-muted-foreground">Selisih</th>
+                                    <th class="hidden lg:table-cell py-3 px-4 text-center font-medium text-muted-foreground">Order</th>
+                                    <th class="hidden lg:table-cell py-3 px-4 text-right font-medium text-muted-foreground">Selisih</th>
                                     <th class="py-3 px-4 text-center font-medium text-muted-foreground">Status</th>
                                 </tr>
                             </thead>
@@ -233,21 +234,35 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                                     class="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
                                     @click="viewShift(shift.id)"
                                 >
-                                    <td v-if="!is_cashier" class="py-3 px-4 font-medium">{{ shift.user_name }}</td>
-                                    <td class="py-3 px-4 text-xs text-muted-foreground">
+                                    <td v-if="!is_cashier" class="py-3 px-4 font-medium">
+                                        {{ shift.user_name }}
+                                        <!-- Ringkasan kolom yang disembunyikan agar info tetap ada di layar sempit -->
+                                        <span v-if="shift.scheduled_start && shift.scheduled_end" class="mt-0.5 block text-xs font-normal text-muted-foreground xl:hidden">
+                                            {{ shift.scheduled_start }} — {{ shift.scheduled_end }}
+                                        </span>
+                                    </td>
+                                    <td class="hidden xl:table-cell py-3 px-4 text-xs text-muted-foreground">
                                         <span v-if="shift.scheduled_start && shift.scheduled_end">
                                             {{ shift.scheduled_start }} — {{ shift.scheduled_end }}
                                         </span>
                                         <span v-else>—</span>
                                     </td>
-                                    <td class="py-3 px-4 text-xs">{{ shift.opened_at }}</td>
-                                    <td class="py-3 px-4 text-xs">{{ shift.closed_at ?? '—' }}</td>
-                                    <td class="py-3 px-4 text-right">{{ formatCurrency(shift.opening_cash) }}</td>
-                                    <td class="py-3 px-4 text-right font-medium">
-                                        {{ shift.total_sales !== null ? formatCurrency(shift.total_sales) : '—' }}
+                                    <td class="py-3 px-4 text-xs">
+                                        {{ shift.opened_at }}
+                                        <span class="mt-0.5 block text-xs text-muted-foreground lg:hidden">
+                                            Tutup: {{ shift.closed_at ?? '—' }}
+                                        </span>
                                     </td>
-                                    <td class="py-3 px-4 text-center">{{ shift.total_orders ?? '—' }}</td>
-                                    <td class="py-3 px-4 text-right">
+                                    <td class="hidden lg:table-cell py-3 px-4 text-xs">{{ shift.closed_at ?? '—' }}</td>
+                                    <td class="hidden xl:table-cell py-3 px-4 text-right whitespace-nowrap tabular-nums">{{ formatCurrency(shift.opening_cash) }}</td>
+                                    <td class="py-3 px-4 text-right font-medium whitespace-nowrap tabular-nums">
+                                        {{ shift.total_sales !== null ? formatCurrency(shift.total_sales) : '—' }}
+                                        <span class="mt-0.5 block text-xs font-normal text-muted-foreground lg:hidden">
+                                            {{ shift.total_orders ?? 0 }} order
+                                        </span>
+                                    </td>
+                                    <td class="hidden lg:table-cell py-3 px-4 text-center tabular-nums">{{ shift.total_orders ?? '—' }}</td>
+                                    <td class="hidden lg:table-cell py-3 px-4 text-right whitespace-nowrap">
                                         <span
                                             v-if="shift.cash_difference !== null"
                                             :class="shift.cash_difference >= 0 ? 'text-green-600' : 'text-red-600'"
@@ -272,23 +287,23 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                         <button
                             v-for="shift in shifts.data"
                             :key="shift.id"
-                            class="w-full text-left rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                            class="w-full text-left rounded-lg border p-3 hover:bg-muted/50 transition-colors"
                             @click="viewShift(shift.id)"
                         >
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="font-medium">{{ is_cashier ? shift.opened_at : shift.user_name }}</span>
-                                <Badge :variant="shift.status === 'open' ? 'default' : 'secondary'" class="text-xs">
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <span class="font-medium min-w-0 break-words">{{ is_cashier ? shift.opened_at : shift.user_name }}</span>
+                                <Badge :variant="shift.status === 'open' ? 'default' : 'secondary'" class="text-xs shrink-0">
                                     {{ shift.status === 'open' ? 'Buka' : 'Tutup' }}
                                 </Badge>
                             </div>
-                            <div class="grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
-                                <span>Buka: {{ shift.opened_at }}</span>
-                                <span class="text-right">Tutup: {{ shift.closed_at ?? '—' }}</span>
-                                <span v-if="shift.scheduled_start">Jadwal: {{ shift.scheduled_start }} — {{ shift.scheduled_end }}</span>
+                            <div class="grid grid-cols-1 gap-y-1 text-xs text-muted-foreground">
+                                <span class="break-words">Buka: {{ shift.opened_at }}</span>
+                                <span class="break-words">Tutup: {{ shift.closed_at ?? '—' }}</span>
+                                <span v-if="shift.scheduled_start" class="break-words">Jadwal: {{ shift.scheduled_start }} — {{ shift.scheduled_end }}</span>
                             </div>
-                            <div class="flex items-center justify-between mt-2 pt-2 border-t text-sm">
-                                <span>{{ shift.total_orders ?? 0 }} order</span>
-                                <span class="font-semibold">{{ shift.total_sales !== null ? formatCurrency(shift.total_sales) : '—' }}</span>
+                            <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t text-sm">
+                                <span class="whitespace-nowrap">{{ shift.total_orders ?? 0 }} order</span>
+                                <span class="font-semibold whitespace-nowrap tabular-nums">{{ shift.total_sales !== null ? formatCurrency(shift.total_sales) : '—' }}</span>
                             </div>
                             <div v-if="shift.cash_difference !== null" class="mt-1 text-xs text-right">
                                 Selisih:
@@ -304,7 +319,7 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
 
         <!-- Open Shift Dialog -->
         <Dialog v-model:open="showOpenDialog">
-            <DialogContent class="max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
                         <Clock class="h-5 w-5" />
@@ -351,9 +366,9 @@ const hasOpenShift = props.shifts?.data?.some(s => s.status === 'open') ?? false
                     <p class="text-xs text-muted-foreground">
                         Jadwal shift opsional. Contoh: 08:00 — 16:00
                     </p>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" @click="showOpenDialog = false">Batal</Button>
-                        <Button type="submit" :disabled="openProcessing">
+                    <DialogFooter class="flex-col-reverse gap-2 sm:flex-row">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" @click="showOpenDialog = false">Batal</Button>
+                        <Button type="submit" class="w-full sm:w-auto" :disabled="openProcessing">
                             {{ openProcessing ? 'Membuka...' : 'Buka Shift' }}
                         </Button>
                     </DialogFooter>

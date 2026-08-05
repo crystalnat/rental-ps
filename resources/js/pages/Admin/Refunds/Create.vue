@@ -4,7 +4,6 @@ import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -160,16 +159,16 @@ function goBack() {
                                             class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                         />
                                         <div class="flex-1 min-w-0">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <span class="font-medium text-sm flex items-center gap-2">
-                                                    <Package class="h-4 w-4 text-muted-foreground" />
-                                                    {{ item.product_name }}
+                                            <div class="flex flex-col gap-1 mb-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                                                <span class="min-w-0 font-medium text-sm flex items-start gap-2">
+                                                    <Package class="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+                                                    <span class="min-w-0 break-words">{{ item.product_name }}</span>
                                                 </span>
-                                                <span v-if="item.selected" class="font-semibold text-red-600 text-sm">
+                                                <span v-if="item.selected" class="font-semibold text-red-600 text-sm tabular-nums whitespace-nowrap sm:shrink-0">
                                                     -{{ formatCurrency((item.unit_price - item.discount_amount) * item.quantity) }}
                                                 </span>
                                             </div>
-                                            <p class="text-xs text-muted-foreground">
+                                            <p class="text-xs text-muted-foreground break-words">
                                                 Harga: {{ formatCurrency(item.unit_price) }}
                                                 <span v-if="item.discount_amount > 0">
                                                     (diskon {{ formatCurrency(item.discount_amount) }}/pcs)
@@ -187,7 +186,7 @@ function goBack() {
                                                         :min="0.001"
                                                         :max="item.max_refund"
                                                         :step="1"
-                                                        class="w-20 h-8 text-sm"
+                                                        class="w-20 h-8 text-sm tabular-nums"
                                                     />
                                                 </div>
                                                 <div class="flex items-center gap-2">
@@ -205,7 +204,7 @@ function goBack() {
                         </div>
 
                         <!-- Reason & Method -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <Label for="reason">Alasan Refund</Label>
                                 <Input
@@ -229,10 +228,10 @@ function goBack() {
                         </div>
 
                         <!-- Summary & Submit -->
-                        <div class="flex items-center justify-between rounded-lg border-2 border-dashed p-4">
-                            <div>
+                        <div class="flex flex-col gap-4 rounded-lg border-2 border-dashed p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0">
                                 <p class="text-sm text-muted-foreground">Total Refund</p>
-                                <p class="text-2xl font-bold text-red-600">
+                                <p class="text-2xl font-bold text-red-600 tabular-nums whitespace-nowrap">
                                     -{{ formatCurrency(totalRefund) }}
                                 </p>
                                 <p class="text-xs text-muted-foreground">
@@ -243,6 +242,7 @@ function goBack() {
                                 :disabled="!canSubmit || processing"
                                 variant="destructive"
                                 size="lg"
+                                class="w-full sm:w-auto"
                                 @click="submitRefund"
                             >
                                 <RotateCcw class="mr-2 h-4 w-4" />

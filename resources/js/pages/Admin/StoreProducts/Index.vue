@@ -600,8 +600,8 @@ function deleteProduct(product: Product) {
         <div class="mb-4 space-y-3">
             <div class="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3 md:flex-row md:items-center">
                 <!-- Search & Layout toggle -->
-                <div class="flex items-center gap-2">
-                    <div class="relative flex-1">
+                <div class="flex min-w-0 flex-1 items-center gap-2">
+                    <div class="relative min-w-0 flex-1">
                         <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input v-model="searchQuery" placeholder="Cari..." class="h-9 pl-8" />
                     </div>
@@ -725,7 +725,95 @@ function deleteProduct(product: Product) {
         </div>
 
         <!-- ── TABLE LAYOUT ── -->
-        <div v-if="layout === 'table'" class="rounded-2xl border bg-card shadow-sm overflow-hidden">
+        <div v-if="layout === 'table'">
+        <!-- Di HP data tabel disajikan sebagai kartu supaya tidak perlu geser horizontal -->
+        <div class="space-y-2 md:hidden">
+            <div
+                v-for="product in filteredProducts"
+                :key="product.id"
+                class="rounded-lg border p-3"
+                :class="selectedProducts.includes(product.id) ? 'ring-2 ring-primary' : ''"
+            >
+                <div class="flex items-start gap-3">
+                    <Checkbox
+                        class="mt-1 shrink-0"
+                        :checked="selectedProducts.includes(product.id)"
+                        @update:checked="toggleProduct(product.id)"
+                    />
+                    <div class="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted">
+                        <img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="h-full w-full object-cover" />
+                        <div v-else class="flex h-full w-full items-center justify-center text-sm font-bold text-primary">
+                            {{ product.name.charAt(0).toUpperCase() }}
+                        </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="break-words font-medium leading-tight">{{ product.name }}</p>
+                        <p v-if="product.sku" class="break-words text-xs text-muted-foreground">{{ product.sku }}</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span
+                                v-if="product.category"
+                                class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                                :style="product.category_color
+                                    ? { backgroundColor: product.category_color + '25', color: product.category_color }
+                                    : {}"
+                                :class="!product.category_color && 'bg-secondary'"
+                            >
+                                <span
+                                    v-if="product.category_color"
+                                    class="h-1.5 w-1.5 shrink-0 rounded-full"
+                                    :style="{ backgroundColor: product.category_color }"
+                                />
+                                {{ product.category }}
+                            </span>
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold"
+                                :class="product.is_available ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'"
+                            >
+                                <span class="h-1.5 w-1.5 rounded-full" :class="product.is_available ? 'bg-success' : 'bg-muted-foreground'" />
+                                {{ product.is_available ? 'Tersedia' : 'Nonaktif' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 grid grid-cols-3 gap-2 border-t pt-2 text-xs">
+                    <div class="min-w-0">
+                        <p class="text-[10px] uppercase text-muted-foreground">Stok</p>
+                        <p v-if="product.has_inventory" class="tabular-nums font-medium" :class="product.current_stock <= product.min_stock ? 'text-warning' : ''">
+                            {{ Number(product.current_stock).toLocaleString('id-ID') }} <span class="text-[10px] text-muted-foreground">{{ product.unit }}</span>
+                        </p>
+                        <p v-else class="text-muted-foreground">Tidak dilacak</p>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] uppercase text-muted-foreground">Harga Beli</p>
+                        <p class="whitespace-nowrap font-mono tabular-nums text-muted-foreground">{{ formatCurrency(product.buy_price) }}</p>
+                    </div>
+                    <div class="min-w-0 text-right">
+                        <p class="text-[10px] uppercase text-muted-foreground">Harga Jual</p>
+                        <p class="whitespace-nowrap font-mono font-semibold tabular-nums">{{ formatCurrency(product.sell_price) }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-2 grid grid-cols-4 gap-1 border-t pt-2">
+                    <button class="action-btn w-full !text-blue-500 hover:!bg-blue-500/15" @click="openStockDialog(product)" title="Edit Stok"><Package class="h-4 w-4" /></button>
+                    <button class="action-btn w-full !text-amber-500 hover:!bg-amber-500/15" @click="openPriceDialog(product)" title="Set Harga"><DollarSign class="h-4 w-4" /></button>
+                    <button class="action-btn w-full !text-violet-500 hover:!bg-violet-500/15" @click="openEditDialog(product)" title="Edit Produk"><Pencil class="h-4 w-4" /></button>
+                    <button class="action-btn w-full !text-red-500 hover:!bg-red-500/15" @click="deleteProduct(product)" title="Hapus"><Trash2 class="h-4 w-4" /></button>
+                </div>
+            </div>
+
+            <div v-if="filteredProducts.length === 0" class="flex flex-col items-center gap-3 rounded-lg border border-dashed py-14 text-muted-foreground">
+                <Package class="h-10 w-10 opacity-30" />
+                <p class="font-medium">Tidak ada produk ditemukan</p>
+                <p v-if="searchQuery" class="text-sm">Coba kata kunci lain atau hapus filter</p>
+                <Button v-else variant="outline" size="sm" @click="openAddDialog">
+                    <Package class="h-4 w-4" />
+                    Tambah Produk Pertama
+                </Button>
+            </div>
+        </div>
+
+        <div class="hidden overflow-hidden rounded-2xl border bg-card shadow-sm md:block">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
@@ -894,6 +982,7 @@ function deleteProduct(product: Product) {
                 </table>
             </div>
         </div>
+        </div>
 
         <!-- ── GRID LAYOUT ── -->
         <div v-else>
@@ -922,7 +1011,7 @@ function deleteProduct(product: Product) {
                             class="flex h-5 w-5 items-center justify-center rounded-full border-2 bg-background shadow transition-all"
                             :class="selectedProducts.includes(product.id)
                                 ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border opacity-0 group-hover:opacity-100'"
+                                : 'border-border opacity-100 md:opacity-0 md:group-hover:opacity-100'"
                         >
                             <Check v-if="selectedProducts.includes(product.id)" class="h-3 w-3" />
                         </div>
@@ -1020,7 +1109,7 @@ function deleteProduct(product: Product) {
 
         <!-- Copy Dialog -->
         <Dialog :open="showCopyDialog" @update:open="showCopyDialog = $event">
-            <DialogContent class="max-w-lg">
+            <DialogContent class="w-[95vw] max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Salin Produk ke Toko Lain</DialogTitle>
                     <DialogDescription>
@@ -1089,7 +1178,7 @@ function deleteProduct(product: Product) {
 
         <!-- Edit Stock Dialog -->
         <Dialog :open="showStockDialog" @update:open="showStockDialog = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Edit Stok</DialogTitle>
                     <DialogDescription>
@@ -1125,7 +1214,7 @@ function deleteProduct(product: Product) {
 
         <!-- Edit Price Dialog -->
         <Dialog :open="showPriceDialog" @update:open="showPriceDialog = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Harga Khusus Toko</DialogTitle>
                     <DialogDescription>
@@ -1158,12 +1247,12 @@ function deleteProduct(product: Product) {
                     </p>
                 </div>
 
-                <DialogFooter>
-                    <Button v-if="priceForm.has_custom_price" variant="outline" @click="resetPrice(priceForm.product_id)" :disabled="processing">
+                <DialogFooter class="flex-col gap-2 sm:flex-row">
+                    <Button v-if="priceForm.has_custom_price" variant="outline" class="w-full sm:w-auto" @click="resetPrice(priceForm.product_id)" :disabled="processing">
                         Reset Default
                     </Button>
-                    <Button variant="outline" @click="showPriceDialog = false" :disabled="processing">Batal</Button>
-                    <Button @click="submitPrice" :disabled="processing">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="showPriceDialog = false" :disabled="processing">Batal</Button>
+                    <Button class="w-full sm:w-auto" @click="submitPrice" :disabled="processing">
                         <Check class="h-4 w-4" />
                         Simpan Harga
                     </Button>
@@ -1173,7 +1262,7 @@ function deleteProduct(product: Product) {
 
         <!-- Add Product Dialog -->
         <Dialog :open="showAddDialog" @update:open="showAddDialog = $event">
-            <DialogContent class="max-w-2xl">
+            <DialogContent class="w-[95vw] max-w-2xl">
                 <DialogHeader class="pr-8">
                     <DialogTitle>Tambah Produk Baru</DialogTitle>
                     <DialogDescription>
@@ -1368,7 +1457,7 @@ function deleteProduct(product: Product) {
 
         <!-- Edit Product Dialog -->
         <Dialog :open="showEditDialog" @update:open="showEditDialog = $event">
-            <DialogContent class="max-w-2xl">
+            <DialogContent class="w-[95vw] max-w-2xl">
                 <DialogHeader class="pr-8">
                     <DialogTitle>Edit Produk</DialogTitle>
                     <DialogDescription>

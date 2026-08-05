@@ -128,14 +128,14 @@ function deleteSupplier() {
             <StatCard variant="primary" class="p-3 md:p-5">
                 <template #title>Total Supplier</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold">{{ stats.total }}</p>
+                    <p class="text-lg font-bold tabular-nums sm:text-2xl">{{ stats.total }}</p>
                 </template>
                 <template #icon><Truck class="h-5 w-5" /></template>
             </StatCard>
             <StatCard variant="success" class="p-3 md:p-5">
                 <template #title>Supplier Aktif</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ stats.active }}</p>
+                    <p class="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-2xl">{{ stats.active }}</p>
                 </template>
                 <template #icon><UserCircle class="h-5 w-5" /></template>
             </StatCard>
@@ -148,7 +148,7 @@ function deleteSupplier() {
             @update:model-value="handleSearch"
         >
             <template #filters>
-                <Button size="sm" class="h-9" @click="openAddModal">
+                <Button size="sm" class="h-9 w-full sm:w-auto" @click="openAddModal">
                     <Plus class="mr-1 h-4 w-4" />
                     Tambah Supplier
                 </Button>
@@ -156,7 +156,47 @@ function deleteSupplier() {
         </TableToolbar>
 
         <!-- Suppliers Table -->
-        <Card variant="elevated" class="mt-4">
+        <!-- Di HP data supplier disajikan sebagai kartu supaya tidak perlu geser horizontal -->
+        <div class="mt-4 space-y-2 md:hidden">
+            <div v-for="supplier in suppliers.data" :key="supplier.id" class="rounded-lg border p-3">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="break-words font-medium text-primary" @click="openEditModal(supplier)">{{ supplier.name }}</p>
+                        <p v-if="supplier.address" class="break-words text-[11px] text-muted-foreground">{{ supplier.address }}</p>
+                    </div>
+                    <Badge :variant="supplier.is_active ? 'success' : 'secondary'" class="shrink-0">
+                        {{ supplier.is_active ? 'Aktif' : 'Nonaktif' }}
+                    </Badge>
+                </div>
+                <div class="mt-2 space-y-1 border-t pt-2 text-xs">
+                    <div class="flex gap-2">
+                        <span class="w-24 shrink-0 text-muted-foreground">Kontak Person</span>
+                        <span class="min-w-0 break-words">{{ supplier.contact_person || '—' }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="w-24 shrink-0 text-muted-foreground">Telepon</span>
+                        <span class="min-w-0 break-words tabular-nums">{{ supplier.phone || '—' }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="w-24 shrink-0 text-muted-foreground">Email</span>
+                        <span class="min-w-0 break-words">{{ supplier.email || '—' }}</span>
+                    </div>
+                </div>
+                <div class="mt-2 flex justify-end gap-1 border-t pt-2">
+                    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditModal(supplier)">
+                        <Pencil class="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" class="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" @click="confirmDelete(supplier)">
+                        <Trash2 class="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+            <div v-if="suppliers.total === 0" class="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+                Belum ada data supplier.
+            </div>
+        </div>
+
+        <Card variant="elevated" class="mt-4 hidden md:block">
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
                     <table class="w-full">
@@ -221,7 +261,7 @@ function deleteSupplier() {
 
         <!-- Form Modal -->
         <Dialog :open="formOpen" @update:open="(v) => { formOpen = v }">
-            <DialogContent class="max-w-md">
+            <DialogContent class="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{{ editingId ? 'Ubah Supplier' : 'Tambah Supplier' }}</DialogTitle>
                     <DialogDescription>
@@ -233,7 +273,7 @@ function deleteSupplier() {
                         <Label for="name">Nama Supplier <span class="text-destructive">*</span></Label>
                         <Input id="name" v-model="form.name" required />
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div class="space-y-2">
                             <Label for="cp">Kontak Person</Label>
                             <Input id="cp" v-model="form.contact_person" />
@@ -251,9 +291,9 @@ function deleteSupplier() {
                         <input type="checkbox" id="status" v-model="form.is_active" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
                         <Label for="status">Supplier Aktif</Label>
                     </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" @click="formOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="form.processing">
+                    <DialogFooter class="flex-col gap-2 sm:flex-row">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" @click="formOpen = false">Batal</Button>
+                        <Button type="submit" class="w-full sm:w-auto" :disabled="form.processing">
                             {{ form.processing ? 'Menyimpan...' : 'Simpan' }}
                         </Button>
                     </DialogFooter>

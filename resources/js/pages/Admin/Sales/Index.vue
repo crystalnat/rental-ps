@@ -489,6 +489,7 @@ function getPaymentLabel(code: string) {
                                         sort-key="created_at"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
+                                        class-names="hidden md:table-cell"
                                         @sort="setSort"
                                     />
                                     <TableHeadSortable
@@ -496,18 +497,19 @@ function getPaymentLabel(code: string) {
                                         sort-key="type"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
-                                        class-names="min-w-[88px]"
+                                        class-names="hidden min-w-[88px] sm:table-cell"
                                         @sort="setSort"
                                     />
-                                    <th class="px-4 py-3 font-medium text-muted-foreground">Meja</th>
-                                    <th class="px-4 py-3 font-medium text-muted-foreground">Pelanggan</th>
-                                    <th class="px-4 py-3 font-medium text-muted-foreground">Kasir</th>
+                                    <th class="hidden px-4 py-3 font-medium text-muted-foreground lg:table-cell">Meja</th>
+                                    <th class="hidden px-4 py-3 font-medium text-muted-foreground lg:table-cell">Pelanggan</th>
+                                    <th class="hidden px-4 py-3 font-medium text-muted-foreground xl:table-cell">Kasir</th>
                                     <TableHeadSortable
                                         label="Item"
                                         sort-key="item_count"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
                                         align="center"
+                                        class-names="hidden md:table-cell"
                                         @sort="setSort"
                                     />
                                     <th class="px-4 py-3 font-medium text-muted-foreground">Bayar</th>
@@ -530,9 +532,12 @@ function getPaymentLabel(code: string) {
                                 >
                                     <td class="px-4 py-3">
                                         <span class="font-mono text-sm font-medium">{{ order.order_code }}</span>
+                                        <!-- Waktu & pelanggan ikut di sel kode saat kolomnya disembunyikan di layar sempit -->
+                                        <span class="mt-0.5 block text-xs text-muted-foreground md:hidden">{{ order.created_at }}</span>
+                                        <span class="block text-xs text-muted-foreground lg:hidden">{{ order.customer_name ?? '—' }}</span>
                                     </td>
-                                    <td class="px-4 py-3 text-sm text-muted-foreground">{{ order.created_at }}</td>
-                                    <td class="whitespace-nowrap px-4 py-3">
+                                    <td class="hidden px-4 py-3 text-sm text-muted-foreground md:table-cell">{{ order.created_at }}</td>
+                                    <td class="hidden whitespace-nowrap px-4 py-3 sm:table-cell">
                                         <span
                                             class="inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
                                             :class="typeBadgeClass[order.type] ?? 'bg-muted text-muted-foreground'"
@@ -540,10 +545,10 @@ function getPaymentLabel(code: string) {
                                             {{ typeLabels[order.type] ?? order.type }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3 text-muted-foreground">{{ order.table_name ?? '—' }}</td>
-                                    <td class="px-4 py-3">{{ order.customer_name ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-muted-foreground">{{ order.cashier_name ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-center font-medium">{{ order.item_count }}</td>
+                                    <td class="hidden px-4 py-3 text-muted-foreground lg:table-cell">{{ order.table_name ?? '—' }}</td>
+                                    <td class="hidden px-4 py-3 lg:table-cell">{{ order.customer_name ?? '—' }}</td>
+                                    <td class="hidden px-4 py-3 text-muted-foreground xl:table-cell">{{ order.cashier_name ?? '—' }}</td>
+                                    <td class="hidden px-4 py-3 text-center font-medium md:table-cell">{{ order.item_count }}</td>
                                     <td class="whitespace-nowrap px-4 py-3">
                                         <span
                                             class="inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium"

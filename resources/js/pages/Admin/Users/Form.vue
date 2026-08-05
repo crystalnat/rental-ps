@@ -136,6 +136,7 @@ function submit() {
                                 v-model="form.phone"
                                 type="tel"
                                 inputmode="numeric"
+                                class="tabular-nums"
                                 placeholder="08123456789"
                                 :disabled="form.processing"
                                 @input="(e: Event) => { form.phone = (e.target as HTMLInputElement).value.replace(/\D/g, '') }"
@@ -200,24 +201,25 @@ function submit() {
                             <p v-if="form.errors.store_id" class="text-xs text-destructive">{{ form.errors.store_id }}</p>
                         </div>
 
-                        <div class="flex items-center gap-2 rounded-lg border p-3">
+                        <div class="flex items-start gap-2 rounded-lg border p-3">
                             <Checkbox
                                 id="is_active"
+                                class="mt-0.5 shrink-0"
                                 :checked="form.is_active"
                                 @update:checked="(v) => form.is_active = !!v"
                             />
-                            <Label for="is_active" class="cursor-pointer text-sm font-medium">
+                            <Label for="is_active" class="min-w-0 cursor-pointer break-words text-sm font-medium">
                                 Aktif — karyawan dapat login ke sistem
                             </Label>
                         </div>
                     </CardContent>
                 </Card>
 
-                <div class="flex items-center justify-end gap-3 rounded-xl border bg-card p-4">
-                    <Button type="button" variant="outline" :disabled="form.processing" as-child>
+                <div class="flex flex-col-reverse gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-end">
+                    <Button type="button" variant="outline" class="w-full sm:w-auto" :disabled="form.processing" as-child>
                         <Link :href="route('admin.users.index')">Batal</Link>
                     </Button>
-                    <Button type="submit" :disabled="form.processing">
+                    <Button type="submit" class="w-full sm:w-auto" :disabled="form.processing">
                         <Loader2 v-if="form.processing" class="animate-spin" />
                         {{ isEdit ? 'Simpan Perubahan' : 'Buat Karyawan' }}
                     </Button>

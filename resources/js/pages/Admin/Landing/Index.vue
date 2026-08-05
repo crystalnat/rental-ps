@@ -218,11 +218,11 @@ const fontOptions = [
     <AdminLayout title="Landing Page CMS">
         <!-- Header -->
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h1 class="text-2xl font-bold">Landing Page</h1>
+            <div class="min-w-0">
+                <h1 class="text-xl font-bold sm:text-2xl">Landing Page</h1>
                 <p class="text-sm text-muted-foreground">Kelola tampilan company profile yang dilihat pelanggan Anda.</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <Badge :variant="settingsForm.is_published ? 'default' : 'secondary'" class="text-xs">
                     {{ settingsForm.is_published ? 'Published' : 'Draft' }}
                 </Badge>
@@ -247,18 +247,18 @@ const fontOptions = [
         <!-- Tab Navigation -->
         <div class="flex gap-1 rounded-lg border bg-muted/30 p-1">
             <button
-                class="flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+                class="min-w-0 flex-1 truncate rounded-md px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm"
                 :class="activeTab === 'sections' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
                 @click="activeTab = 'sections'"
             >
-                <Globe class="mr-2 inline h-4 w-4" /> Konten Halaman
+                <Globe class="mr-1 inline h-4 w-4 sm:mr-2" /> Konten Halaman
             </button>
             <button
-                class="flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+                class="min-w-0 flex-1 truncate rounded-md px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm"
                 :class="activeTab === 'settings' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
                 @click="activeTab = 'settings'"
             >
-                <Settings2 class="mr-2 inline h-4 w-4" /> Pengaturan & Tema
+                <Settings2 class="mr-1 inline h-4 w-4 sm:mr-2" /> Pengaturan & Tema
             </button>
         </div>
 
@@ -272,18 +272,18 @@ const fontOptions = [
             >
                 <button
                     type="button"
-                    class="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-muted/30"
+                    class="flex w-full items-center gap-2 px-3 py-4 text-left transition-colors hover:bg-muted/30 sm:gap-3 sm:px-5"
                     @click="toggleExpand(section.id)"
                 >
-                    <GripVertical class="h-4 w-4 text-muted-foreground/50" />
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold">{{ sectionLabels[section.section_key] ?? section.section_key }}</span>
+                    <GripVertical class="hidden h-4 w-4 shrink-0 text-muted-foreground/50 sm:block" />
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span class="break-words font-semibold">{{ sectionLabels[section.section_key] ?? section.section_key }}</span>
                             <Badge v-if="!getSectionForm(section).is_visible" variant="outline" class="text-[10px]">Tersembunyi</Badge>
                         </div>
-                        <p class="text-xs text-muted-foreground">{{ section.title || 'Belum ada judul' }}</p>
+                        <p class="truncate text-xs text-muted-foreground">{{ section.title || 'Belum ada judul' }}</p>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex shrink-0 items-center gap-1 sm:gap-2">
                         <button
                             type="button"
                             class="rounded-md p-1.5 transition-colors hover:bg-muted"
@@ -297,7 +297,7 @@ const fontOptions = [
                 </button>
 
                 <Transition name="slide">
-                    <div v-if="expandedSection === section.id" class="border-t px-5 py-5">
+                    <div v-if="expandedSection === section.id" class="border-t px-3 py-4 sm:px-5 sm:py-5">
                         <!-- Common Fields -->
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
@@ -352,9 +352,9 @@ const fontOptions = [
                             <div
                                 v-for="(item, idx) in getSectionForm(section).items"
                                 :key="idx"
-                                class="flex gap-3 rounded-lg border bg-muted/20 p-3"
+                                class="flex gap-2 rounded-lg border bg-muted/20 p-3 sm:gap-3"
                             >
-                                <div class="flex-1 space-y-2">
+                                <div class="min-w-0 flex-1 space-y-2">
                                     <Input v-model="item.title" placeholder="Nama Layanan" />
                                     <Textarea v-model="item.description" rows="2" placeholder="Deskripsi singkat" />
                                     <Input v-model="item.icon" placeholder="Ikon (briefcase, palette, megaphone, star, ...)" />
@@ -371,7 +371,7 @@ const fontOptions = [
                         <!-- Gallery Items -->
                         <div v-if="section.section_key === 'gallery'" class="mt-4 space-y-3">
                             <Label>Gambar Galeri</Label>
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            <div class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3">
                                 <div
                                     v-for="(item, idx) in getSectionForm(section).items"
                                     :key="idx"
@@ -396,7 +396,7 @@ const fontOptions = [
                                     <button
                                         type="button"
                                         @click="removeGalleryItem(section.id, idx)"
-                                        class="absolute right-1 top-1 rounded-full bg-destructive p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                        class="absolute right-1 top-1 rounded-full bg-destructive p-1 text-white opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
                                     >
                                         <Trash2 class="h-3 w-3" />
                                     </button>
@@ -413,10 +413,10 @@ const fontOptions = [
                             <div
                                 v-for="(item, idx) in getSectionForm(section).items"
                                 :key="idx"
-                                class="flex gap-3 rounded-lg border bg-muted/20 p-3"
+                                class="flex gap-2 rounded-lg border bg-muted/20 p-3 sm:gap-3"
                             >
-                                <div class="flex-1 space-y-2">
-                                    <div class="grid grid-cols-2 gap-2">
+                                <div class="min-w-0 flex-1 space-y-2">
+                                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <Input v-model="item.name" placeholder="Nama" />
                                         <Input v-model="item.role" placeholder="Jabatan / Perusahaan" />
                                     </div>
@@ -469,7 +469,7 @@ const fontOptions = [
                         </div>
 
                         <div class="mt-5 flex justify-end">
-                            <Button @click="saveSection(section)" :disabled="savingSectionId === section.id">
+                            <Button class="w-full sm:w-auto" @click="saveSection(section)" :disabled="savingSectionId === section.id">
                                 <Save class="mr-2 h-4 w-4" />
                                 {{ savingSectionId === section.id ? 'Menyimpan...' : 'Simpan Section' }}
                             </Button>
@@ -510,12 +510,12 @@ const fontOptions = [
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                        <div v-for="(val, key) in settingsForm.colors" :key="key">
+                    <div class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-5 sm:gap-4">
+                        <div v-for="(val, key) in settingsForm.colors" :key="key" class="min-w-0">
                             <Label class="text-xs capitalize">{{ key }}</Label>
                             <div class="flex items-center gap-2">
-                                <input type="color" v-model="settingsForm.colors[key]" class="h-9 w-9 cursor-pointer rounded border" />
-                                <Input v-model="settingsForm.colors[key]" class="text-xs font-mono" />
+                                <input type="color" v-model="settingsForm.colors[key]" class="h-9 w-9 shrink-0 cursor-pointer rounded border" />
+                                <Input v-model="settingsForm.colors[key]" class="min-w-0 text-xs font-mono" />
                             </div>
                         </div>
                     </div>
@@ -596,7 +596,7 @@ const fontOptions = [
             </Card>
 
             <div class="flex justify-end">
-                <Button size="lg" @click="saveSettings" :disabled="savingSettings">
+                <Button size="lg" class="w-full sm:w-auto" @click="saveSettings" :disabled="savingSettings">
                     <Save class="mr-2 h-4 w-4" />
                     {{ savingSettings ? 'Menyimpan...' : 'Simpan Pengaturan' }}
                 </Button>

@@ -102,14 +102,14 @@ function deleteFloor(floor: Floor) {
         </template>
 
         <!-- Header -->
-        <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+            <div class="min-w-0">
                 <h2 class="text-lg font-semibold">Lantai & Area PS</h2>
                 <p class="text-sm text-muted-foreground">
                     Atur area rental PS, lalu tambahkan unit PS, kasir, dan elemen lainnya.
                 </p>
             </div>
-            <Button @click="showAddDialog = true">
+            <Button class="w-full sm:w-auto" @click="showAddDialog = true">
                 <Plus class="h-4 w-4" />
                 Tambah Lantai
             </Button>
@@ -122,21 +122,22 @@ function deleteFloor(floor: Floor) {
                 v-for="floor in floors"
                 :key="floor.id"
                 :href="`/admin/stores/${store.id}/floor-plan/${floor.id}`"
-                class="group relative block rounded-2xl border bg-card p-5 shadow-sm transition-all hover:shadow-md"
+                class="group relative block rounded-2xl border bg-card p-4 shadow-sm transition-all hover:shadow-md sm:p-5"
             >
                 <div class="flex items-start justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                             <Map class="h-6 w-6" />
                         </div>
-                        <div>
-                            <h3 class="font-semibold">{{ floor.name }}</h3>
-                            <p class="text-sm text-muted-foreground">
+                        <div class="min-w-0">
+                            <h3 class="break-words font-semibold">{{ floor.name }}</h3>
+                            <p class="text-sm text-muted-foreground tabular-nums">
                                 {{ floor.width_meters }}m × {{ floor.length_meters }}m
                             </p>
                         </div>
                     </div>
-                    <div class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100" @click.stop>
+                    <!-- Perangkat sentuh tidak punya hover, jadi aksi selalu tampil di layar kecil -->
+                    <div class="flex shrink-0 gap-1 transition-opacity md:opacity-0 md:group-hover:opacity-100" @click.stop>
                         <a
                             v-if="floor.tables_count > 0"
                             :href="`/admin/stores/${store.id}/floor-plan/${floor.id}/print-qr`"
@@ -183,12 +184,12 @@ function deleteFloor(floor: Floor) {
         <!-- Empty State -->
         <div
             v-else
-            class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-20 text-center text-muted-foreground"
+            class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-12 text-center text-muted-foreground sm:py-20"
         >
             <Map class="mb-4 h-16 w-16 opacity-30" />
             <p class="font-medium">Belum ada lantai</p>
             <p class="mt-1 text-sm">Buat lantai pertama dengan dimensi (meter), lalu atur meja dan elemen di denah.</p>
-            <Button class="mt-4" @click="showAddDialog = true">
+            <Button class="mt-4 w-full sm:w-auto" @click="showAddDialog = true">
                 <Plus class="h-4 w-4" />
                 Tambah Lantai Pertama
             </Button>
@@ -196,7 +197,7 @@ function deleteFloor(floor: Floor) {
 
         <!-- Add Floor Dialog -->
         <Dialog :open="showAddDialog" @update:open="showAddDialog = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Tambah Lantai</DialogTitle>
                     <DialogDescription>

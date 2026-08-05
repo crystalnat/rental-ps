@@ -10,20 +10,20 @@ const { theme, toggleTheme } = useTheme()
 </script>
 
 <template>
-    <header class="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-red-950/50 bg-red-900 px-6 text-white shadow-md">
+    <header class="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-red-950/50 bg-red-900 px-3 text-white shadow-md sm:h-16 sm:gap-4 sm:px-6">
         <button
-            class="rounded-md p-1.5 text-white/90 hover:bg-red-800 hover:text-white lg:hidden"
+            class="shrink-0 rounded-md p-1.5 text-white/90 hover:bg-red-800 hover:text-white lg:hidden"
             @click="$emit('toggleSidebar')"
         >
             <Menu class="h-5 w-5" />
         </button>
 
-        <div class="flex-1">
-            <h1 v-if="title" class="text-lg font-semibold text-white">{{ title }}</h1>
+        <div class="min-w-0 flex-1">
+            <h1 v-if="title" class="truncate text-base font-semibold text-white sm:text-lg">{{ title }}</h1>
             <slot v-else name="title" />
         </div>
 
-        <div class="header-actions flex items-center gap-2">
+        <div class="header-actions flex shrink-0 items-center gap-1.5 sm:gap-2">
             <slot name="actions" />
             <NotificationDrawer />
             <button

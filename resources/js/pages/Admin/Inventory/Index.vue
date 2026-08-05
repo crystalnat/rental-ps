@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import AlertDialog from '@/components/AlertDialog.vue'
 import { formatCurrency } from '@/lib/utils'
-import { Package, Search, Plus, Pencil, Loader2, Trash2 } from 'lucide-vue-next'
+import { Package, Search, Plus, Pencil, Loader2, Trash2, X } from 'lucide-vue-next'
 
 interface Product {
     id: number
@@ -576,7 +576,7 @@ function submitForm() {
 
         <!-- Modal Pilih Produk -->
         <Dialog :open="pickerForIndex !== null" @update:open="(v) => { if (!v) pickerForIndex = null }">
-            <DialogContent class="max-w-lg">
+            <DialogContent class="w-[95vw] max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Pilih Produk</DialogTitle>
                     <DialogDescription>Klik produk untuk memilih</DialogDescription>
@@ -656,9 +656,73 @@ function submitForm() {
                     <p class="text-sm text-muted-foreground">
                         Menampilkan <strong class="text-foreground">{{ filteredStockIns.length }}</strong> dari {{ recent_stock_ins.length }} catatan
                     </p>
-                    <div class="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <!-- Daftar kartu: dipakai di HP supaya tabel lebar tidak perlu digeser horizontal -->
+                    <div class="space-y-2 md:hidden">
+                        <div
+                            v-for="s in filteredStockIns"
+                            :key="s.id"
+                            class="rounded-lg border p-3"
+                            @click="openEditDialog(s as RecentStockIn)"
+                        >
+                            <div class="flex items-start gap-3">
+                                <div class="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted">
+                                    <img
+                                        v-if="s.product_image"
+                                        :src="s.product_image as string"
+                                        :alt="s.product_name"
+                                        class="h-full w-full object-cover"
+                                    />
+                                    <div v-else class="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">
+                                        {{ s.product_name.charAt(0) }}
+                                    </div>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="break-words font-medium leading-tight">{{ s.product_name }}</p>
+                                    <p class="text-xs text-muted-foreground">{{ s.created_at }}</p>
+                                    <p v-if="s.creator_name" class="text-xs text-muted-foreground">{{ s.creator_name }}</p>
+                                </div>
+                                <div class="flex shrink-0 gap-1" @click.stop>
+                                    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditDialog(s as RecentStockIn)" title="Edit">
+                                        <Pencil class="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        class="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                                        @click="deleteTarget = s as RecentStockIn"
+                                        title="Hapus"
+                                    >
+                                        <Trash2 class="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <div class="mt-3 grid grid-cols-3 gap-2 border-t pt-2 text-xs">
+                                <div class="min-w-0">
+                                    <p class="text-[10px] uppercase text-muted-foreground">Jumlah</p>
+                                    <p class="tabular-nums font-medium">{{ s.quantity }} <span class="text-[10px] uppercase text-muted-foreground">{{ s.unit }}</span></p>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-[10px] uppercase text-muted-foreground">Harga/unit</p>
+                                    <p class="whitespace-nowrap tabular-nums">{{ formatCurrency(s.buy_price) }}</p>
+                                </div>
+                                <div class="min-w-0 text-right">
+                                    <p class="text-[10px] uppercase text-muted-foreground">Total</p>
+                                    <p class="whitespace-nowrap font-bold tabular-nums text-primary">{{ formatCurrency(s.total_amount) }}</p>
+                                </div>
+                            </div>
+                            <div v-if="!s.add_to_stock || !s.add_to_expense" class="mt-2 flex flex-wrap gap-1">
+                                <Badge v-if="!s.add_to_stock" variant="secondary" class="text-[10px]">Manual</Badge>
+                                <Badge v-if="!s.add_to_expense" variant="outline" class="text-[10px]">Tanpa pengeluaran</Badge>
+                            </div>
+                        </div>
+                        <div v-if="filteredStockIns.length === 0" class="rounded-lg border py-8 text-center text-sm text-muted-foreground">
+                            Tidak ada data yang cocok dengan filter / pencarian.
+                        </div>
+                    </div>
+
+                    <div class="hidden overflow-hidden rounded-2xl border bg-card shadow-sm md:block">
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[720px] text-sm">
+                            <table class="w-full text-sm">
                                 <thead>
                                     <tr class="border-b bg-muted/20 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <TableHeadSortable
@@ -673,6 +737,7 @@ function submitForm() {
                                             sort-key="created_at_iso"
                                             :current-sort-key="sortStockSortKey"
                                             :sort-dir="sortStockDir"
+                                            class-names="hidden lg:table-cell"
                                             @sort="setStockSort"
                                         />
                                         <TableHeadSortable
@@ -731,9 +796,9 @@ function submitForm() {
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3.5 text-muted-foreground hidden lg:table-cell">{{ s.created_at }}</td>
                                         <td class="px-4 py-3.5 text-right tabular-nums font-medium">{{ s.quantity }} <span class="text-[10px] uppercase text-muted-foreground">{{ s.unit }}</span></td>
-                                        <td class="px-4 py-3.5 text-right tabular-nums hidden sm:table-cell">{{ formatCurrency(s.buy_price) }}</td>
-                                        <td class="px-4 py-3.5 text-right font-bold tabular-nums text-primary">{{ formatCurrency(s.total_amount) }}</td>
-                                        <td class="px-4 py-3.5 hidden md:table-cell">
+                                        <td class="whitespace-nowrap px-4 py-3.5 text-right tabular-nums">{{ formatCurrency(s.buy_price) }}</td>
+                                        <td class="whitespace-nowrap px-4 py-3.5 text-right font-bold tabular-nums text-primary">{{ formatCurrency(s.total_amount) }}</td>
+                                        <td class="px-4 py-3.5">
                                             <div class="flex flex-wrap gap-1">
                                                 <Badge v-if="!s.add_to_stock" variant="secondary" class="text-[10px]">Manual</Badge>
                                                 <Badge v-if="!s.add_to_expense" variant="outline" class="text-[10px]">Tanpa pengeluaran</Badge>
@@ -769,7 +834,7 @@ function submitForm() {
 
         <!-- Hapus Konfirmasi -->
         <Dialog :open="!!deleteTarget" @update:open="(v) => { if (!v) deleteTarget = null }">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Hapus Barang Masuk</DialogTitle>
                     <DialogDescription>
@@ -777,16 +842,16 @@ function submitForm() {
                         Stok dan pengeluaran akan dikembalikan/dihapus otomatis.
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" @click="deleteTarget = null">Batal</Button>
-                    <Button variant="destructive" @click="handleDelete">Ya, Hapus</Button>
+                <DialogFooter class="flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="deleteTarget = null">Batal</Button>
+                    <Button variant="destructive" class="w-full sm:w-auto" @click="handleDelete">Ya, Hapus</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
         <!-- Edit Barang Masuk Modal -->
         <Dialog :open="showEditDialog" @update:open="showEditDialog = $event">
-            <DialogContent class="max-w-md">
+            <DialogContent class="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Barang Masuk</DialogTitle>
                     <DialogDescription>
@@ -856,9 +921,9 @@ function submitForm() {
                         <Input id="edit_notes" v-model="editForm.notes" placeholder="No. faktur, supplier, dll" class="mt-1" :disabled="processing" />
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" @click="showEditDialog = false" :disabled="processing">Batal</Button>
-                    <Button @click="submitEdit" :disabled="processing || Number(editForm.quantity) <= 0 || Number(editForm.buy_price) < 0">
+                <DialogFooter class="flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="showEditDialog = false" :disabled="processing">Batal</Button>
+                    <Button class="w-full sm:w-auto" @click="submitEdit" :disabled="processing || Number(editForm.quantity) <= 0 || Number(editForm.buy_price) < 0">
                         <Loader2 v-if="processing" class="h-4 w-4 animate-spin" />
                         Simpan
                     </Button>

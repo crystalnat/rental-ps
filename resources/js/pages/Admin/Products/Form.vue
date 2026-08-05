@@ -206,14 +206,14 @@ function formatDuration(m: number) {
     <AdminLayout :title="pageTitle">
         <div class="mx-auto max-w-2xl">
             <!-- ─── Back button in body ─────────────────────────────────── -->
-            <div class="mb-5 flex items-center gap-3">
+            <div class="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <Link href="/admin/products">
                     <Button variant="outline" size="sm" class="gap-2">
                         <ArrowLeft class="h-4 w-4" />
                         Kembali ke Daftar Produk
                     </Button>
                 </Link>
-                <div class="text-sm text-muted-foreground">
+                <div class="min-w-0 break-words text-sm text-muted-foreground">
                     <span v-if="!typeChosen">Pilih tipe produk terlebih dahulu</span>
                     <span v-else-if="productType === 'rental'" class="flex items-center gap-1">
                         <Gamepad2 class="h-3.5 w-3.5 text-primary" />
@@ -279,9 +279,9 @@ function formatDuration(m: number) {
             <form v-else @submit.prevent="submit" class="space-y-6">
 
                 <!-- ── Rental Package Banner ── -->
-                <div v-if="productType === 'rental'" class="flex items-center gap-3 rounded-xl border-2 border-violet-300 bg-violet-50 px-4 py-3">
+                <div v-if="productType === 'rental'" class="flex flex-wrap items-center gap-3 rounded-xl border-2 border-violet-300 bg-violet-50 px-4 py-3">
                     <Gamepad2 class="h-5 w-5 text-violet-600 shrink-0" />
-                    <div>
+                    <div class="min-w-0 flex-1 break-words">
                         <p class="text-sm font-bold text-violet-800">Mode: Paket Rental PS</p>
                         <p class="text-xs text-violet-600">Form ini untuk membuat paket sewa PS yang bisa dipilih kasir saat memulai rental.</p>
                     </div>
@@ -292,9 +292,9 @@ function formatDuration(m: number) {
                         @click="typeChosen = false"
                     >Ganti tipe</button>
                 </div>
-                <div v-else-if="!isEdit" class="flex items-center gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+                <div v-else-if="!isEdit" class="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 px-4 py-3">
                     <ShoppingBag class="h-5 w-5 text-muted-foreground shrink-0" />
-                    <p class="text-sm text-muted-foreground flex-1">Mode: <strong>Produk Biasa</strong> — Makanan, minuman, atau item satuan</p>
+                    <p class="min-w-0 flex-1 break-words text-sm text-muted-foreground">Mode: <strong>Produk Biasa</strong> — Makanan, minuman, atau item satuan</p>
                     <button
                         type="button"
                         class="text-xs text-muted-foreground underline hover:text-foreground"
@@ -390,7 +390,7 @@ function formatDuration(m: number) {
                         <!-- Duration picker -->
                         <div class="space-y-2">
                             <Label>Durasi Paket <span class="text-destructive"> *</span></Label>
-                            <div class="grid grid-cols-3 gap-2">
+                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                 <button
                                     v-for="d in durationPresets"
                                     :key="d"
@@ -404,14 +404,14 @@ function formatDuration(m: number) {
                                     {{ formatDuration(d) }}
                                 </button>
                             </div>
-                            <div class="flex items-center gap-2 mt-1">
+                            <div class="mt-1 flex flex-wrap items-center gap-2">
                                 <Input
                                     :value="form.rental_duration_minutes ?? ''"
                                     type="number"
                                     min="1"
                                     placeholder="Atau ketik durasi custom (menit)"
                                     :disabled="form.processing"
-                                    class="flex-1"
+                                    class="w-full flex-1 tabular-nums sm:w-auto"
                                     @input="form.rental_duration_minutes = ($event.target as HTMLInputElement).valueAsNumber || null"
                                 />
                                 <span class="text-xs text-muted-foreground whitespace-nowrap">menit</span>
@@ -426,12 +426,12 @@ function formatDuration(m: number) {
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="space-y-2">
                                 <Label for="buy_price_rental">Modal / HPP Paket</Label>
-                                <Input id="buy_price_rental" v-model.number="form.buy_price" type="number" min="0" :disabled="form.processing" />
+                                <Input id="buy_price_rental" v-model.number="form.buy_price" type="number" min="0" class="tabular-nums" :disabled="form.processing" />
                                 <p class="text-[10px] text-muted-foreground">Estimasi biaya operasional paket ini</p>
                             </div>
                             <div class="space-y-2">
                                 <Label for="sell_price_rental">Harga Jual Paket <span class="text-destructive"> *</span></Label>
-                                <Input id="sell_price_rental" v-model.number="form.sell_price" type="number" min="0" :disabled="form.processing" required />
+                                <Input id="sell_price_rental" v-model.number="form.sell_price" type="number" min="0" class="tabular-nums" :disabled="form.processing" required />
                                 <p class="text-[10px] text-muted-foreground">Harga total yang dibayar pelanggan</p>
                                 <p v-if="form.errors.sell_price" class="text-xs text-destructive">{{ form.errors.sell_price }}</p>
                             </div>
@@ -440,7 +440,7 @@ function formatDuration(m: number) {
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="space-y-2">
                                 <Label for="discount_rental">Diskon Paket (%)</Label>
-                                <Input id="discount_rental" v-model.number="form.discount_percent" type="number" min="0" max="100" :disabled="form.processing" />
+                                <Input id="discount_rental" v-model.number="form.discount_percent" type="number" min="0" max="100" class="tabular-nums" :disabled="form.processing" />
                                 <p class="text-[10px] text-muted-foreground">Diskon dari harga jual normal</p>
                             </div>
                             <div v-if="form.sell_price > 0 && form.rental_duration_minutes" class="rounded-xl bg-violet-100 p-3 text-center">
@@ -472,8 +472,8 @@ function formatDuration(m: number) {
                                 :key="i"
                                 class="flex items-center gap-3 rounded-lg border bg-background px-3 py-2"
                             >
-                                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">{{ item.qty }}x</span>
-                                <span class="flex-1 text-sm font-medium">{{ item.product_name }}</span>
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 tabular-nums">{{ item.qty }}x</span>
+                                <span class="min-w-0 flex-1 break-words text-sm font-medium">{{ item.product_name }}</span>
                                 <button
                                     type="button"
                                     class="text-muted-foreground hover:text-destructive transition-colors"
@@ -491,17 +491,17 @@ function formatDuration(m: number) {
                         <!-- Product Picker -->
                         <div class="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/40 p-3 space-y-2">
                             <p class="text-xs font-semibold text-violet-700 mb-2">➕ Tambah Produk ke Paket</p>
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap gap-2">
                                 <!-- Qty -->
                                 <Input
                                     v-model.number="pickerQty"
                                     type="number"
                                     min="1"
-                                    class="w-16 text-center shrink-0"
+                                    class="w-16 shrink-0 text-center tabular-nums"
                                     placeholder="Qty"
                                 />
                                 <!-- Searchable product select -->
-                                <div class="relative flex-1">
+                                <div class="relative min-w-[8rem] flex-1">
                                     <Input
                                         v-model="pickerSearch"
                                         placeholder="Cari produk..."
@@ -543,7 +543,7 @@ function formatDuration(m: number) {
                                 <Button
                                     type="button"
                                     size="sm"
-                                    class="shrink-0 gap-1 bg-violet-600 hover:bg-violet-700"
+                                    class="w-full shrink-0 gap-1 bg-violet-600 hover:bg-violet-700 sm:w-auto"
                                     :disabled="!pickerSelectedId"
                                     @click="addIncludedItem"
                                 >
@@ -571,12 +571,12 @@ function formatDuration(m: number) {
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="space-y-2">
                                 <Label for="buy_price">Harga Beli / HPP <span class="text-destructive">*</span></Label>
-                                <Input id="buy_price" v-model.number="form.buy_price" type="number" min="0" step="0.01" :disabled="form.processing" required />
+                                <Input id="buy_price" v-model.number="form.buy_price" type="number" min="0" step="0.01" class="tabular-nums" :disabled="form.processing" required />
                                 <p v-if="form.errors.buy_price" class="text-xs text-destructive">{{ form.errors.buy_price }}</p>
                             </div>
                             <div class="space-y-2">
                                 <Label for="sell_price">Harga Jual <span class="text-destructive">*</span></Label>
-                                <Input id="sell_price" v-model.number="form.sell_price" type="number" min="0" step="0.01" :disabled="form.processing" required />
+                                <Input id="sell_price" v-model.number="form.sell_price" type="number" min="0" step="0.01" class="tabular-nums" :disabled="form.processing" required />
                                 <p v-if="form.errors.sell_price" class="text-xs text-destructive">{{ form.errors.sell_price }}</p>
                             </div>
                         </div>
@@ -590,7 +590,7 @@ function formatDuration(m: number) {
                             </div>
                             <div class="space-y-2">
                                 <Label for="discount_percent">Diskon Penjualan (%)</Label>
-                                <Input id="discount_percent" v-model.number="form.discount_percent" type="number" min="0" max="100" step="0.01" :disabled="form.processing" />
+                                <Input id="discount_percent" v-model.number="form.discount_percent" type="number" min="0" max="100" step="0.01" class="tabular-nums" :disabled="form.processing" />
                                 <p class="text-[10px] text-muted-foreground">Otomatis aktif di kasir</p>
                                 <p v-if="form.errors.discount_percent" class="text-xs text-destructive">{{ form.errors.discount_percent }}</p>
                             </div>
@@ -607,12 +607,12 @@ function formatDuration(m: number) {
 
                 <!-- ── Card: Varian & Modifier (Produk Biasa only) ── -->
                 <Card v-if="productType === 'regular'">
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0">
-                        <div>
+                    <CardHeader class="flex flex-col items-start gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
                             <CardTitle>Varian & Modifier</CardTitle>
                             <CardDescription>Pilihan tambahan (Size, Topping, Gula, dll)</CardDescription>
                         </div>
-                        <Button type="button" variant="outline" size="sm" @click="addModifierGroup">
+                        <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto" @click="addModifierGroup">
                             <Plus class="mr-1 h-3.5 w-3.5" />
                             Tambah Group
                         </Button>
@@ -631,27 +631,27 @@ function formatDuration(m: number) {
                                     <Label class="text-xs">Nama Group (Contoh: Ukuran, Topping)</Label>
                                     <Input v-model="group.name" placeholder="Pilih Ukuran" required />
                                 </div>
-                                <div class="flex items-center gap-4 pt-6">
+                                <div class="flex flex-wrap items-center gap-4 sm:pt-6">
                                     <div class="flex items-center gap-2">
                                         <Switch v-model:checked="group.is_required" />
                                         <Label class="text-xs">Wajib Pilih</Label>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <Label class="text-xs">Max Pilih</Label>
-                                        <Input v-model.number="group.max_select" type="number" min="1" class="h-8 w-16" />
+                                        <Input v-model.number="group.max_select" type="number" min="1" class="h-8 w-16 tabular-nums" />
                                     </div>
                                 </div>
                             </div>
                             <div class="space-y-3">
                                 <Label class="text-xs font-bold text-muted-foreground">Pilihan Opsi</Label>
-                                <div v-for="(opt, oIdx) in group.options" :key="oIdx" class="flex items-center gap-2">
-                                    <div class="flex h-10 w-full items-center gap-2 rounded-md bg-background px-2 border">
-                                        <GripVertical class="h-4 w-4 text-muted-foreground/30" />
-                                        <input v-model="opt.name" class="flex-1 bg-transparent border-none text-sm outline-none placeholder:text-muted-foreground/50" placeholder="Nama Opsi (Hot / Large)" required />
-                                        <div class="h-4 w-px bg-border mx-1" />
+                                <div v-for="(opt, oIdx) in group.options" :key="oIdx" class="flex items-start gap-2 sm:items-center">
+                                    <div class="flex min-h-10 w-full min-w-0 flex-wrap items-center gap-2 rounded-md bg-background px-2 py-1.5 border sm:flex-nowrap sm:py-0">
+                                        <GripVertical class="hidden h-4 w-4 shrink-0 text-muted-foreground/30 sm:block" />
+                                        <input v-model="opt.name" class="w-full min-w-0 flex-1 bg-transparent border-none text-sm outline-none placeholder:text-muted-foreground/50 sm:w-auto" placeholder="Nama Opsi (Hot / Large)" required />
+                                        <div class="hidden h-4 w-px bg-border mx-1 sm:block" />
                                         <span class="text-[10px] text-muted-foreground">+Rp</span>
-                                        <input v-model.number="opt.price_extra" type="number" class="w-20 bg-transparent border-none text-sm font-bold text-right outline-none" min="0" />
-                                        <div class="h-4 w-px bg-border mx-1" />
+                                        <input v-model.number="opt.price_extra" type="number" class="w-20 bg-transparent border-none text-sm font-bold text-right tabular-nums outline-none" min="0" />
+                                        <div class="hidden h-4 w-px bg-border mx-1 sm:block" />
                                         <div class="flex items-center gap-1.5 px-1 py-0.5 rounded bg-muted/50">
                                             <Switch :checked="opt.is_available" @update:checked="opt.is_available = $event" class="scale-[0.7]" title="Tersedia (Ready Stock)" />
                                             <span class="text-[9px] font-bold" :class="opt.is_available ? 'text-green-600' : 'text-destructive'">
@@ -659,7 +659,7 @@ function formatDuration(m: number) {
                                             </span>
                                         </div>
                                     </div>
-                                    <Button v-if="group.options.length > 1" type="button" variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-destructive" @click="removeOption(gIdx, oIdx)">
+                                    <Button v-if="group.options.length > 1" type="button" variant="ghost" size="icon" class="mt-1 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive sm:mt-0" @click="removeOption(gIdx, oIdx)">
                                         <Trash2 class="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
@@ -677,15 +677,15 @@ function formatDuration(m: number) {
                         <CardTitle>Pengaturan</CardTitle>
                     </CardHeader>
                     <CardContent class="space-y-3">
-                        <div v-if="productType === 'regular'" class="flex items-center justify-between rounded-lg border p-3">
-                            <div>
+                        <div v-if="productType === 'regular'" class="flex items-center justify-between gap-3 rounded-lg border p-3">
+                            <div class="min-w-0 break-words">
                                 <p class="text-sm font-medium">Lacak Stok</p>
                                 <p class="text-xs text-muted-foreground">Aktifkan tracking stok untuk produk ini</p>
                             </div>
                             <Switch v-model:checked="form.track_stock" :disabled="form.processing" />
                         </div>
-                        <div class="flex items-center justify-between rounded-lg border p-3">
-                            <div>
+                        <div class="flex items-center justify-between gap-3 rounded-lg border p-3">
+                            <div class="min-w-0 break-words">
                                 <p class="text-sm font-medium">{{ productType === 'rental' ? 'Paket Aktif (muncul di kasir)' : 'Tersedia untuk Dijual' }}</p>
                                 <p class="text-xs text-muted-foreground">
                                     {{ productType === 'rental'
@@ -699,11 +699,11 @@ function formatDuration(m: number) {
                 </Card>
 
                 <!-- ── Submit bar ── -->
-                <div class="flex items-center justify-between rounded-xl border bg-card p-4">
-                    <Link href="/admin/products">
-                        <Button type="button" variant="outline" :disabled="form.processing">Batal</Button>
+                <div class="flex flex-col-reverse gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <Link href="/admin/products" class="w-full sm:w-auto">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" :disabled="form.processing">Batal</Button>
                     </Link>
-                    <Button type="submit" :disabled="form.processing" :class="productType === 'rental' ? 'bg-violet-600 hover:bg-violet-700' : ''">
+                    <Button type="submit" class="w-full sm:w-auto" :disabled="form.processing" :class="productType === 'rental' ? 'bg-violet-600 hover:bg-violet-700' : ''">
                         <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                         {{ isEdit ? 'Simpan Perubahan' : (productType === 'rental' ? '🎮 Buat Paket Rental' : 'Buat Produk') }}
                     </Button>

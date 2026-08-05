@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm, router } from '@inertiajs/vue3'
+import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ArrowLeft, CheckCircle2, XCircle, Box, Pencil, Calendar, MapPin, Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
@@ -119,34 +119,34 @@ function goBack() {
     <AdminLayout>
         <div class="space-y-6">
             <!-- Header Interna -->
-            <div class="flex items-center justify-between gap-4">
-                <Button variant="ghost" size="sm" @click="goBack" class="px-0 hover:bg-transparent text-foreground">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <Button variant="ghost" size="sm" @click="goBack" class="self-start px-0 text-foreground hover:bg-transparent">
                     <ArrowLeft class="mr-2 h-4 w-4" />
                     Kembali
                 </Button>
 
-                <div class="flex items-center gap-3">
-                    <Button v-if="purchaseOrder.status === 'pending'" variant="outline" size="sm" @click="router.visit(`/admin/purchase-orders/${purchaseOrder.id}/edit`)" :disabled="processing">
+                <div v-if="purchaseOrder.status === 'pending'" class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+                    <Button variant="outline" size="sm" class="w-full sm:w-auto" @click="router.visit(`/admin/purchase-orders/${purchaseOrder.id}/edit`)" :disabled="processing">
                         <Pencil class="mr-2 h-4 w-4" /> Edit
                     </Button>
-                    <Button v-if="purchaseOrder.status === 'pending'" variant="destructive" size="sm" @click="showCancelDialog = true" :disabled="processing">
+                    <Button variant="destructive" size="sm" class="w-full sm:w-auto" @click="showCancelDialog = true" :disabled="processing">
                         <XCircle class="mr-2 h-4 w-4" /> Batal
                     </Button>
-                    <Button v-if="purchaseOrder.status === 'pending'" size="sm" @click="showReceiveDialog = true" class="bg-green-600 hover:bg-green-700 text-white" :disabled="processing">
-                        <CheckCircle2 v-v-if="!processing" class="mr-2 h-4 w-4" />
+                    <Button size="sm" @click="showReceiveDialog = true" class="w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto" :disabled="processing">
                         <Loader2 v-if="processing" class="mr-2 h-4 w-4 animate-spin" />
+                        <CheckCircle2 v-else class="mr-2 h-4 w-4" />
                         Terima Barang
                     </Button>
                 </div>
             </div>
 
             <!-- Title & Status -->
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-foreground">PO: {{ purchaseOrder.po_number }}</h1>
-                    <p class="text-sm text-muted-foreground">{{ purchaseOrder.store.name }} · {{ purchaseOrder.supplier.name }}</p>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h1 class="text-xl font-bold text-foreground break-words sm:text-2xl">PO: {{ purchaseOrder.po_number }}</h1>
+                    <p class="text-sm text-muted-foreground break-words">{{ purchaseOrder.store.name }} · {{ purchaseOrder.supplier.name }}</p>
                 </div>
-                <Badge :variant="getStatusColor(purchaseOrder.status) as any" class="text-sm px-4 py-1">
+                <Badge :variant="getStatusColor(purchaseOrder.status) as any" class="shrink-0 whitespace-nowrap px-4 py-1 text-sm">
                     {{ getStatusLabel(purchaseOrder.status) }}
                 </Badge>
             </div>
@@ -154,20 +154,20 @@ function goBack() {
             <div class="grid gap-6 md:grid-cols-2">
                 <!-- Info Cards -->
                 <Card>
-                    <CardContent class="p-6 text-foreground">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-4 border-b pb-2 flex items-center gap-2">
-                            <MapPin class="h-4 w-4" /> Lokasi & Supplier
+                    <CardContent class="p-4 text-foreground sm:p-6">
+                        <h3 class="mb-4 flex items-center gap-2 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <MapPin class="h-4 w-4 shrink-0" /> Lokasi & Supplier
                         </h3>
                         <div class="space-y-4">
-                            <div>
-                                <p class="text-[10px] text-muted-foreground uppercase font-bold">Cabang Tujuan</p>
-                                <p class="font-medium">{{ purchaseOrder.store.name }}</p>
-                                <p class="text-xs text-muted-foreground mt-1" v-if="purchaseOrder.store.address">{{ purchaseOrder.store.address }}</p>
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-bold uppercase text-muted-foreground">Cabang Tujuan</p>
+                                <p class="font-medium break-words">{{ purchaseOrder.store.name }}</p>
+                                <p class="mt-1 text-xs text-muted-foreground break-words" v-if="purchaseOrder.store.address">{{ purchaseOrder.store.address }}</p>
                             </div>
-                            <div>
-                                <p class="text-[10px] text-muted-foreground uppercase font-bold">Supplier</p>
-                                <p class="font-medium">{{ purchaseOrder.supplier.name }}</p>
-                                <p class="text-xs text-muted-foreground mt-1">
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-bold uppercase text-muted-foreground">Supplier</p>
+                                <p class="font-medium break-words">{{ purchaseOrder.supplier.name }}</p>
+                                <p class="mt-1 text-xs text-muted-foreground break-all">
                                     {{ purchaseOrder.supplier.phone || '-' }} · {{ purchaseOrder.supplier.email || '-' }}
                                 </p>
                             </div>
@@ -176,30 +176,30 @@ function goBack() {
                 </Card>
 
                 <Card>
-                    <CardContent class="p-6 text-foreground">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-4 border-b pb-2 flex items-center gap-2">
-                            <Calendar class="h-4 w-4" /> Detail Dokumen
+                    <CardContent class="p-4 text-foreground sm:p-6">
+                        <h3 class="mb-4 flex items-center gap-2 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <Calendar class="h-4 w-4 shrink-0" /> Detail Dokumen
                         </h3>
-                        <div class="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <p class="text-[10px] text-muted-foreground uppercase">Tgl Dibuat</p>
-                                <p class="font-medium">{{ formatDate(purchaseOrder.created_at, true) }}</p>
+                        <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                            <div class="min-w-0">
+                                <p class="text-[10px] uppercase text-muted-foreground">Tgl Dibuat</p>
+                                <p class="font-medium break-words">{{ formatDate(purchaseOrder.created_at, true) }}</p>
                             </div>
-                            <div>
-                                <p class="text-[10px] text-muted-foreground uppercase">Estimasi Datang</p>
-                                <p class="font-medium">{{ formatDate(purchaseOrder.expected_date) }}</p>
+                            <div class="min-w-0">
+                                <p class="text-[10px] uppercase text-muted-foreground">Estimasi Datang</p>
+                                <p class="font-medium break-words">{{ formatDate(purchaseOrder.expected_date) }}</p>
                             </div>
-                            <div>
-                                <p class="text-[10px] text-muted-foreground uppercase">Admin</p>
-                                <p class="font-medium">{{ purchaseOrder.creator?.name || 'Sistem' }}</p>
+                            <div class="min-w-0">
+                                <p class="text-[10px] uppercase text-muted-foreground">Admin</p>
+                                <p class="font-medium break-words">{{ purchaseOrder.creator?.name || 'Sistem' }}</p>
                             </div>
-                            <div v-if="purchaseOrder.status === 'received'">
-                                <p class="text-[10px] text-green-600 font-bold uppercase">Waktu Terima</p>
-                                <p class="font-bold text-green-700 dark:text-green-500">{{ formatDate(purchaseOrder.received_at, true) }}</p>
+                            <div v-if="purchaseOrder.status === 'received'" class="min-w-0">
+                                <p class="text-[10px] font-bold uppercase text-green-600">Waktu Terima</p>
+                                <p class="font-bold text-green-700 break-words dark:text-green-500">{{ formatDate(purchaseOrder.received_at, true) }}</p>
                             </div>
-                            <div class="col-span-2 mt-2">
-                                <p class="text-[10px] text-muted-foreground uppercase">Catatan</p>
-                                <p class="italic text-muted-foreground">{{ purchaseOrder.notes || '—' }}</p>
+                            <div class="mt-2 min-w-0 sm:col-span-2">
+                                <p class="text-[10px] uppercase text-muted-foreground">Catatan</p>
+                                <p class="italic text-muted-foreground break-words">{{ purchaseOrder.notes || '—' }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -213,9 +213,39 @@ function goBack() {
                         <Box class="w-4 h-4 text-muted-foreground" />
                         <h3 class="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Item Pesanan</h3>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm whitespace-nowrap">
-                            <thead class="bg-muted/30 text-muted-foreground border-b text-xs font-semibold uppercase tracking-wide">
+                    <!-- Kartu vertikal untuk layar sempit -->
+                    <div class="md:hidden">
+                        <div class="divide-y">
+                            <div v-for="item in purchaseOrder.items" :key="`card-${item.id}`" class="p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="font-medium break-words">{{ item.product.name }}</p>
+                                        <p class="text-[10px] uppercase text-muted-foreground break-all" v-if="item.product.sku">
+                                            SKU: {{ item.product.sku }}
+                                        </p>
+                                    </div>
+                                    <Badge variant="outline" class="shrink-0 whitespace-nowrap border-muted-foreground/30 font-bold">
+                                        {{ Number(item.quantity) }} {{ item.product.unit }}
+                                    </Badge>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between gap-3 text-sm">
+                                    <span class="text-muted-foreground tabular-nums whitespace-nowrap">{{ formatCurrency(item.buy_price) }} / {{ item.product.unit }}</span>
+                                    <span class="font-semibold tabular-nums whitespace-nowrap">{{ formatCurrency(item.subtotal) }}</span>
+                                </div>
+                            </div>
+                            <p v-if="!purchaseOrder.items.length" class="p-8 text-center text-sm text-muted-foreground">
+                                Belum ada item.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/10 p-4">
+                            <span class="text-xs uppercase tracking-wider text-muted-foreground">Grand Total Estimasi</span>
+                            <span class="text-lg font-bold text-primary tabular-nums whitespace-nowrap">{{ formatCurrency(purchaseOrder.total_amount) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="hidden md:block">
+                        <table class="w-full text-left text-sm">
+                            <thead class="border-b bg-muted/30 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 <tr>
                                     <th class="h-10 px-4">Produk</th>
                                     <th class="h-10 px-4 text-center">Jumlah</th>
@@ -224,30 +254,35 @@ function goBack() {
                                 </tr>
                             </thead>
                             <tbody class="divide-y text-foreground">
-                                <tr v-for="item in purchaseOrder.items" :key="item.id" class="hover:bg-muted/10 transition-colors">
+                                <tr v-for="item in purchaseOrder.items" :key="item.id" class="transition-colors hover:bg-muted/10">
                                     <td class="p-4">
-                                        <div class="font-medium">{{ item.product.name }}</div>
-                                        <div class="text-[10px] text-muted-foreground uppercase" v-if="item.product.sku">
+                                        <div class="font-medium break-words">{{ item.product.name }}</div>
+                                        <div class="text-[10px] uppercase text-muted-foreground break-all" v-if="item.product.sku">
                                             SKU: {{ item.product.sku }}
                                         </div>
                                     </td>
                                     <td class="p-4 text-center align-middle">
-                                        <Badge variant="outline" class="font-bold border-muted-foreground/30">
+                                        <Badge variant="outline" class="whitespace-nowrap border-muted-foreground/30 font-bold">
                                             {{ Number(item.quantity) }} {{ item.product.unit }}
                                         </Badge>
                                     </td>
-                                    <td class="p-4 text-right text-muted-foreground tabular-nums">
+                                    <td class="p-4 text-right text-muted-foreground tabular-nums whitespace-nowrap">
                                         {{ formatCurrency(item.buy_price) }}
                                     </td>
-                                    <td class="p-4 text-right font-semibold tabular-nums">
+                                    <td class="p-4 text-right font-semibold tabular-nums whitespace-nowrap">
                                         {{ formatCurrency(item.subtotal) }}
                                     </td>
                                 </tr>
+                                <tr v-if="!purchaseOrder.items.length">
+                                    <td colspan="4" class="p-8 text-center text-muted-foreground">
+                                        Belum ada item.
+                                    </td>
+                                </tr>
                             </tbody>
-                            <tfoot class="bg-muted/10 font-bold border-t">
+                            <tfoot class="border-t bg-muted/10 font-bold">
                                 <tr class="text-foreground">
-                                    <td colspan="3" class="p-4 text-right uppercase text-xs tracking-wider text-muted-foreground">Grand Total Estimasi Pembelian</td>
-                                    <td class="p-4 text-right text-xl text-primary tabular-nums">{{ formatCurrency(purchaseOrder.total_amount) }}</td>
+                                    <td colspan="3" class="p-4 text-right text-xs uppercase tracking-wider text-muted-foreground">Grand Total Estimasi Pembelian</td>
+                                    <td class="p-4 text-right text-xl text-primary tabular-nums whitespace-nowrap">{{ formatCurrency(purchaseOrder.total_amount) }}</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -258,31 +293,31 @@ function goBack() {
 
         <!-- Dialogs -->
         <Dialog :open="showReceiveDialog" @update:open="showReceiveDialog = $event">
-            <DialogContent class="sm:max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle>Konfirmasi Penerimaan Stok</DialogTitle>
                     <DialogDescription>
-                        Aksi ini akan mengubah status PO menjadi <span class="text-green-600 font-bold">DITERIMA</span> dan secara otomatis menambahkan stok barang ke database.
+                        Aksi ini akan mengubah status PO menjadi <span class="font-bold text-green-600">DITERIMA</span> dan secara otomatis menambahkan stok barang ke database.
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter class="mt-4">
-                    <Button variant="outline" @click="showReceiveDialog = false">Batal</Button>
-                    <Button class="bg-green-600 text-white" @click="receivePO">Ya, Terima Barang</Button>
+                <DialogFooter class="mt-4 flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="showReceiveDialog = false">Batal</Button>
+                    <Button class="w-full bg-green-600 text-white sm:w-auto" @click="receivePO">Ya, Terima Barang</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
         <Dialog :open="showCancelDialog" @update:open="showCancelDialog = $event">
-            <DialogContent class="sm:max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle>Batalkan Purchase Order?</DialogTitle>
                     <DialogDescription>
                         Apakah Anda benar-benar ingin membatalkan pesanan barang ini?
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter class="mt-4">
-                    <Button variant="outline" @click="showCancelDialog = false">Tutup</Button>
-                    <Button variant="destructive" @click="cancelPO">Ya, Batalkan</Button>
+                <DialogFooter class="mt-4 flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="showCancelDialog = false">Tutup</Button>
+                    <Button variant="destructive" class="w-full sm:w-auto" @click="cancelPO">Ya, Batalkan</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

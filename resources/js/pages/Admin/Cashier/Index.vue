@@ -1222,32 +1222,33 @@ const showQrOrAccount = computed(() => {
         </Teleport>
 
         <!-- 2-Tab Layout -->
-        <div class="flex flex-col md:flex-row h-[calc(100vh-7rem)] gap-4 pb-[72px] md:pb-0 md:overflow-hidden relative">
+        <!-- dvh dipakai supaya tinggi ikut menyusut saat bilah alamat browser mobile muncul/hilang -->
+        <div class="relative flex h-[calc(100dvh-7rem)] flex-col gap-3 pb-[72px] md:flex-row md:gap-4 md:overflow-hidden md:pb-0">
             <!-- Tab switcher + main content area -->
             <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card h-full">
                 <!-- Tab buttons -->
-                <div class="flex shrink-0 items-center gap-1 border-b bg-muted/30 px-3 py-2">
+                <div class="flex shrink-0 items-center gap-1 border-b bg-muted/30 px-2 py-2 sm:px-3">
                     <button
                         type="button"
-                        class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+                        class="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-all sm:gap-2 sm:px-4 sm:text-sm"
                         :class="activeTab === 'rental' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
                         @click="activeTab = 'rental'"
                     >
-                        <Gamepad2 class="h-4 w-4" />
+                        <Gamepad2 class="h-4 w-4 shrink-0" />
                         Rental PS
                     </button>
                     <button
                         type="button"
-                        class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+                        class="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-all sm:gap-2 sm:px-4 sm:text-sm"
                         :class="activeTab === 'produk' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
                         @click="activeTab = 'produk'"
                     >
-                        <Package class="h-4 w-4" />
+                        <Package class="h-4 w-4 shrink-0" />
                         Produk
                     </button>
 
                     <!-- Shift & store info in tab bar -->
-                    <div class="ml-auto flex items-center gap-2">
+                    <div class="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
                         <div v-if="activeShift" class="hidden md:flex items-center gap-1.5 rounded-full bg-muted/50 border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                             <Clock class="h-3 w-3 text-primary" />
                             <span>Shift #{{ activeShift.id }}</span>
@@ -1255,7 +1256,7 @@ const showQrOrAccount = computed(() => {
                         <select
                             v-if="stores.length > 1"
                             :value="store.id"
-                            class="filter-select flex h-8 rounded-md border border-input bg-background pl-3 pr-8 py-1 text-xs text-foreground"
+                            class="filter-select flex h-8 min-w-0 max-w-[110px] truncate rounded-md border border-input bg-background py-1 pl-2 pr-7 text-xs text-foreground sm:max-w-none sm:pl-3 sm:pr-8"
                             @change="changeStore(Number(($event.target as HTMLSelectElement).value))"
                         >
                             <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -1339,8 +1340,8 @@ const showQrOrAccount = computed(() => {
                         </div>
                     </div>
                     <!-- Products grid -->
-                    <div class="flex-1 overflow-y-auto p-3">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-3">
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                         <button
                             v-for="p in filteredProducts"
                             :key="p.id"
@@ -1376,7 +1377,7 @@ const showQrOrAccount = computed(() => {
                                     </span>
                                 </div>
                                 <p class="truncate text-xs md:text-sm font-semibold leading-tight mb-1">{{ p.name }}</p>
-                                <p class="truncate text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
+                                <p class="text-[10px] leading-tight text-muted-foreground md:text-xs">
                                     <span v-if="p.discount_percent > 0" class="line-through text-muted-foreground/50 mr-1">{{ formatCurrency(p.sell_price) }}</span>
                                     <span v-if="p.discount_percent > 0" class="font-bold text-destructive">{{ formatCurrency(p.sell_price - Math.round(p.sell_price * (p.discount_percent / 100))) }}</span>
                                     <span v-else>{{ formatCurrency(p.sell_price) }}</span>
@@ -1401,7 +1402,9 @@ const showQrOrAccount = computed(() => {
 
             <div
                 :class="[
-                    'fixed inset-x-0 bottom-0 z-50 flex h-[85vh] flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-all duration-300 md:static md:z-auto md:h-full md:shrink-0 md:translate-y-0 md:bg-transparent md:p-0 md:shadow-none min-h-0 relative',
+                    // 'relative' tidak boleh ikut di sini: utility itu menang atas 'fixed' di
+                    // urutan CSS Tailwind, sehingga panel keranjang batal jadi bottom sheet di mobile
+                    'fixed inset-x-0 bottom-0 z-50 flex h-[85dvh] min-h-0 flex-col gap-3 rounded-t-xl bg-background p-4 shadow-2xl transition-transform duration-300 md:relative md:z-auto md:h-full md:shrink-0 md:translate-y-0 md:bg-transparent md:p-0 md:shadow-none',
                     showMobileCart ? 'translate-y-0' : 'translate-y-full',
                     isCartCollapsed ? 'md:w-[60px] md:overflow-visible' : 'md:w-[400px] lg:w-[460px]'
                 ]"

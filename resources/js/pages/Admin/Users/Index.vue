@@ -108,23 +108,23 @@ function canDelete(user: UserItem) {
 <template>
     <AdminLayout title="Karyawan">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div class="grid flex-1 grid-cols-2 gap-4">
-                <StatCard variant="primary" class="border-none shadow-sm">
+            <div class="grid flex-1 grid-cols-2 gap-3 sm:gap-4">
+                <StatCard variant="primary" class="border-none shadow-sm p-3 sm:p-5">
                     <template #title>Total Karyawan</template>
                     <template #value>
-                        <p class="text-xl md:text-2xl font-black tabular-nums">{{ users.length }}</p>
+                        <p class="text-lg sm:text-2xl font-black tabular-nums">{{ users.length }}</p>
                     </template>
                     <template #icon><Users class="h-5 w-5" /></template>
                 </StatCard>
-                <StatCard variant="success" class="border-none shadow-sm">
+                <StatCard variant="success" class="border-none shadow-sm p-3 sm:p-5">
                     <template #title>Aktif</template>
                     <template #value>
-                        <p class="text-xl md:text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{{ users.filter(u => u.is_active).length }}</p>
+                        <p class="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{{ users.filter(u => u.is_active).length }}</p>
                     </template>
                     <template #icon><Users class="h-5 w-5" /></template>
                 </StatCard>
             </div>
-            <Button class="h-11 md:h-10 font-bold px-6 shadow-md" as-child>
+            <Button class="h-11 md:h-10 w-full sm:w-auto font-bold px-6 shadow-md" as-child>
                 <Link href="/admin/users/create">
                     <Plus class="mr-2 h-5 w-5 md:h-4 md:w-4" />
                     Tambah Karyawan
@@ -134,7 +134,7 @@ function canDelete(user: UserItem) {
 
         <!-- Filters -->
         <Card class="border-none shadow-sm md:shadow-md mb-6 overflow-hidden">
-            <CardContent class="p-4">
+            <CardContent class="p-3 sm:p-5">
                 <div class="space-y-4">
                     <div class="relative group">
                         <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -145,7 +145,7 @@ function canDelete(user: UserItem) {
                             @keydown.enter="applyFilters"
                         />
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         <div class="space-y-1.5">
                             <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-1">Jabatan</Label>
                             <select
@@ -168,7 +168,7 @@ function canDelete(user: UserItem) {
                                 <option v-for="s in stores" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
                             </select>
                         </div>
-                        <div class="space-y-1.5 col-span-2 md:col-span-1">
+                        <div class="space-y-1.5 sm:col-span-2 md:col-span-1">
                             <Label class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-1">Status Akun</Label>
                             <select
                                 v-model="filterState.status"
@@ -180,7 +180,7 @@ function canDelete(user: UserItem) {
                             </select>
                         </div>
                     </div>
-                    <div class="flex gap-2 pt-2 border-t border-dashed">
+                    <div class="flex flex-col gap-2 pt-2 border-t border-dashed sm:flex-row">
                         <Button class="flex-1 h-11 md:h-10 font-bold" @click="applyFilters">
                             Terapkan Filter
                         </Button>
@@ -200,24 +200,27 @@ function canDelete(user: UserItem) {
                         <thead>
                             <tr class="bg-muted/50 border-b">
                                 <th class="px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Nama Karyawan</th>
-                                <th class="px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Kontak</th>
+                                <th class="hidden xl:table-cell px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Kontak</th>
                                 <th class="px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Akses</th>
-                                <th class="px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Toko</th>
+                                <th class="hidden lg:table-cell px-4 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Toko</th>
                                 <th class="px-4 py-4 text-center font-black uppercase tracking-widest text-[10px] text-muted-foreground">Status</th>
                                 <th class="px-4 py-4 text-right font-black uppercase tracking-widest text-[10px] text-muted-foreground">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y">
                             <tr v-for="user in users" :key="user.id" class="hover:bg-primary/5 transition-colors group" :class="{ 'opacity-60 grayscale-[0.5]': !user.is_active }">
-                                <td class="px-4 py-3">
-                                    <Link :href="`/admin/users/${user.id}`" class="font-bold text-primary group-hover:underline">
+                                <td class="px-4 py-3 min-w-0">
+                                    <Link :href="`/admin/users/${user.id}`" class="font-bold text-primary group-hover:underline break-words">
                                         {{ user.name }}
                                         <Badge v-if="user.id === currentUserId" variant="secondary" class="ml-2 text-[8px] h-4">SAYA</Badge>
                                     </Link>
+                                    <!-- Ringkasan kolom yang disembunyikan agar info tetap ada di layar sempit -->
+                                    <span class="mt-0.5 block text-xs text-muted-foreground break-all xl:hidden">{{ user.email }}</span>
+                                    <span class="mt-0.5 block text-xs text-muted-foreground lg:hidden">{{ user.store_name || 'Semua Cabang' }}</span>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="hidden xl:table-cell px-4 py-3">
                                     <div class="text-xs space-y-0.5">
-                                        <p>{{ user.email }}</p>
+                                        <p class="break-all">{{ user.email }}</p>
                                         <p v-if="user.phone" class="text-muted-foreground italic font-mono">{{ user.phone }}</p>
                                     </div>
                                 </td>
@@ -226,7 +229,7 @@ function canDelete(user: UserItem) {
                                         {{ roleLabels[user.role] ?? user.role }}
                                     </Badge>
                                 </td>
-                                <td class="px-4 py-3 text-xs font-medium">{{ user.store_name || 'Semua Cabang' }}</td>
+                                <td class="hidden lg:table-cell px-4 py-3 text-xs font-medium">{{ user.store_name || 'Semua Cabang' }}</td>
                                 <td class="px-4 py-3 text-center">
                                     <Badge :variant="user.is_active ? 'success' : 'secondary'" class="text-[10px] font-bold">
                                         {{ user.is_active ? 'AKTIF' : 'NONAKTIF' }}
@@ -257,15 +260,15 @@ function canDelete(user: UserItem) {
 
                 <!-- Mobile Cards -->
                 <div class="md:hidden divide-y">
-                    <div v-for="user in users" :key="user.id" class="p-4 space-y-3" :class="{ 'opacity-60': !user.is_active }">
-                        <div class="flex items-start justify-between gap-4">
-                            <div class="space-y-1">
-                                <div class="flex items-center gap-2">
-                                    <Link :href="`/admin/users/${user.id}`" class="font-bold text-primary text-base">{{ user.name }}</Link>
+                    <div v-for="user in users" :key="user.id" class="p-3 space-y-3" :class="{ 'opacity-60': !user.is_active }">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 space-y-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <Link :href="`/admin/users/${user.id}`" class="font-bold text-primary text-base break-words">{{ user.name }}</Link>
                                     <Badge v-if="user.id === currentUserId" variant="secondary" class="text-[8px] h-3.5 px-1 font-black">SAYA</Badge>
                                 </div>
                                 <div class="text-xs text-muted-foreground space-y-0.5">
-                                    <p>{{ user.email }}</p>
+                                    <p class="break-all">{{ user.email }}</p>
                                     <p v-if="user.phone" class="font-mono">{{ user.phone }}</p>
                                 </div>
                                 <div class="flex flex-wrap gap-1.5 pt-1">
@@ -318,7 +321,7 @@ function canDelete(user: UserItem) {
 
         <!-- Delete Confirmation Dialog -->
         <Dialog :open="!!deleteTarget" @update:open="(v) => { if (!v) deleteTarget = null }">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Hapus Karyawan</DialogTitle>
                     <DialogDescription>
@@ -327,9 +330,9 @@ function canDelete(user: UserItem) {
                         Akun ini tidak dapat digunakan lagi untuk login.
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" @click="deleteTarget = null">Batal</Button>
-                    <Button variant="destructive" @click="handleDelete">Ya, Hapus</Button>
+                <DialogFooter class="flex-col-reverse gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="deleteTarget = null">Batal</Button>
+                    <Button variant="destructive" class="w-full sm:w-auto" @click="handleDelete">Ya, Hapus</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

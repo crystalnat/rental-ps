@@ -22,7 +22,7 @@ function selectStore(storeId: number) {
 
 <template>
     <AdminLayout title="Pilih Toko">
-        <div class="flex min-h-[50vh] items-center justify-center">
+        <div class="flex min-h-[50dvh] items-center justify-center">
             <Card class="w-full max-w-md">
                 <CardHeader>
                     <CardTitle class="flex items-center gap-2">
@@ -43,7 +43,7 @@ function selectStore(storeId: number) {
                             @click="selectStore(s.id)"
                         >
                             <Store class="mr-3 h-4 w-4 shrink-0" />
-                            {{ s.name }}
+                            <span class="min-w-0 truncate">{{ s.name }}</span>
                         </Button>
                     </div>
                 </CardContent>

@@ -93,13 +93,13 @@ const presetColors = [
                                     id="color"
                                     v-model="form.color"
                                     type="color"
-                                    class="h-9 w-14 cursor-pointer rounded border border-input bg-transparent p-0.5"
+                                    class="h-9 w-14 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5"
                                     :disabled="form.processing"
                                 />
                                 <Input
                                     v-model="form.color"
                                     placeholder="#3b82f6"
-                                    class="font-mono"
+                                    class="min-w-0 flex-1 font-mono"
                                     :disabled="form.processing"
                                 />
                             </div>
@@ -125,30 +125,32 @@ const presetColors = [
                                 v-model.number="form.sort_order"
                                 type="number"
                                 min="0"
+                                class="tabular-nums"
                                 :disabled="form.processing"
                             />
                             <p class="text-xs text-muted-foreground">Angka lebih kecil tampil lebih dulu</p>
                             <p v-if="form.errors.sort_order" class="text-xs text-destructive">{{ form.errors.sort_order }}</p>
                         </div>
 
-                        <div class="flex items-center gap-2 rounded-lg border p-3">
+                        <div class="flex items-start gap-2 rounded-lg border p-3">
                             <Checkbox
                                 id="is_active"
+                                class="mt-0.5 shrink-0"
                                 :checked="form.is_active"
                                 @update:checked="(v) => form.is_active = !!v"
                             />
-                            <Label for="is_active" class="cursor-pointer text-sm font-medium">
+                            <Label for="is_active" class="min-w-0 cursor-pointer break-words text-sm font-medium">
                                 Aktif — kategori tampil di daftar pilihan
                             </Label>
                         </div>
                     </CardContent>
                 </Card>
 
-                <div class="flex items-center justify-end gap-3 rounded-xl border bg-card p-4">
-                    <Link href="/admin/categories">
-                        <Button type="button" variant="outline" :disabled="form.processing">Batal</Button>
+                <div class="flex flex-col-reverse gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-end">
+                    <Link href="/admin/categories" class="w-full sm:w-auto">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" :disabled="form.processing">Batal</Button>
                     </Link>
-                    <Button type="submit" :disabled="form.processing">
+                    <Button type="submit" class="w-full sm:w-auto" :disabled="form.processing">
                         <Loader2 v-if="form.processing" class="animate-spin" />
                         {{ isEdit ? 'Simpan Perubahan' : 'Buat Kategori' }}
                     </Button>

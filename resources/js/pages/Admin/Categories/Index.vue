@@ -18,7 +18,7 @@ import TableToolbar from '@/components/TableToolbar.vue'
 import FilterSelect from '@/components/FilterSelect.vue'
 import AlertDialog from '@/components/AlertDialog.vue'
 import { TableHeadSortable } from '@/components/ui/table'
-import { Plus, Tags, Pencil, Trash2, Loader2 } from 'lucide-vue-next'
+import { Plus, Tags, Pencil, Trash2, Loader2, CheckCircle2, EyeOff, Package } from 'lucide-vue-next'
 
 const presetColors = [
     '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
@@ -61,6 +61,9 @@ const hasActiveFilters = computed(
         !!sortKey.value ||
         (filterValues.value?.status && filterValues.value.status !== 'all'),
 )
+
+const activeCount = computed(() => props.categories.filter(c => c.is_active).length)
+const totalProducts = computed(() => props.categories.reduce((sum, c) => sum + c.products_count, 0))
 
 const deleteTarget = ref<CategoryItem | null>(null)
 
@@ -163,20 +166,34 @@ function submitCategory() {
 <template>
     <AdminLayout title="Kategori">
         <!-- Summary -->
-        <div class="mb-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
+        <div class="mb-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             <StatCard variant="primary" class="p-3 md:p-5">
                 <template #title>Total Kategori</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold">{{ categories.length }}</p>
+                    <p class="text-xl md:text-2xl font-bold tabular-nums">{{ categories.length }}</p>
                 </template>
                 <template #icon><Tags class="h-5 w-5" /></template>
             </StatCard>
             <StatCard variant="success" class="p-3 md:p-5">
                 <template #title>Aktif</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ categories.filter(c => c.is_active).length }}</p>
+                    <p class="text-xl md:text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{{ activeCount }}</p>
                 </template>
-                <template #icon><Tags class="h-5 w-5" /></template>
+                <template #icon><CheckCircle2 class="h-5 w-5" /></template>
+            </StatCard>
+            <StatCard variant="default" class="p-3 md:p-5">
+                <template #title>Nonaktif</template>
+                <template #value>
+                    <p class="text-xl md:text-2xl font-bold tabular-nums text-muted-foreground">{{ categories.length - activeCount }}</p>
+                </template>
+                <template #icon><EyeOff class="h-5 w-5" /></template>
+            </StatCard>
+            <StatCard variant="default" class="p-3 md:p-5">
+                <template #title>Total Produk</template>
+                <template #value>
+                    <p class="text-xl md:text-2xl font-bold tabular-nums">{{ totalProducts }}</p>
+                </template>
+                <template #icon><Package class="h-5 w-5" /></template>
             </StatCard>
         </div>
 
@@ -203,7 +220,59 @@ function submitCategory() {
         <!-- Categories Table -->
         <Card variant="elevated" class="mt-4">
             <CardContent class="p-0">
-                <div class="overflow-x-auto">
+                <!-- Mobile: kartu per baris supaya tabel tidak perlu digeser horizontal -->
+                <div v-if="categories.length > 0" class="divide-y md:hidden">
+                    <div
+                        v-for="category in filteredAndSortedData"
+                        :key="`card-${category.id}`"
+                        class="flex items-start gap-3 p-3"
+                        :class="{ 'opacity-60': !category.is_active }"
+                    >
+                        <div
+                            class="mt-1 h-3 w-3 shrink-0 rounded-full border"
+                            :style="category.color ? { backgroundColor: category.color } : { backgroundColor: 'transparent' }"
+                        />
+                        <div class="min-w-0 flex-1">
+                            <p class="break-words font-medium">{{ category.name }}</p>
+                            <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                <Badge :variant="category.is_active ? 'success' : 'secondary'">
+                                    {{ category.is_active ? 'Aktif' : 'Nonaktif' }}
+                                </Badge>
+                                <Badge variant="outline" class="font-normal tabular-nums">
+                                    {{ category.products_count }} produk
+                                </Badge>
+                                <Badge variant="outline" class="font-normal tabular-nums">
+                                    Urutan {{ category.sort_order }}
+                                </Badge>
+                                <span
+                                    v-if="category.color"
+                                    class="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase"
+                                    :style="{ backgroundColor: category.color + '30', color: category.color }"
+                                >
+                                    {{ category.color }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-1">
+                            <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditCategory(category)">
+                                <Pencil class="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                class="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                @click="deleteTarget = category"
+                            >
+                                <Trash2 class="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    </div>
+                    <p v-if="filteredAndSortedData.length === 0" class="py-12 text-center text-muted-foreground">
+                        Tidak ada kategori sesuai filter
+                    </p>
+                </div>
+
+                <div v-if="categories.length > 0" class="hidden md:block">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b bg-muted/30">
@@ -214,13 +283,14 @@ function submitCategory() {
                                     :sort-dir="sortDir"
                                     @sort="setSort"
                                 />
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warna</th>
+                                <th class="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:table-cell">Warna</th>
                                 <TableHeadSortable
                                     label="Urutan"
                                     sort-key="sort_order"
                                     :current-sort-key="sortKey"
                                     :sort-dir="sortDir"
                                     align="center"
+                                    class-names="hidden md:table-cell"
                                     @sort="setSort"
                                 />
                                 <TableHeadSortable
@@ -237,12 +307,13 @@ function submitCategory() {
                                     :current-sort-key="sortKey"
                                     :sort-dir="sortDir"
                                     align="center"
+                                    class-names="hidden md:table-cell"
                                     @sort="setSort"
                                 />
                                 <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="text-sm">
                             <tr
                                 v-for="category in filteredAndSortedData"
                                 :key="category.id"
@@ -250,37 +321,38 @@ function submitCategory() {
                                 :class="{ 'opacity-60': !category.is_active }"
                             >
                                 <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-2.5">
                                         <div
-                                            v-if="category.color"
-                                            class="h-4 w-4 shrink-0 rounded-full border"
-                                            :style="{ backgroundColor: category.color }"
+                                            class="h-3 w-3 shrink-0 rounded-full border"
+                                            :style="category.color
+                                                ? { backgroundColor: category.color }
+                                                : { backgroundColor: 'transparent' }"
                                         />
                                         <span class="font-medium">{{ category.name }}</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="hidden px-4 py-3 sm:table-cell">
                                     <span
                                         v-if="category.color"
-                                        class="inline-block rounded px-2 py-0.5 text-xs font-mono"
+                                        class="inline-block rounded px-2 py-0.5 font-mono text-xs uppercase"
                                         :style="{ backgroundColor: category.color + '30', color: category.color }"
                                     >
                                         {{ category.color }}
                                     </span>
                                     <span v-else class="text-xs text-muted-foreground">—</span>
                                 </td>
-                                <td class="px-4 py-3 text-center hidden md:table-cell text-sm">{{ category.sort_order }}</td>
-                                <td class="px-4 py-3 text-center">
-                                    <div class="flex flex-col md:items-center gap-1">
-                                        <Badge variant="outline" class="font-normal w-fit">
-                                            {{ category.products_count }} <span class="hidden sm:inline ml-0.5">produk</span>
+                                <td class="hidden px-4 py-3 text-center tabular-nums md:table-cell">{{ category.sort_order }}</td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <Badge variant="outline" class="w-fit font-normal tabular-nums">
+                                            {{ category.products_count }} <span class="ml-0.5 hidden sm:inline">produk</span>
                                         </Badge>
                                         <Badge :variant="category.is_active ? 'success' : 'secondary'" class="w-fit md:hidden">
                                             {{ category.is_active ? 'Aktif' : 'Nonaktif' }}
                                         </Badge>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-center hidden md:table-cell">
+                                <td class="hidden px-4 py-3 text-center md:table-cell">
                                     <Badge :variant="category.is_active ? 'success' : 'secondary'">
                                         {{ category.is_active ? 'Aktif' : 'Nonaktif' }}
                                     </Badge>

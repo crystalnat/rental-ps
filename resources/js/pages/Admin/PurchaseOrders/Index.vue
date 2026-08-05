@@ -96,24 +96,24 @@ function handleDelete() {
     <AdminLayout title="Purchase Order">
         <!-- Summary Units -->
         <div class="mb-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
-            <StatCard variant="primary" class="p-3 md:p-5">
+            <StatCard variant="primary" class="p-3 sm:p-5">
                 <template #title>Total PO</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold">{{ stats.total }}</p>
+                    <p class="text-lg sm:text-2xl font-bold tabular-nums">{{ stats.total }}</p>
                 </template>
                 <template #icon><FileText class="h-5 w-5" /></template>
             </StatCard>
-            <StatCard variant="warning" class="p-3 md:p-5">
+            <StatCard variant="warning" class="p-3 sm:p-5">
                 <template #title>Pending</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">{{ stats.pending }}</p>
+                    <p class="text-lg sm:text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{{ stats.pending }}</p>
                 </template>
                 <template #icon><Clock class="h-5 w-5" /></template>
             </StatCard>
-            <StatCard variant="success" class="p-3 md:p-5 hidden lg:block">
+            <StatCard variant="success" class="p-3 sm:p-5 hidden lg:block">
                 <template #title>Total Nominal</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(stats.total_amount) }}</p>
+                    <p class="text-lg sm:text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{{ formatCurrency(stats.total_amount) }}</p>
                 </template>
                 <template #icon><CheckCircle2 class="h-5 w-5" /></template>
             </StatCard>
@@ -126,8 +126,8 @@ function handleDelete() {
             @update:model-value="handleSearch"
         >
             <template #filters>
-                <Link href="/admin/purchase-orders/create">
-                    <Button size="sm" class="h-9">
+                <Link href="/admin/purchase-orders/create" class="w-full sm:w-auto">
+                    <Button size="sm" class="h-9 w-full sm:w-auto">
                         <Plus class="mr-1 h-4 w-4" />
                         Buat PO
                     </Button>
@@ -147,51 +147,63 @@ function handleDelete() {
                                     sort-key="po_number"
                                     :current-sort-key="filters.sort || null"
                                     :sort-dir="filters.direction || 'asc'"
+                                    class-names="px-3 sm:px-4"
                                     @sort="setSort"
                                 />
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tujuan</th>
+                                <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier</th>
+                                <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tujuan</th>
                                 <TableHeadSortable
                                     label="Total"
                                     sort-key="total_amount"
                                     :current-sort-key="filters.sort || null"
                                     :sort-dir="filters.direction || 'asc'"
                                     align="right"
+                                    class-names="px-3 sm:px-4"
                                     @sort="setSort"
                                 />
-                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aksi</th>
+                                <th class="hidden sm:table-cell px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                                <th class="px-3 sm:px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="po in purchaseOrders.data" :key="po.id" class="border-b transition-colors hover:bg-muted/20">
-                                <td class="px-4 py-3 text-sm">
-                                    <div class="font-medium text-primary hover:underline cursor-pointer" @click="router.visit(`/admin/purchase-orders/${po.id}`)">
+                                <td class="px-3 sm:px-4 py-3 text-sm min-w-0">
+                                    <div class="font-medium text-primary hover:underline cursor-pointer break-words" @click="router.visit(`/admin/purchase-orders/${po.id}`)">
                                         {{ po.po_number }}
                                     </div>
                                     <div class="text-[10px] text-muted-foreground mt-0.5">
                                         {{ formatDate(po.created_at) }}
                                     </div>
+                                    <!-- Ringkasan kolom yang disembunyikan agar info tetap ada di layar sempit -->
+                                    <div class="mt-0.5 text-xs text-muted-foreground break-words md:hidden">
+                                        {{ po.supplier.name }} · {{ po.store.name }}
+                                    </div>
+                                    <div class="mt-1 sm:hidden">
+                                        <Badge :variant="getStatusProps(po.status).variant as any">
+                                            {{ getStatusProps(po.status).label }}
+                                        </Badge>
+                                    </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm align-middle">
+                                <td class="hidden md:table-cell px-4 py-3 text-sm align-middle">
                                     {{ po.supplier.name }}
+                                    <span class="mt-0.5 block text-xs text-muted-foreground lg:hidden">{{ po.store.name }}</span>
                                 </td>
-                                <td class="px-4 py-3 text-sm align-middle">
+                                <td class="hidden lg:table-cell px-4 py-3 text-sm align-middle">
                                     <div class="flex items-center gap-1">
                                         <Warehouse class="h-3 w-3 text-muted-foreground" />
                                         {{ po.store.name }}
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-right font-medium tabular-nums">
+                                <td class="px-3 sm:px-4 py-3 text-sm text-right font-medium tabular-nums whitespace-nowrap">
                                     {{ formatCurrency(po.total_amount) }}
                                 </td>
-                                <td class="px-4 py-3 text-center align-middle">
+                                <td class="hidden sm:table-cell px-4 py-3 text-center align-middle">
                                     <Badge :variant="getStatusProps(po.status).variant as any">
                                         {{ getStatusProps(po.status).label }}
                                     </Badge>
                                 </td>
-                                <td class="px-4 py-3 text-right align-middle">
-                                    <div class="flex items-center justify-end gap-1">
+                                <td class="px-3 sm:px-4 py-3 text-right align-middle">
+                                    <div class="flex flex-wrap items-center justify-end gap-1">
                                         <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="router.visit(`/admin/purchase-orders/${po.id}`)">
                                             <Eye class="h-4 w-4" />
                                         </Button>

@@ -92,24 +92,24 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
     <AdminLayout title="Promo & Voucher">
         <!-- Summary Cards -->
         <div class="mb-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
-            <StatCard variant="primary" class="p-3 md:p-5">
+            <StatCard variant="primary" class="p-3 sm:p-5">
                 <template #title>Total Promo</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold">{{ promos.total }}</p>
+                    <p class="text-lg sm:text-2xl font-bold tabular-nums">{{ promos.total }}</p>
                 </template>
                 <template #icon><Ticket class="h-5 w-5" /></template>
             </StatCard>
-            <StatCard variant="success" class="p-3 md:p-5">
+            <StatCard variant="success" class="p-3 sm:p-5">
                 <template #title>Promo Aktif</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ activeCount }}</p>
+                    <p class="text-lg sm:text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{{ activeCount }}</p>
                 </template>
                 <template #icon><Activity class="h-5 w-5" /></template>
             </StatCard>
-            <StatCard variant="warning" class="p-3 md:p-5 hidden lg:block">
+            <StatCard variant="warning" class="p-3 sm:p-5 hidden lg:block">
                 <template #title>Sedang Berjalan</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">Aktif</p>
+                    <p class="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400">Aktif</p>
                 </template>
                 <template #icon><Calendar class="h-5 w-5" /></template>
             </StatCard>
@@ -121,8 +121,8 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
             search-placeholder="Cari kode promo..."
         >
             <template #filters>
-                <Link href="/admin/promos/create">
-                    <Button size="sm" class="h-9">
+                <Link href="/admin/promos/create" class="w-full sm:w-auto">
+                    <Button size="sm" class="h-9 w-full sm:w-auto">
                         <Plus class="mr-1 h-4 w-4" />
                         Tambah Promo
                     </Button>
@@ -137,26 +137,38 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-muted/30 text-muted-foreground border-b text-xs font-semibold uppercase tracking-wide">
                             <tr>
-                                <th class="h-11 px-4">Kode Promo</th>
-                                <th class="h-11 px-4">Diskon</th>
-                                <th class="h-11 px-4">Min. Belanja</th>
-                                <th class="h-11 px-4">Masa Berlaku</th>
-                                <th class="h-11 px-4 text-center">Kuota (Terpakai)</th>
-                                <th class="h-11 px-4 text-center">Status</th>
-                                <th class="h-11 px-4 text-right">Aksi</th>
+                                <th class="h-11 px-3 sm:px-4">Kode Promo</th>
+                                <th class="h-11 px-3 sm:px-4">Diskon</th>
+                                <th class="hidden lg:table-cell h-11 px-4">Min. Belanja</th>
+                                <th class="hidden md:table-cell h-11 px-4">Masa Berlaku</th>
+                                <th class="hidden lg:table-cell h-11 px-4 text-center">Kuota (Terpakai)</th>
+                                <th class="hidden sm:table-cell h-11 px-4 text-center">Status</th>
+                                <th class="h-11 px-3 sm:px-4 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y text-foreground">
                             <tr v-for="promo in promos.data" :key="promo.id" class="hover:bg-muted/10 transition-colors">
-                                <td class="p-4 align-middle">
+                                <td class="p-3 sm:p-4 align-middle">
                                     <div class="flex items-center gap-2">
-                                        <div class="flex h-8 w-8 items-center justify-center rounded bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                        <div class="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                                             <Tag class="h-4 w-4" />
                                         </div>
                                         <span class="font-bold tracking-wider uppercase">{{ promo.code }}</span>
                                     </div>
+                                    <!-- Ringkasan kolom yang disembunyikan agar info tetap ada di layar sempit -->
+                                    <div class="mt-1 flex flex-col gap-1 whitespace-normal sm:hidden">
+                                        <Badge :variant="promo.is_active ? 'success' : 'secondary'" class="w-fit rounded-full px-2 text-[10px]">
+                                            {{ promo.is_active ? 'Aktif' : 'Nonaktif' }}
+                                        </Badge>
+                                    </div>
+                                    <div class="mt-0.5 whitespace-normal text-[10px] text-muted-foreground md:hidden">
+                                        {{ formatDate(promo.valid_from) }} - {{ formatDate(promo.valid_until) }}
+                                    </div>
+                                    <div class="mt-0.5 whitespace-normal text-[10px] text-muted-foreground lg:hidden">
+                                        Min. {{ formatCurrency(promo.min_purchase) }} · {{ promo.used_count }}/{{ promo.quota ?? '∞' }}
+                                    </div>
                                 </td>
-                                <td class="p-4 align-middle">
+                                <td class="p-3 sm:p-4 align-middle">
                                     <div v-if="promo.type === 'percentage'" class="flex items-center gap-1.5 font-medium text-blue-600 dark:text-blue-400">
                                         <Percent class="h-3.5 w-3.5" />
                                         {{ Number(promo.value) }}% 
@@ -169,17 +181,17 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
                                         {{ formatCurrency(promo.value) }}
                                     </div>
                                 </td>
-                                <td class="p-4 align-middle tabular-nums">
+                                <td class="hidden lg:table-cell p-4 align-middle tabular-nums">
                                     {{ formatCurrency(promo.min_purchase) }}
                                 </td>
-                                <td class="p-4 align-middle">
+                                <td class="hidden md:table-cell p-4 align-middle">
                                     <div class="flex flex-col text-[11px] leading-tight">
                                         <span class="text-muted-foreground italic">{{ formatDate(promo.valid_from) }}</span>
                                         <span class="mx-auto my-0.5 text-muted-foreground/30">▼</span>
                                         <span class="font-medium">{{ formatDate(promo.valid_until) }}</span>
                                     </div>
                                 </td>
-                                <td class="p-4 align-middle text-center">
+                                <td class="hidden lg:table-cell p-4 align-middle text-center">
                                     <div class="flex flex-col items-center">
                                         <div class="font-bold tabular-nums">{{ promo.used_count }} <span class="text-[10px] font-normal text-muted-foreground">/ {{ promo.quota ?? '∞' }}</span></div>
                                         <div v-if="promo.quota" class="mt-1 h-1 w-16 overflow-hidden rounded-full bg-muted">
@@ -190,13 +202,13 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
                                         </div>
                                     </div>
                                 </td>
-                                <td class="p-4 align-middle text-center">
+                                <td class="hidden sm:table-cell p-4 align-middle text-center">
                                     <Badge :variant="promo.is_active ? 'success' : 'secondary'" class="rounded-full px-3">
                                         {{ promo.is_active ? 'Aktif' : 'Nonaktif' }}
                                     </Badge>
                                 </td>
-                                <td class="p-4 align-middle text-right">
-                                    <div class="flex items-center justify-end gap-1">
+                                <td class="p-3 sm:p-4 align-middle text-right">
+                                    <div class="flex flex-wrap items-center justify-end gap-1">
                                         <Link :href="`/admin/promos/${promo.id}/edit`">
                                             <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary">
                                                 <Pencil class="h-4 w-4" />
@@ -209,7 +221,7 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
                                 </td>
                             </tr>
                             <tr v-if="promos.data.length === 0">
-                                <td colspan="7" class="py-20 text-center text-muted-foreground">
+                                <td colspan="7" class="whitespace-normal px-4 py-16 text-center text-muted-foreground">
                                     <div class="flex flex-col items-center">
                                         <Ticket class="h-10 w-10 text-muted-foreground/20 mb-3" />
                                         <p class="font-medium text-sm">Belum ada promo yang terdaftar</p>
@@ -223,7 +235,7 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
                     </table>
                 </div>
 
-                <div v-if="promos.total > 0" class="border-t p-4">
+                <div v-if="promos.total > 0" class="border-t p-3 sm:p-4">
                     <Pagination :links="promos.links" :from="promos.from" :to="promos.to" :total="promos.total" />
                 </div>
             </CardContent>
@@ -231,16 +243,16 @@ const activeCount = computed(() => props.promos.data.filter(p => p.is_active).le
 
         <!-- Delete Modal (Standard pattern) -->
         <Dialog :open="showDeleteDialog" @update:open="showDeleteDialog = $event">
-            <DialogContent class="sm:max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle>Hapus Promo</DialogTitle>
                     <DialogDescription>
                         Apakah Anda yakin ingin menghapus promo <strong>{{ promoToDelete?.code }}</strong>? Aksi ini tidak dapat dibatalkan.
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter class="mt-4">
-                    <Button variant="outline" @click="showDeleteDialog = false">Batal</Button>
-                    <Button variant="destructive" @click="deletePromo">Ya, Hapus</Button>
+                <DialogFooter class="mt-4 flex-col-reverse gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="showDeleteDialog = false">Batal</Button>
+                    <Button variant="destructive" class="w-full sm:w-auto" @click="deletePromo">Ya, Hapus</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

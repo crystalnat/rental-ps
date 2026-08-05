@@ -226,7 +226,7 @@ function confirmDelete(pm: PaymentMethod) {
             </CardHeader>
             <CardContent>
                 <div class="mb-4 flex justify-end">
-                    <Button size="sm" @click="openAdd">
+                    <Button size="sm" class="w-full sm:w-auto" @click="openAdd">
                         <Plus class="h-4 w-4" />
                         Tambah Metode Pembayaran
                     </Button>
@@ -235,21 +235,21 @@ function confirmDelete(pm: PaymentMethod) {
                     <div
                         v-for="pm in payment_methods"
                         :key="pm.id"
-                        class="flex items-center justify-between rounded-lg border p-4"
+                        class="flex items-start justify-between gap-3 rounded-lg border p-3 sm:items-center sm:p-4"
                     >
-                        <div class="flex items-center gap-4">
-                            <div>
-                                <p class="font-medium">{{ pm.name }}</p>
-                                <p class="text-sm text-muted-foreground">
+                        <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                            <div class="min-w-0">
+                                <p class="break-words font-medium">{{ pm.name }}</p>
+                                <p class="break-words text-sm text-muted-foreground">
                                     {{ pm.code }}
                                     <span v-if="pm.qrcode_image" class="ml-1 text-xs">· QR</span>
                                     <span v-if="pm.account_number" class="ml-1 text-xs">· {{ pm.account_number }}</span>
                                 </p>
                             </div>
-                            <Badge v-if="!pm.is_active" variant="secondary">Nonaktif</Badge>
-                            <Badge v-else-if="pm.requires_cash_input" variant="outline">Input tunai</Badge>
+                            <Badge v-if="!pm.is_active" variant="secondary" class="w-fit">Nonaktif</Badge>
+                            <Badge v-else-if="pm.requires_cash_input" variant="outline" class="w-fit">Input tunai</Badge>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex shrink-0 items-center gap-1 sm:gap-2">
                             <Button variant="ghost" size="icon" @click="openEdit(pm)">
                                 <Pencil class="h-4 w-4" />
                             </Button>
@@ -279,7 +279,7 @@ function confirmDelete(pm: PaymentMethod) {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Button variant="destructive" @click="showResetDialog = true">
+                <Button variant="destructive" class="w-full sm:w-auto" @click="showResetDialog = true">
                     <AlertTriangle class="h-4 w-4" />
                     Reset Data Trial
                 </Button>
@@ -287,7 +287,7 @@ function confirmDelete(pm: PaymentMethod) {
         </Card>
 
         <Dialog v-model:open="showResetDialog">
-            <DialogContent class="max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2 text-destructive">
                         <AlertTriangle class="h-5 w-5" />
@@ -324,7 +324,7 @@ function confirmDelete(pm: PaymentMethod) {
 
         <!-- Add/Edit Dialog -->
         <Dialog v-model:open="showAddDialog">
-            <DialogContent class="max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle>{{ editingId ? 'Edit' : 'Tambah' }} Metode Pembayaran</DialogTitle>
                     <DialogDescription>
@@ -368,8 +368,8 @@ function confirmDelete(pm: PaymentMethod) {
                             class="mt-1 block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
                             @change="form.qrcode_image = ($event.target as HTMLInputElement).files?.[0] ?? null"
                         />
-                        <div v-if="existingQrcode && !form.remove_qrcode" class="mt-2 flex items-center gap-2">
-                            <img :src="existingQrcode" alt="QR" class="h-24 w-24 rounded border object-cover" />
+                        <div v-if="existingQrcode && !form.remove_qrcode" class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <img :src="existingQrcode" alt="QR" class="h-24 w-24 shrink-0 rounded border object-cover" />
                             <label class="flex items-center gap-2 text-sm">
                                 <input v-model="form.remove_qrcode" type="checkbox" />
                                 Hapus & ganti gambar
@@ -406,8 +406,8 @@ function confirmDelete(pm: PaymentMethod) {
                         </div>
                     </div>
 
-                    <div v-if="showCashInputField" class="flex items-center justify-between rounded-lg border p-4">
-                        <div>
+                    <div v-if="showCashInputField" class="flex items-center justify-between gap-3 rounded-lg border p-3 sm:p-4">
+                        <div class="min-w-0">
                             <Label for="requires_cash_input">Input uang tunai</Label>
                             <p class="text-xs text-muted-foreground">Kasir input uang diterima & kembalian</p>
                         </div>

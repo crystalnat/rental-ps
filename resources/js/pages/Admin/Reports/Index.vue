@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { router } from '@inertiajs/vue3'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
 import {
@@ -210,7 +211,16 @@ function makeChartSalesConfig(labels: string[], data: number[]) {
     }
 }
 
-const chartSalesOptions = {
+const isNarrow = useMediaQuery('(max-width: 640px)')
+
+// Label rupiah penuh memakan lebar area grafik di layar ponsel
+function shortCurrency(value: number): string {
+    if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} jt`
+    if (Math.abs(value) >= 1_000) return `${Math.round(value / 1_000)} rb`
+    return String(value)
+}
+
+const chartSalesOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -222,12 +232,24 @@ const chartSalesOptions = {
         },
     },
     scales: {
+        x: {
+            ticks: {
+                font: { size: isNarrow.value ? 9 : 11 },
+                maxRotation: isNarrow.value ? 60 : 0,
+                autoSkip: true,
+                maxTicksLimit: isNarrow.value ? 8 : 24,
+            },
+            grid: { display: false },
+        },
         y: {
             beginAtZero: true,
-            ticks: { callback: (v: any) => formatCurrency(v) },
+            ticks: {
+                font: { size: isNarrow.value ? 9 : 11 },
+                callback: (v: any) => (isNarrow.value ? shortCurrency(v) : formatCurrency(v)),
+            },
         },
     },
-}
+}))
 
 function makeChartExpenseConfig(labels: string[], amounts: number[]) {
     const colors = [
@@ -244,11 +266,15 @@ function makeChartExpenseConfig(labels: string[], amounts: number[]) {
     }
 }
 
-const chartExpenseOptions = {
+// Legenda di samping memakan hampir separuh lebar layar ponsel, jadi dipindah ke bawah
+const chartExpenseOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-        legend: { position: 'right' as const },
+        legend: {
+            position: (isNarrow.value ? 'bottom' : 'right') as 'bottom' | 'right',
+            labels: { boxWidth: 12, padding: 10, font: { size: isNarrow.value ? 10 : 12 } },
+        },
         tooltip: {
             callbacks: {
                 label: (ctx: any) =>
@@ -256,7 +282,7 @@ const chartExpenseOptions = {
             },
         },
     },
-}
+}))
 
 function makeChartByStoreConfig(labels: string[], data: number[], color: string) {
     return {
@@ -676,41 +702,40 @@ function exportPdf() {
                                 Periode Laporan
                                 <span v-if="isLoading" class="ml-2 normal-case text-primary">memuat...</span>
                             </Label>
-                            <div class="flex items-center gap-2">
-                                <Input v-model="filterState.date_from" type="date" class="h-10 flex-1 lg:w-36 font-medium" @change="applyFilters" />
-                                <span class="text-muted-foreground font-black">/</span>
-                                <Input v-model="filterState.date_to" type="date" class="h-10 flex-1 lg:w-36 font-medium" @change="applyFilters" />
+                            <!-- Dua input tanggal berdampingan tidak muat di layar 320px, jadi ditumpuk dulu -->
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <Input v-model="filterState.date_from" type="date" class="h-10 w-full min-w-0 font-medium sm:flex-1 lg:w-36" @change="applyFilters" />
+                                <span class="hidden font-black text-muted-foreground sm:inline">/</span>
+                                <Input v-model="filterState.date_to" type="date" class="h-10 w-full min-w-0 font-medium sm:flex-1 lg:w-36" @change="applyFilters" />
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap items-end gap-4 lg:ml-auto">
-                            <div class="space-y-1.5" v-if="hasData">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end lg:ml-auto">
+                            <div class="min-w-0 space-y-1.5" v-if="hasData">
                                 <Label class="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unduh Excel</Label>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <Button variant="outline" class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50" @click="exportXlsx" title="Export Excel lengkap">
-                                        <FileSpreadsheet class="h-4 w-4 mr-2" /> Lengkap
+                                <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                                    <Button variant="outline" class="h-10 w-full min-w-0 justify-center border-green-200 bg-green-50 px-3 text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-900/50 sm:w-auto" @click="exportXlsx" title="Export Excel lengkap">
+                                        <FileSpreadsheet class="mr-2 h-4 w-4 shrink-0" /> <span class="truncate">Lengkap</span>
                                     </Button>
 
                                     <Button
                                         v-for="segment in overall.segments"
                                         :key="segment.key"
                                         variant="outline"
-                                        class="h-10 px-3 bg-green-50 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
+                                        class="h-10 w-full min-w-0 justify-center border-green-200 bg-green-50 px-3 text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-900/50 sm:w-auto"
                                         :title="`Export Excel ${segment.label}`"
                                         @click="exportSegmentXlsx(segment.key)"
                                     >
-                                        <FileSpreadsheet class="h-4 w-4 mr-2" /> {{ segment.label }}
+                                        <FileSpreadsheet class="mr-2 h-4 w-4 shrink-0" /> <span class="truncate">{{ segment.label }}</span>
                                     </Button>
                                 </div>
                             </div>
 
                             <div class="space-y-1.5" v-if="hasData">
                                 <Label class="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cetak</Label>
-                                <div class="flex items-center gap-2">
-                                    <Button variant="outline" class="h-10 px-3 bg-red-50 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50" @click="exportPdf" title="Export PDF">
-                                        <Printer class="h-4 w-4 mr-2" /> PDF
-                                    </Button>
-                                </div>
+                                <Button variant="outline" class="h-10 w-full justify-center border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/50 sm:w-auto" @click="exportPdf" title="Export PDF">
+                                    <Printer class="mr-2 h-4 w-4 shrink-0" /> PDF
+                                </Button>
                             </div>
                         </div>
                     </div>
@@ -734,11 +759,11 @@ function exportPdf() {
                     </div>
 
                     <!-- Overall Summary Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
                         <StatCard variant="primary" class="border-none shadow-sm">
                             <template #title>Penjualan</template>
                             <template #value>
-                                <p class="text-2xl md:text-3xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums">{{ formatCurrency(overall.income) }}</p>
+                                <p class="text-lg sm:text-2xl lg:text-3xl font-black break-words text-emerald-600 dark:text-emerald-400 tabular-nums">{{ formatCurrency(overall.income) }}</p>
                             </template>
                             <template #subtitle>{{ overall.order_count }} Transaksi</template>
                             <template #icon><TrendingUp class="h-6 w-6" /></template>
@@ -746,7 +771,7 @@ function exportPdf() {
                         <StatCard variant="primary" class="border-none shadow-sm">
                             <template #title>Total HPP</template>
                             <template #value>
-                                <p class="text-2xl md:text-3xl font-black text-orange-600 dark:text-orange-400 tabular-nums">{{ formatCurrency(overall.hpp) }}</p>
+                                <p class="text-lg sm:text-2xl lg:text-3xl font-black break-words text-orange-600 dark:text-orange-400 tabular-nums">{{ formatCurrency(overall.hpp) }}</p>
                             </template>
                             <template #subtitle>Modal Barang Terjual</template>
                             <template #icon><ShoppingBag class="h-6 w-6 text-orange-500" /></template>
@@ -754,7 +779,7 @@ function exportPdf() {
                         <StatCard variant="destructive" class="border-none shadow-sm">
                             <template #title>Pengeluaran</template>
                             <template #value>
-                                <p class="text-2xl md:text-3xl font-black text-destructive tabular-nums">{{ formatCurrency(overall.expenses) }}</p>
+                                <p class="text-lg sm:text-2xl lg:text-3xl font-black break-words text-destructive tabular-nums">{{ formatCurrency(overall.expenses) }}</p>
                             </template>
                             <template #subtitle>Operasional & Inventaris</template>
                             <template #icon><TrendingDown class="h-6 w-6" /></template>
@@ -762,7 +787,7 @@ function exportPdf() {
                         <StatCard variant="primary" class="border-none shadow-sm">
                             <template #title>Laba Kotor</template>
                             <template #value>
-                                <p class="text-2xl md:text-3xl font-black text-primary tabular-nums">{{ formatCurrency(overall.gross_profit) }}</p>
+                                <p class="text-lg sm:text-2xl lg:text-3xl font-black break-words text-primary tabular-nums">{{ formatCurrency(overall.gross_profit) }}</p>
                             </template>
                             <template #subtitle>Sebelum Pengeluaran</template>
                             <template #icon><Package class="h-6 w-6" /></template>
@@ -770,7 +795,7 @@ function exportPdf() {
                         <StatCard :variant="overall.net >= 0 ? 'success' : 'destructive'" class="border-none shadow-sm ring-2" :class="overall.net >= 0 ? 'ring-emerald-500/20' : 'ring-destructive/20'">
                             <template #title>Laba Bersih</template>
                             <template #value>
-                                <p class="text-2xl md:text-3xl font-black tabular-nums" :class="overall.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
+                                <p class="text-lg sm:text-2xl lg:text-3xl font-black break-words tabular-nums" :class="overall.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
                                     {{ formatCurrency(overall.net) }}
                                 </p>
                             </template>
@@ -779,14 +804,14 @@ function exportPdf() {
                         </StatCard>
                     </div>
                     <!-- Overall Charts -->
-                    <div class="grid gap-4 md:gap-6 lg:grid-cols-2">
+                    <div class="grid gap-4 sm:gap-6 md:grid-cols-2">
                         <Card variant="elevated" class="overflow-hidden border-none shadow-sm">
                             <CardHeader class="p-4 md:p-6 pb-2">
                                 <CardTitle class="text-base md:text-lg font-bold">Penjualan Harian</CardTitle>
                                 <CardDescription class="text-xs">Statistik gabungan seluruh cabang</CardDescription>
                             </CardHeader>
                             <CardContent class="p-4 md:p-6 pt-0">
-                                <div class="h-[250px] md:h-[300px] w-full">
+                                <div class="h-[220px] w-full sm:h-[260px] lg:h-[280px]">
                                     <Bar
                                         v-if="overall.chart_sales.labels.length > 0"
                                         :data="makeChartSalesConfig(overall.chart_sales.labels, overall.chart_sales.data)"
@@ -802,20 +827,11 @@ function exportPdf() {
                                 <CardDescription class="text-xs">Distribusi biaya operasional</CardDescription>
                             </CardHeader>
                             <CardContent class="p-4 md:p-6 pt-0">
-                                <div class="h-[250px] md:h-[300px] w-full">
+                                <div class="h-[220px] w-full sm:h-[260px] lg:h-[280px]">
                                     <Doughnut
                                         v-if="overall.chart_expense_by_category.labels.length > 0"
                                         :data="makeChartExpenseConfig(overall.chart_expense_by_category.labels, overall.chart_expense_by_category.amounts)"
-                                        :options="{
-                                            ...chartExpenseOptions,
-                                            plugins: {
-                                                ...chartExpenseOptions.plugins,
-                                                legend: {
-                                                    position: 'bottom',
-                                                    labels: { boxWidth: 10, padding: 10, font: { size: 10 } }
-                                                }
-                                            }
-                                        }"
+                                        :options="chartExpenseOptions"
                                     />
                                     <div v-else class="flex h-full items-center justify-center text-muted-foreground italic">Tidak ada data pengeluaran</div>
                                 </div>
@@ -825,14 +841,29 @@ function exportPdf() {
                     </div>
 
                     <!-- Overall Tables -->
-                    <div class="grid gap-6 lg:grid-cols-2">
+                    <div class="grid gap-4 sm:gap-6 md:grid-cols-2">
                         <Card variant="elevated" class="overflow-hidden border-none shadow-sm">
                             <CardHeader class="p-4 md:p-6 pb-4">
                                 <CardTitle class="text-base md:text-lg font-black">Produk Terlaris</CardTitle>
                                 <CardDescription class="text-xs">Top 20 produk paling laku</CardDescription>
                             </CardHeader>
                             <CardContent class="p-0">
-                                <div class="max-h-[400px] overflow-y-auto">
+                                <!-- Di bawah md tabel diganti daftar kartu supaya tidak perlu digeser horizontal -->
+                                <div class="max-h-[400px] divide-y overflow-y-auto md:hidden">
+                                    <div v-for="(p, i) in overall.top_products" :key="i" class="flex items-start justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="break-words text-sm font-bold">{{ p.product_name }}</p>
+                                            <p class="text-[11px] text-muted-foreground tabular-nums">{{ p.total_qty }} terjual</p>
+                                        </div>
+                                        <span class="shrink-0 whitespace-nowrap text-sm font-black tabular-nums text-primary">
+                                            {{ formatCurrency(p.total_amount) }}
+                                        </span>
+                                    </div>
+                                    <p v-if="overall.top_products.length === 0" class="px-4 py-12 text-center italic text-muted-foreground">
+                                        Belum ada data penjualan
+                                    </p>
+                                </div>
+                                <div class="hidden max-h-[400px] overflow-y-auto md:block">
                                     <table class="w-full text-xs md:text-sm">
                                         <thead class="sticky top-0 bg-muted/90 backdrop-blur-sm shadow-sm z-10">
                                             <tr class="text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -861,14 +892,34 @@ function exportPdf() {
                                 <CardDescription class="text-xs">Statistik performa kasir</CardDescription>
                             </CardHeader>
                             <CardContent class="p-0">
-                                <div class="max-h-[400px] overflow-y-auto">
+                                <!-- Di bawah md tabel diganti daftar kartu supaya tidak perlu digeser horizontal -->
+                                <div class="max-h-[400px] divide-y overflow-y-auto md:hidden">
+                                    <div v-for="(c, i) in overall.sales_by_cashier" :key="i" class="flex items-start justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="break-words text-sm font-bold">{{ c.cashier_name }}</p>
+                                            <p class="text-[11px] text-muted-foreground tabular-nums">{{ c.order_count }} transaksi</p>
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <span class="whitespace-nowrap text-sm font-black tabular-nums text-primary">
+                                                {{ formatCurrency(c.total_amount) }}
+                                            </span>
+                                            <Button v-if="c.cashier_id" variant="ghost" size="icon" class="h-8 w-8 rounded-full" @click="viewCashier(c.cashier_id)">
+                                                <Search class="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <p v-if="overall.sales_by_cashier.length === 0" class="px-4 py-12 text-center italic text-muted-foreground">
+                                        Belum ada data kasir
+                                    </p>
+                                </div>
+                                <div class="hidden max-h-[400px] overflow-y-auto md:block">
                                     <table class="w-full text-xs md:text-sm">
                                         <thead class="sticky top-0 bg-muted/90 backdrop-blur-sm shadow-sm z-10">
                                             <tr class="text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                                 <th class="px-4 py-3">Nama Kasir</th>
                                                 <th class="px-4 py-3 text-center">Tx</th>
                                                 <th class="px-4 py-3 text-right">Total</th>
-                                                <th class="w-12"></th>
+                                                <th class="w-12"><span class="sr-only">Aksi</span></th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y">
@@ -892,14 +943,25 @@ function exportPdf() {
                         </Card>
                     </div>
 
-                    <div class="grid gap-6 lg:grid-cols-2">
+                    <div class="grid gap-4 sm:gap-6 md:grid-cols-2">
                         <Card variant="elevated">
                             <CardHeader>
                                 <CardTitle>Penjualan per Tipe Order</CardTitle>
                                 <CardDescription>Dine In, Take Away, Walk In</CardDescription>
                             </CardHeader>
                             <CardContent class="p-0">
-                                <table class="w-full text-sm">
+                                <!-- Di bawah md tabel diganti daftar kartu supaya tidak perlu digeser horizontal -->
+                                <div class="divide-y md:hidden">
+                                    <div v-for="(t, i) in overall.sales_by_type" :key="i" class="flex items-start justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="break-words text-sm font-medium">{{ t.label }}</p>
+                                            <p class="text-[11px] text-muted-foreground tabular-nums">{{ t.count }} transaksi</p>
+                                        </div>
+                                        <span class="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums">{{ formatCurrency(t.total) }}</span>
+                                    </div>
+                                    <p v-if="overall.sales_by_type.length === 0" class="px-4 py-8 text-center text-muted-foreground">Tidak ada data</p>
+                                </div>
+                                <table class="hidden w-full text-sm md:table">
                                     <thead>
                                         <tr class="border-b bg-muted/50 text-left">
                                             <th class="px-4 py-3 font-medium text-muted-foreground">Tipe</th>
@@ -926,7 +988,18 @@ function exportPdf() {
                                 <CardDescription>Tunai, QRIS, Transfer, E-Wallet</CardDescription>
                             </CardHeader>
                             <CardContent class="p-0">
-                                <table class="w-full text-sm">
+                                <!-- Di bawah md tabel diganti daftar kartu supaya tidak perlu digeser horizontal -->
+                                <div class="divide-y md:hidden">
+                                    <div v-for="(p, i) in overall.sales_by_payment" :key="i" class="flex items-start justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="break-words text-sm font-medium">{{ p.label }}</p>
+                                            <p class="text-[11px] text-muted-foreground tabular-nums">{{ p.count }} transaksi</p>
+                                        </div>
+                                        <span class="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums">{{ formatCurrency(p.total) }}</span>
+                                    </div>
+                                    <p v-if="overall.sales_by_payment.length === 0" class="px-4 py-8 text-center text-muted-foreground">Tidak ada data</p>
+                                </div>
+                                <table class="hidden w-full text-sm md:table">
                                     <thead>
                                         <tr class="border-b bg-muted/50 text-left">
                                             <th class="px-4 py-3 font-medium text-muted-foreground">Metode</th>
@@ -955,7 +1028,18 @@ function exportPdf() {
                             <CardDescription>Jumlah transaksi dan total per kategori</CardDescription>
                         </CardHeader>
                         <CardContent class="p-0">
-                            <table class="w-full text-sm">
+                            <!-- Di bawah md tabel diganti daftar kartu supaya tidak perlu digeser horizontal -->
+                            <div class="divide-y md:hidden">
+                                <div v-for="(e, i) in overall.expense_by_category_detail" :key="i" class="flex items-start justify-between gap-3 px-4 py-3">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="break-words text-sm font-medium">{{ e.category_label }}</p>
+                                        <p class="text-[11px] text-muted-foreground tabular-nums">{{ e.count }} transaksi</p>
+                                    </div>
+                                    <span class="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums">{{ formatCurrency(e.total) }}</span>
+                                </div>
+                                <p v-if="overall.expense_by_category_detail.length === 0" class="px-4 py-8 text-center text-muted-foreground">Tidak ada data</p>
+                            </div>
+                            <table class="hidden w-full text-sm md:table">
                                 <thead>
                                     <tr class="border-b bg-muted/50 text-left">
                                         <th class="px-4 py-3 font-medium text-muted-foreground">Kategori</th>

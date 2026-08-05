@@ -86,25 +86,25 @@ function submitLookup() {
         <div class="space-y-6">
             <!-- Header -->
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        <RotateCcw class="h-6 w-6 text-primary" />
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+                        <RotateCcw class="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
                         Riwayat Refund
                     </h1>
                     <p class="text-sm text-muted-foreground mt-1">
                         Kelola pengembalian barang dan uang pelanggan
                     </p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-2">
                     <select
                         v-if="stores.length > 1"
                         :value="store?.id"
-                        class="filter-select flex h-9 rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
+                        class="filter-select flex h-9 w-full sm:w-auto rounded-md border border-input bg-transparent pl-3 pr-9 py-1 text-sm text-foreground"
                         @change="changeStore(Number(($event.target as HTMLSelectElement).value))"
                     >
                         <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
                     </select>
-                    <Button @click="showLookupDialog = true">
+                    <Button class="w-full sm:w-auto" @click="showLookupDialog = true">
                         <Plus class="mr-2 h-4 w-4" />
                         Proses Refund Baru
                     </Button>
@@ -113,26 +113,26 @@ function submitLookup() {
 
             <!-- Search -->
             <Card>
-                <CardContent class="pt-6">
-                    <form class="flex gap-3" @submit.prevent="applySearch">
-                        <div class="relative flex-1">
+                <CardContent class="p-3 pt-4 sm:p-6">
+                    <form class="flex flex-col gap-2 sm:flex-row sm:gap-3" @submit.prevent="applySearch">
+                        <div class="relative flex-1 min-w-0">
                             <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input v-model="searchQuery" placeholder="Cari kode refund atau kode order..." class="pl-9" />
                         </div>
-                        <Button type="submit" variant="outline">Cari</Button>
+                        <Button type="submit" variant="outline" class="w-full sm:w-auto">Cari</Button>
                     </form>
                 </CardContent>
             </Card>
 
             <!-- Table -->
             <Card>
-                <CardHeader>
+                <CardHeader class="p-4 sm:p-6">
                     <CardTitle>Daftar Refund</CardTitle>
-                    <CardDescription v-if="store">
+                    <CardDescription v-if="store" class="break-words">
                         Toko: {{ store.name }} · {{ refunds.total }} refund
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent class="p-3 pt-0 sm:p-6 sm:pt-0">
                     <div v-if="!store" class="py-12 text-center text-muted-foreground">
                         Pilih toko terlebih dahulu.
                     </div>
@@ -187,21 +187,21 @@ function submitLookup() {
                         <button
                             v-for="r in refunds.data"
                             :key="r.id"
-                            class="w-full text-left rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                            class="w-full text-left rounded-lg border p-3 hover:bg-muted/50 transition-colors"
                             @click="viewRefund(r.id)"
                         >
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="font-mono font-medium text-sm">{{ r.refund_code }}</span>
-                                <Badge :variant="r.type === 'full' ? 'destructive' : 'secondary'" class="text-xs">
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <span class="font-mono font-medium text-sm min-w-0 break-all">{{ r.refund_code }}</span>
+                                <Badge :variant="r.type === 'full' ? 'destructive' : 'secondary'" class="text-xs shrink-0">
                                     {{ r.type === 'full' ? 'Full' : 'Partial' }}
                                 </Badge>
                             </div>
-                            <div class="text-xs text-muted-foreground mb-1">
+                            <div class="text-xs text-muted-foreground mb-1 break-words">
                                 Order: {{ r.order_code ?? '—' }} · {{ r.created_at }}
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs text-muted-foreground">{{ r.user_name }}</span>
-                                <span class="font-semibold text-red-600">-{{ formatCurrency(r.refund_amount) }}</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs text-muted-foreground min-w-0 truncate">{{ r.user_name }}</span>
+                                <span class="font-semibold text-red-600 whitespace-nowrap tabular-nums">-{{ formatCurrency(r.refund_amount) }}</span>
                             </div>
                         </button>
                     </div>
@@ -211,7 +211,7 @@ function submitLookup() {
 
         <!-- Lookup Order Dialog -->
         <Dialog v-model:open="showLookupDialog">
-            <DialogContent class="max-w-md">
+            <DialogContent class="w-[95vw] max-w-md">
                 <DialogHeader>
                     <DialogTitle class="flex items-center gap-2">
                         <RotateCcw class="h-5 w-5" />
@@ -236,11 +236,11 @@ function submitLookup() {
                             Kode pesanan dapat ditemukan pada struk belanja pelanggan.
                         </p>
                     </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" @click="showLookupDialog = false" :disabled="lookingUp">
+                    <DialogFooter class="flex-col-reverse gap-2 sm:flex-row">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" @click="showLookupDialog = false" :disabled="lookingUp">
                             Batal
                         </Button>
-                        <Button type="submit" variant="destructive" :disabled="lookingUp || !lookupCode.trim()">
+                        <Button type="submit" variant="destructive" class="w-full sm:w-auto" :disabled="lookingUp || !lookupCode.trim()">
                             <Loader2 v-if="lookingUp" class="mr-2 h-4 w-4 animate-spin" />
                             {{ lookingUp ? 'Mencari...' : 'Cari Pesanan' }}
                         </Button>

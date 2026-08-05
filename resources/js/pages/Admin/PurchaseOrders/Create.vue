@@ -130,12 +130,12 @@ function goBack() {
     <AdminLayout>
         <div class="space-y-6">
             <!-- Header Intena (Sama dengan Shift Detail) -->
-            <div class="flex items-center justify-between gap-4">
-                <Button variant="ghost" size="sm" @click="goBack" class="px-0 hover:bg-transparent">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <Button variant="ghost" size="sm" @click="goBack" class="self-start px-0 hover:bg-transparent">
                     <ArrowLeft class="mr-2 h-4 w-4" />
                     Kembali
                 </Button>
-                <h1 class="text-xl font-bold text-foreground">
+                <h1 class="min-w-0 break-words text-lg font-bold text-foreground sm:text-xl">
                     {{ isEditing ? 'Ubah Purchase Order' : 'Buat Purchase Order Baru' }}
                 </h1>
             </div>
@@ -143,11 +143,11 @@ function goBack() {
             <form @submit.prevent="submit" class="space-y-6">
                 <!-- Basic Info -->
                 <Card>
-                    <CardContent class="p-6">
+                    <CardContent class="p-4 sm:p-6">
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-4 border-b pb-2 flex items-center gap-2">
                             <Warehouse class="h-4 w-4" /> Informasi Dasar
                         </h3>
-                        <div class="grid gap-6 md:grid-cols-2">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
                             <div class="space-y-2">
                                 <Label for="store" class="text-sm font-medium">Cabang Masuk <span class="text-destructive">*</span></Label>
                                 <select 
@@ -198,7 +198,7 @@ function goBack() {
                                 <Box class="h-4 w-4" /> Daftar Item Pesanan
                             </h3>
                             
-                            <div class="flex items-center gap-2 w-full max-w-md">
+                            <div class="flex w-full items-center gap-2 md:max-w-md">
                                 <div class="relative flex-1">
                                     <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input 
@@ -230,7 +230,55 @@ function goBack() {
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto">
+                        <!-- Mobile: daftar kartu vertikal -->
+                        <div class="md:hidden divide-y">
+                            <div v-for="(item, index) in form.items" :key="index" class="p-4 space-y-3">
+                                <div class="flex items-start gap-3">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-medium text-foreground break-words">{{ item.product?.name }}</div>
+                                        <div class="text-[10px] text-muted-foreground break-words" v-if="item.product?.sku">SKU: {{ item.product?.sku }}</div>
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" class="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/10" @click="removeItem(index)">
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <span class="text-[10px] uppercase tracking-wide text-muted-foreground">Kuantitas</span>
+                                        <Input v-model="item.quantity" type="number" step="0.01" min="0.01" class="h-9 w-full text-center text-sm text-foreground tabular-nums" required />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <span class="text-[10px] uppercase tracking-wide text-muted-foreground">Harga Beli</span>
+                                        <div class="relative">
+                                            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">Rp</span>
+                                            <Input v-model="item.buy_price" type="number" step="1" min="0" class="h-9 w-full pl-7 text-right text-sm text-foreground tabular-nums" required />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between border-t pt-2">
+                                    <span class="text-[10px] uppercase tracking-wide text-muted-foreground">Subtotal</span>
+                                    <span class="font-semibold text-foreground tabular-nums whitespace-nowrap">
+                                        {{ formatCurrency((Number(item.quantity) || 0) * (Number(item.buy_price) || 0)) }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div v-if="form.items.length === 0" class="py-12 px-4 text-center text-muted-foreground bg-muted/5">
+                                <div class="flex flex-col items-center">
+                                    <ShoppingCart class="h-10 w-10 text-muted-foreground/30 mb-2" />
+                                    <p class="font-medium text-sm text-muted-foreground">Keranjang Pesanan Kosong</p>
+                                    <p class="text-xs text-muted-foreground break-words">Silakan klik "Pilih Produk" atau cari di atas.</p>
+                                </div>
+                            </div>
+
+                            <div v-else class="flex items-center justify-between gap-3 bg-muted/5 p-4">
+                                <span class="text-[10px] uppercase tracking-wider text-muted-foreground break-words">Total Estimasi Pembelian</span>
+                                <span class="text-lg font-semibold text-primary tabular-nums whitespace-nowrap">{{ formatCurrency(grandTotal) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Desktop: tabel -->
+                        <div class="hidden md:block">
                             <table class="w-full text-left text-sm whitespace-nowrap">
                                 <thead class="bg-muted/30 text-muted-foreground border-b text-xs font-semibold uppercase tracking-wide">
                                     <tr>
@@ -291,9 +339,9 @@ function goBack() {
                     </CardContent>
                 </Card>
 
-                <div class="flex justify-end gap-3 py-4">
-                    <Button type="button" variant="outline" class="px-6" @click="goBack">Batal</Button>
-                    <Button type="submit" class="px-8 shadow-sm" :disabled="form.processing || form.items.length === 0">
+                <div class="flex flex-col-reverse gap-3 py-4 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="outline" class="w-full sm:w-auto sm:px-6" @click="goBack">Batal</Button>
+                    <Button type="submit" class="w-full shadow-sm sm:w-auto sm:px-8" :disabled="form.processing || form.items.length === 0">
                         <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                         {{ isEditing ? 'Simpan Perubahan' : 'Proses Purchase Order' }}
                     </Button>
@@ -303,7 +351,7 @@ function goBack() {
 
         <!-- Browse Products Modal -->
         <Dialog :open="showBrowseModal" @update:open="showBrowseModal = $event">
-            <DialogContent class="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent class="w-[95vw] max-w-4xl max-h-[90dvh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader class="p-6 pb-2">
                     <DialogTitle>Daftar Inventaris Produk</DialogTitle>
                     <DialogDescription>
@@ -318,8 +366,30 @@ function goBack() {
                     </div>
                 </div>
 
-                <div class="flex-1 overflow-y-auto px-6 py-4 border-t">
-                    <table class="w-full text-sm">
+                <div class="flex-1 overflow-y-auto px-4 py-4 border-t sm:px-6">
+                    <!-- Mobile: daftar kartu vertikal -->
+                    <div class="md:hidden space-y-3">
+                        <div v-for="p in browsedProducts" :key="p.id" class="rounded-lg border p-3 space-y-2">
+                            <div class="min-w-0">
+                                <div class="font-medium text-foreground break-words">{{ p.name }}</div>
+                                <div class="text-[10px] text-muted-foreground break-words" v-if="p.sku">{{ p.sku }}</div>
+                                <div class="text-[10px] text-muted-foreground break-words">Kategori: {{ p.category || '—' }}</div>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <Badge variant="outline" class="tabular-nums whitespace-nowrap" :class="Number(p.total_stock) <= 0 ? 'text-destructive border-destructive' : 'text-foreground'">
+                                    {{ Number(p.total_stock) }} {{ p.unit }}
+                                </Badge>
+                                <Button size="sm" variant="secondary" class="h-8 shrink-0" @click="addProduct(p)">
+                                    Pilih
+                                </Button>
+                            </div>
+                        </div>
+                        <div v-if="browsedProducts.length === 0" class="py-10 text-center text-muted-foreground italic">
+                            Produk tidak ditemukan.
+                        </div>
+                    </div>
+
+                    <table class="hidden w-full text-sm md:table">
                         <thead class="bg-muted text-xs font-semibold uppercase tracking-wide sticky top-0 z-10 border-b">
                             <tr>
                                 <th class="px-3 py-2 text-left">Produk / SKU</th>

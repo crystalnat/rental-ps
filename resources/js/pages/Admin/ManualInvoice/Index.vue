@@ -217,36 +217,36 @@ function printInvoice() {
     <AdminLayout>
         <div class="flex h-full flex-col gap-0">
             <!-- Header -->
-            <div class="no-print flex items-center justify-between border-b px-6 py-4">
+            <div class="no-print flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <div>
                     <h1 class="text-lg font-bold">Struk Manual</h1>
                     <p class="text-xs text-muted-foreground">Buat struk manual — tersimpan otomatis ke riwayat penjualan</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="grid grid-cols-2 gap-2 sm:flex">
                     <button
                         type="button"
-                        class="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"
+                        class="flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"
                         @click="resetForm"
                     >
-                        <RotateCcw class="h-4 w-4" />
+                        <RotateCcw class="h-4 w-4 shrink-0" />
                         Reset
                     </button>
                     <button
                         type="button"
                         :disabled="saving"
-                        class="flex items-center gap-1.5 rounded-lg border bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+                        class="flex items-center justify-center gap-1.5 rounded-lg border bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
                         @click="saveAndPrint"
                     >
-                        <Save class="h-4 w-4" />
-                        {{ saving ? 'Menyimpan...' : 'Simpan & Cetak Struk' }}
+                        <Save class="h-4 w-4 shrink-0" />
+                        <span class="truncate">{{ saving ? 'Menyimpan...' : 'Simpan & Cetak' }}</span>
                     </button>
                 </div>
             </div>
 
             <!-- Body: Form + Preview -->
-            <div class="no-print flex min-h-0 flex-1 overflow-hidden">
+            <div class="no-print flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
                 <!-- Left: Form -->
-                <div class="w-[420px] shrink-0 overflow-y-auto border-r bg-muted/20 p-5">
+                <div class="w-full shrink-0 border-b bg-muted/20 p-4 sm:p-5 lg:w-[420px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
                     <div class="space-y-5">
                         <!-- Info dasar -->
                         <div class="space-y-3">
@@ -408,7 +408,7 @@ function printInvoice() {
                 </div>
 
                 <!-- Right: Live Preview -->
-                <div class="flex flex-1 items-start justify-center overflow-y-auto bg-slate-100 p-8 dark:bg-slate-900">
+                <div class="flex flex-1 items-start justify-center bg-slate-100 p-4 dark:bg-slate-900 sm:p-6 lg:overflow-y-auto lg:p-8">
                     <!-- Receipt Preview (always visible, acts as print source too) -->
                     <div class="receipt-preview shadow-lg">
                         <!-- Header -->
@@ -633,9 +633,10 @@ function printInvoice() {
 <style scoped>
 /* ─── Live Preview (receipt card shown on screen) ─────────────────────────── */
 .receipt-preview {
-    width: 80mm;
+    /* Layar 320px (iPhone SE lama) lebih sempit dari 80mm, jadi lebar struk ikut menyusut */
+    width: min(80mm, 100%);
     background: white;
-    padding: 10mm 5mm;
+    padding: 8mm 4mm;
     font-family: 'Courier New', 'Consolas', monospace;
     font-size: 12px;
     line-height: 1.4;

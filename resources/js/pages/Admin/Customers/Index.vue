@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { router, Head } from '@inertiajs/vue3'
+import { router, Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StatCard from '@/components/StatCard.vue'
 import TableToolbar from '@/components/TableToolbar.vue'
@@ -193,21 +193,21 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
             <StatCard variant="primary" class="p-3 md:p-5">
                 <template #title>Total Pelanggan</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold">{{ customers.length }}</p>
+                    <p class="text-lg font-bold tabular-nums sm:text-2xl">{{ customers.length }}</p>
                 </template>
                 <template #icon><UserCircle class="h-5 w-5" /></template>
             </StatCard>
             <StatCard variant="success" class="p-3 md:p-5">
                 <template #title>Total Transaksi</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{{ totalOrders }}</p>
+                    <p class="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-2xl">{{ totalOrders }}</p>
                 </template>
                 <template #icon><ShoppingBag class="h-5 w-5" /></template>
             </StatCard>
             <StatCard variant="warning" class="p-3 md:p-5 hidden lg:block">
                 <template #title>Loyalitas</template>
                 <template #value>
-                    <p class="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-400">Database</p>
+                    <p class="text-lg font-bold text-amber-600 dark:text-amber-400 sm:text-2xl">Database</p>
                 </template>
                 <template #icon><Contact class="h-5 w-5" /></template>
             </StatCard>
@@ -219,15 +219,65 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
             search-placeholder="Cari nama, email, atau telepon..."
         >
             <template #filters>
-                <Button size="sm" class="h-9" @click="openCreate">
+                <Button size="sm" class="h-9 w-full sm:w-auto" @click="openCreate">
                     <Plus class="mr-1 h-4 w-4" />
                     Tambah Pelanggan
                 </Button>
             </template>
         </TableToolbar>
 
+        <!-- Di HP data pelanggan disajikan sebagai kartu supaya tidak perlu geser horizontal -->
+        <div class="mt-4 space-y-2 md:hidden">
+            <div v-for="customer in customers" :key="customer.id" class="rounded-lg border p-3">
+                <div class="flex items-start gap-2">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <UserCircle class="h-5 w-5" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="break-words font-medium" @click="openHistory(customer)">{{ customer.name }}</p>
+                        <div class="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
+                            <div v-if="customer.email" class="flex items-start gap-1.5">
+                                <Mail class="mt-0.5 h-3 w-3 shrink-0" />
+                                <span class="min-w-0 break-words">{{ customer.email }}</span>
+                            </div>
+                            <div v-if="customer.phone" class="flex items-center gap-1.5">
+                                <Phone class="h-3 w-3 shrink-0" />
+                                <span class="tabular-nums">{{ customer.phone }}</span>
+                            </div>
+                            <span v-if="!customer.email && !customer.phone" class="italic text-muted-foreground/40">Tanpa Kontak</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-end justify-between gap-2 border-t pt-2 text-xs">
+                    <div>
+                        <p class="text-[10px] uppercase text-muted-foreground">Total Order</p>
+                        <p class="font-medium tabular-nums">{{ customer.total_orders }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] uppercase text-muted-foreground">Total Belanja</p>
+                        <p class="whitespace-nowrap font-bold tabular-nums text-primary">{{ formatCurrency(customer.total_spent) }}</p>
+                    </div>
+                </div>
+                <div class="mt-2 flex justify-end gap-1 border-t pt-2">
+                    <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary" @click="openEdit(customer)" title="Edit">
+                        <Pencil class="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-primary" @click="openHistory(customer)" title="Riwayat">
+                        <History class="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-destructive" @click="deleteTarget = customer" title="Hapus">
+                        <Trash2 class="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+            <div v-if="customers.length === 0" class="rounded-lg border border-dashed py-14 text-center text-muted-foreground">
+                <UserCircle class="mx-auto mb-3 h-10 w-10 text-muted-foreground/20" />
+                <p class="text-sm font-medium">Belum ada pelanggan ditemukan</p>
+            </div>
+        </div>
+
         <!-- Customers Table -->
-        <Card variant="elevated" class="mt-4">
+        <Card variant="elevated" class="mt-4 hidden md:block">
             <CardContent class="p-0">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
@@ -302,7 +352,7 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
 
         <!-- Form Dialog -->
         <Dialog :open="formOpen" @update:open="formOpen = $event">
-            <DialogContent class="max-w-md">
+            <DialogContent class="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{{ editingId != null ? 'Ubah Data Pelanggan' : 'Tambah Pelanggan Baru' }}</DialogTitle>
                     <DialogDescription>
@@ -322,9 +372,9 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
                         <Label for="cust-phone">Nomor Telepon (Opsional)</Label>
                         <Input id="cust-phone" v-model="form.phone" placeholder="08123456789" class="text-foreground" />
                     </div>
-                    <DialogFooter class="pt-4">
-                        <Button type="button" variant="outline" @click="formOpen = false" :disabled="processing">Batal</Button>
-                        <Button type="submit" :disabled="processing || !form.name.trim()">
+                    <DialogFooter class="flex-col gap-2 pt-4 sm:flex-row">
+                        <Button type="button" variant="outline" class="w-full sm:w-auto" @click="formOpen = false" :disabled="processing">Batal</Button>
+                        <Button type="submit" class="w-full sm:w-auto" :disabled="processing || !form.name.trim()">
                             <Loader2 v-if="processing" class="mr-2 h-4 w-4 animate-spin" />
                             {{ editingId != null ? 'Simpan Perubahan' : 'Tambah Pelanggan' }}
                         </Button>
@@ -335,8 +385,8 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
 
         <!-- History Dialog -->
         <Dialog :open="historyOpen" @update:open="(v) => !v && closeHistory()">
-            <DialogContent class="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
-                <div class="border-b px-6 py-5 bg-muted/20">
+            <DialogContent class="flex max-h-[90vh] w-[95vw] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+                <div class="border-b px-4 py-4 bg-muted/20 sm:px-6 sm:py-5">
                     <DialogHeader>
                         <DialogTitle class="flex items-center gap-2">
                             <History class="h-5 w-5 text-primary" />
@@ -349,7 +399,7 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
                     </DialogHeader>
                 </div>
 
-                <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
                     <div v-if="historyLoading" class="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                         <Loader2 class="h-8 w-8 animate-spin" />
                         <span class="text-xs italic">Memuat riwayat belanja...</span>
@@ -357,18 +407,47 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
                     <p v-else-if="historyError" class="text-center py-10 text-sm text-destructive font-medium">{{ historyError }}</p>
                     
                     <template v-else-if="historyPayload">
-                        <div class="mb-6 grid grid-cols-2 gap-4">
-                            <div class="rounded-lg border bg-card p-4 shadow-sm">
-                                <p class="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-1">Total Kunjungan</p>
-                                <p class="text-2xl font-bold">{{ historyPayload.customer.total_orders }} <span class="text-sm font-normal text-muted-foreground ml-1">Order</span></p>
+                        <div class="mb-6 grid grid-cols-2 gap-3 sm:gap-4">
+                            <div class="rounded-lg border bg-card p-3 shadow-sm sm:p-4">
+                                <p class="mb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Kunjungan</p>
+                                <p class="text-lg font-bold tabular-nums sm:text-2xl">{{ historyPayload.customer.total_orders }} <span class="ml-1 text-xs font-normal text-muted-foreground sm:text-sm">Order</span></p>
                             </div>
-                            <div class="rounded-lg border bg-card p-4 shadow-sm">
-                                <p class="text-[10px] uppercase font-black text-muted-foreground tracking-widest mb-1">Total Kontribusi</p>
-                                <p class="text-2xl font-bold text-primary">{{ formatCurrency(historyPayload.customer.total_spent) }}</p>
+                            <div class="rounded-lg border bg-card p-3 shadow-sm sm:p-4">
+                                <p class="mb-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Kontribusi</p>
+                                <p class="whitespace-nowrap text-lg font-bold tabular-nums text-primary sm:text-2xl">{{ formatCurrency(historyPayload.customer.total_spent) }}</p>
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto rounded-md border">
+                        <!-- Riwayat versi kartu untuk HP, tabel tetap dipakai di layar lebar -->
+                        <div class="space-y-2 md:hidden">
+                            <div v-for="order in historyPayload.orders" :key="order.id" class="rounded-lg border p-3">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="break-words font-mono text-xs font-bold">{{ order.order_code }}</p>
+                                        <p class="text-[11px] text-muted-foreground">
+                                            {{ new Date(order.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                                        </p>
+                                        <p class="break-words text-[11px]">{{ order.store_name }}</p>
+                                    </div>
+                                    <Badge variant="outline" class="shrink-0 whitespace-nowrap px-1.5 py-0 text-[10px] font-bold uppercase tracking-widest">
+                                        {{ typeLabels[order.type] ?? order.type }}
+                                    </Badge>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+                                    <span class="whitespace-nowrap text-sm font-bold tabular-nums">{{ formatCurrency(order.final_amount) }}</span>
+                                    <Button variant="ghost" size="icon" class="h-7 w-7 rounded-full" as-child>
+                                        <Link :href="`/admin/orders/${order.id}`">
+                                            <Eye class="h-3.5 w-3.5" />
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                            <div v-if="historyPayload.orders.length === 0" class="rounded-lg border border-dashed py-12 text-center text-sm italic text-muted-foreground">
+                                Belum ada riwayat pesanan tercatat.
+                            </div>
+                        </div>
+
+                        <div class="hidden overflow-x-auto rounded-md border md:block">
                             <table class="w-full text-sm">
                                 <thead class="bg-muted/50 border-b">
                                     <tr class="text-xs font-black uppercase text-muted-foreground tracking-wider">
@@ -415,7 +494,7 @@ const totalOrders = computed(() => props.customers.reduce((s, c) => s + c.total_
                         </div>
                     </template>
                 </div>
-                <DialogFooter class="px-6 py-4 border-t bg-muted/10">
+                <DialogFooter class="border-t bg-muted/10 px-4 py-3 sm:px-6 sm:py-4">
                     <Button variant="outline" @click="closeHistory">Tutup</Button>
                 </DialogFooter>
             </DialogContent>

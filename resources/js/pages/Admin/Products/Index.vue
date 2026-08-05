@@ -86,37 +86,38 @@ function handleDelete() {
     <AdminLayout title="Produk">
 
         <!-- Summary Cards -->
-        <div class="mb-6 grid gap-4 sm:grid-cols-3">
+        <div class="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
             <Card>
-                <CardContent class="flex items-center gap-4 pt-5">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                        <Package class="h-5 w-5" />
+                <CardContent class="flex items-center gap-3 p-3 pt-3 sm:gap-4 sm:p-5">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary sm:h-11 sm:w-11">
+                        <Package class="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Produk</p>
-                        <p class="mt-1 text-2xl font-semibold">{{ products.length }}</p>
+                    <div class="min-w-0">
+                        <p class="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Total Produk</p>
+                        <p class="mt-1 text-lg font-semibold tabular-nums sm:text-2xl">{{ products.length }}</p>
                     </div>
                 </CardContent>
             </Card>
             <Card>
-                <CardContent class="flex items-center gap-4 pt-5">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-success/15 text-success">
-                        <Package class="h-5 w-5" />
+                <CardContent class="flex items-center gap-3 p-3 pt-3 sm:gap-4 sm:p-5">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-success/15 text-success sm:h-11 sm:w-11">
+                        <Package class="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tersedia</p>
-                        <p class="mt-1 text-2xl font-semibold">{{ products.filter(p => p.is_available).length }}</p>
+                    <div class="min-w-0">
+                        <p class="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Tersedia</p>
+                        <p class="mt-1 text-lg font-semibold tabular-nums sm:text-2xl">{{ products.filter(p => p.is_available).length }}</p>
                     </div>
                 </CardContent>
             </Card>
-            <Card>
-                <CardContent class="flex items-center gap-4 pt-5">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-warning/15 text-warning">
-                        <AlertCircle class="h-5 w-5" />
+            <!-- Kartu ketiga jadi lebar penuh di HP agar grid 2 kolom tidak menyisakan sel kosong -->
+            <Card class="col-span-2 lg:col-span-1">
+                <CardContent class="flex items-center gap-3 p-3 pt-3 sm:gap-4 sm:p-5">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning sm:h-11 sm:w-11">
+                        <AlertCircle class="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tidak Tersedia</p>
-                        <p class="mt-1 text-2xl font-semibold">{{ products.filter(p => !p.is_available).length }}</p>
+                    <div class="min-w-0">
+                        <p class="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Tidak Tersedia</p>
+                        <p class="mt-1 text-lg font-semibold tabular-nums sm:text-2xl">{{ products.filter(p => !p.is_available).length }}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -124,8 +125,8 @@ function handleDelete() {
 
         <!-- Filters -->
         <Card class="mb-4">
-            <CardContent class="flex flex-wrap items-center gap-3 py-4">
-                <div class="relative flex-1 min-w-[200px]">
+            <CardContent class="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:flex-wrap lg:items-center">
+                <div class="relative w-full min-w-0 lg:w-auto lg:flex-1 lg:min-w-[200px]">
                     <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         v-model="search"
@@ -133,10 +134,12 @@ function handleDelete() {
                         class="pl-9"
                     />
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <!-- Chip kategori digulir horizontal supaya tidak memaksa lebar halaman di HP -->
+                <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     <Button
                         variant="outline"
                         size="sm"
+                        class="shrink-0 whitespace-nowrap"
                         :class="{ 'bg-primary/10 text-primary border-primary': !selectedCategory }"
                         @click="selectedCategory = null"
                     >
@@ -147,6 +150,7 @@ function handleDelete() {
                         :key="cat.id"
                         variant="outline"
                         size="sm"
+                        class="shrink-0 whitespace-nowrap"
                         :class="{
                             'bg-primary/10 text-primary border-primary': selectedCategory === cat.id && !cat.color,
                         }"
@@ -166,8 +170,8 @@ function handleDelete() {
                     </Button>
                 </div>
                 <!-- Tambah button moved here -->
-                <Link href="/admin/products/create" class="ml-auto shrink-0">
-                    <Button size="sm" class="gap-2">
+                <Link href="/admin/products/create" class="w-full shrink-0 lg:ml-auto lg:w-auto">
+                    <Button size="sm" class="w-full gap-2 lg:w-auto">
                         <Plus class="h-4 w-4" />
                         Tambah Produk
                     </Button>
@@ -189,9 +193,9 @@ function handleDelete() {
 
                 <!-- Info -->
                 <div class="space-y-2">
-                    <div>
-                        <h3 class="font-semibold line-clamp-2">{{ product.name }}</h3>
-                        <p v-if="product.sku" class="text-xs text-muted-foreground">SKU: {{ product.sku }}</p>
+                    <div class="min-w-0">
+                        <h3 class="line-clamp-2 break-words font-semibold">{{ product.name }}</h3>
+                        <p v-if="product.sku" class="break-words text-xs text-muted-foreground">SKU: {{ product.sku }}</p>
                     </div>
 
                     <span
@@ -213,20 +217,20 @@ function handleDelete() {
                         {{ product.category }}
                     </span>
 
-                    <div class="flex items-center justify-between border-t pt-2 mt-2">
-                        <div>
+                    <div class="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+                        <div class="min-w-0">
                             <p class="text-xs text-muted-foreground">Harga Jual</p>
                             <div v-if="product.discount_percent > 0">
-                                <p class="text-[10px] text-muted-foreground line-through">{{ formatCurrency(product.sell_price) }}</p>
-                                <p class="font-bold text-sm text-destructive">
+                                <p class="whitespace-nowrap text-[10px] text-muted-foreground line-through">{{ formatCurrency(product.sell_price) }}</p>
+                                <p class="whitespace-nowrap text-sm font-bold text-destructive">
                                     {{ formatCurrency(product.sell_price - Math.round(product.sell_price * (product.discount_percent / 100))) }}
                                 </p>
                             </div>
                             <div v-else>
-                                <p class="font-semibold text-sm">{{ formatCurrency(product.sell_price) }}</p>
+                                <p class="whitespace-nowrap text-sm font-semibold">{{ formatCurrency(product.sell_price) }}</p>
                             </div>
                         </div>
-                        <div class="flex flex-col items-end gap-1">
+                        <div class="flex shrink-0 flex-col items-end gap-1">
                             <Badge v-if="product.discount_percent > 0" variant="destructive" class="text-[10px] px-1 py-0 h-4">
                                 <span class="font-mono">{{ product.discount_percent }}%</span>
                             </Badge>
@@ -237,7 +241,7 @@ function handleDelete() {
                     </div>
 
                     <div class="flex items-center gap-2 pt-2">
-                        <Link :href="`/admin/products/${product.id}/edit`" class="flex-1">
+                        <Link :href="`/admin/products/${product.id}/edit`" class="min-w-0 flex-1">
                             <Button variant="outline" size="sm" class="w-full">
                                 <Pencil class="h-3.5 w-3.5" />
                                 Edit
@@ -246,7 +250,7 @@ function handleDelete() {
                         <Button
                             variant="outline"
                             size="sm"
-                            class="text-destructive hover:bg-destructive/10"
+                            class="shrink-0 text-destructive hover:bg-destructive/10"
                             @click="deleteTarget = product"
                         >
                             <Trash2 class="h-3.5 w-3.5" />
@@ -273,18 +277,18 @@ function handleDelete() {
 
         <!-- Delete Confirmation Dialog -->
         <Dialog :open="!!deleteTarget" @update:open="(v) => { if (!v) deleteTarget = null }">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Hapus Produk</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription class="break-words">
                         Apakah Anda yakin ingin menghapus produk
                         <strong>{{ deleteTarget?.name }}</strong>?
                         Tindakan ini tidak dapat dibatalkan.
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" @click="deleteTarget = null">Batal</Button>
-                    <Button variant="destructive" @click="handleDelete">Ya, Hapus</Button>
+                <DialogFooter class="flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" class="w-full sm:w-auto" @click="deleteTarget = null">Batal</Button>
+                    <Button variant="destructive" class="w-full sm:w-auto" @click="handleDelete">Ya, Hapus</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

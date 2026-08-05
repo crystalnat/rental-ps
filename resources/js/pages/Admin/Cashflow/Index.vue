@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { router } from '@inertiajs/vue3'
 import TableToolbar from '@/components/TableToolbar.vue'
 import FilterSelect from '@/components/FilterSelect.vue'
@@ -38,6 +39,7 @@ import {
     Calendar,
     Search,
     Receipt,
+    ChevronLeft,
     ChevronRight,
     ArrowUpRight,
     ArrowDownRight,
@@ -119,11 +121,23 @@ const chartIncomeExpenseData = computed(() => ({
     ],
 }))
 
-const chartIncomeExpenseOptions = {
+const isNarrow = useMediaQuery('(max-width: 640px)')
+
+// Label rupiah penuh memakan lebar area grafik di layar ponsel
+function shortCurrency(value: number): string {
+    if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} jt`
+    if (Math.abs(value) >= 1_000) return `${Math.round(value / 1_000)} rb`
+    return String(value)
+}
+
+const chartIncomeExpenseOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-        legend: { position: 'top' as const },
+        legend: {
+            position: 'top' as const,
+            labels: { boxWidth: 12, padding: 10, font: { size: isNarrow.value ? 10 : 12 } },
+        },
         tooltip: {
             callbacks: {
                 label: (ctx: any) => formatCurrency(ctx.raw),
@@ -131,14 +145,24 @@ const chartIncomeExpenseOptions = {
         },
     },
     scales: {
+        x: {
+            ticks: {
+                font: { size: isNarrow.value ? 9 : 11 },
+                maxRotation: isNarrow.value ? 60 : 0,
+                autoSkip: true,
+                maxTicksLimit: isNarrow.value ? 8 : 24,
+            },
+            grid: { display: false },
+        },
         y: {
             beginAtZero: true,
             ticks: {
-                callback: (value: number) => formatCurrency(value),
+                font: { size: isNarrow.value ? 9 : 11 },
+                callback: (value: number) => (isNarrow.value ? shortCurrency(value) : formatCurrency(value)),
             },
         },
     },
-}
+}))
 
 const chartIncomeExpenseLineData = computed(() => ({
     labels: props.chart_income_expense.labels,
@@ -289,11 +313,11 @@ function clearFilters() {
     <AdminLayout :title="`Cashflow - ${store.name}`">
         <div class="space-y-6">
             <!-- Summary Cards -->
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                 <StatCard variant="success">
                     <template #title>Pemasukan</template>
                     <template #value>
-                        <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatCurrency(income) }}</p>
+                        <p class="text-lg sm:text-2xl font-bold tabular-nums break-words text-emerald-600 dark:text-emerald-400">{{ formatCurrency(income) }}</p>
                     </template>
                     <template #subtitle>{{ order_count }} transaksi</template>
                     <template #icon><TrendingUp class="h-5 w-5" /></template>
@@ -302,7 +326,7 @@ function clearFilters() {
                 <StatCard variant="destructive">
                     <template #title>Pengeluaran</template>
                     <template #value>
-                        <p class="text-2xl font-bold text-destructive">{{ formatCurrency(expenses) }}</p>
+                        <p class="text-lg sm:text-2xl font-bold tabular-nums break-words text-destructive">{{ formatCurrency(expenses) }}</p>
                     </template>
                     <template #icon><TrendingDown class="h-5 w-5" /></template>
                 </StatCard>
@@ -310,7 +334,7 @@ function clearFilters() {
                 <StatCard :variant="net >= 0 ? 'primary' : 'destructive'">
                     <template #title>Net</template>
                     <template #value>
-                        <p class="text-2xl font-bold" :class="net >= 0 ? 'text-primary' : 'text-destructive'">
+                        <p class="text-lg sm:text-2xl font-bold tabular-nums break-words" :class="net >= 0 ? 'text-primary' : 'text-destructive'">
                             {{ formatCurrency(net) }}
                         </p>
                     </template>
@@ -321,7 +345,7 @@ function clearFilters() {
                 <StatCard variant="muted">
                     <template #title>Periode</template>
                     <template #value>
-                        <p class="text-2xl font-bold">{{ date_from }} – {{ date_to }}</p>
+                        <p class="text-sm sm:text-base lg:text-lg font-bold tabular-nums break-words">{{ date_from }} – {{ date_to }}</p>
                     </template>
                     <template #icon><Calendar class="h-5 w-5" /></template>
                 </StatCard>
@@ -352,10 +376,11 @@ function clearFilters() {
                         </div>
                         <div class="flex flex-col gap-1.5" :class="stores.length > 1 ? 'md:col-start-2' : 'md:col-span-2'">
                             <Label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Periode</Label>
-                            <div class="flex items-center gap-2">
-                                <Input v-model="filterState.date_from" type="date" class="h-10 flex-1 min-w-0" />
-                                <span class="shrink-0 text-muted-foreground text-xs font-bold px-1">s/d</span>
-                                <Input v-model="filterState.date_to" type="date" class="h-10 flex-1 min-w-0" />
+                            <!-- Dua input tanggal berdampingan tidak muat di layar 320px, jadi ditumpuk dulu -->
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <Input v-model="filterState.date_from" type="date" class="h-10 w-full min-w-0 sm:flex-1" />
+                                <span class="hidden shrink-0 px-1 text-xs font-bold text-muted-foreground sm:inline">s/d</span>
+                                <Input v-model="filterState.date_to" type="date" class="h-10 w-full min-w-0 sm:flex-1" />
                             </div>
                         </div>
                     </div>
@@ -386,7 +411,7 @@ function clearFilters() {
             </Card>
 
             <!-- Charts -->
-            <div class="grid gap-6 lg:grid-cols-2">
+            <div class="grid gap-4 sm:gap-6 md:grid-cols-2">
                 <Card variant="elevated" class="overflow-hidden">
                     <CardHeader class="p-4 md:p-6">
                         <CardTitle class="text-base md:text-lg">Pemasukan vs Pengeluaran (Bar)</CardTitle>
@@ -395,7 +420,7 @@ function clearFilters() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="p-2 md:p-6 pt-0">
-                        <div class="relative h-[250px] md:h-[300px] w-full">
+                        <div class="relative h-[220px] w-full sm:h-[260px] lg:h-[280px]">
                             <Bar
                                 v-if="chart_income_expense.labels.length > 0"
                                 :data="chartIncomeExpenseData"
@@ -415,7 +440,7 @@ function clearFilters() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="p-2 md:p-6 pt-0">
-                        <div class="relative h-[250px] md:h-[300px] w-full">
+                        <div class="relative h-[220px] w-full sm:h-[260px] lg:h-[280px]">
                             <Line
                                 v-if="chart_income_expense.labels.length > 0"
                                 :data="chartIncomeExpenseLineData"
@@ -438,14 +463,58 @@ function clearFilters() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="p-0">
-                    <div class="w-full overflow-x-auto">
-                        <table class="w-full min-w-[500px] text-sm md:min-w-full">
+                    <!-- Di bawah md tabel diganti daftar kartu supaya tidak perlu digeser horizontal -->
+                    <div class="divide-y md:hidden">
+                        <div v-for="row in history.data" :key="row.id" class="px-4 py-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="break-words font-bold text-foreground">{{ row.description }}</p>
+                                    <p class="mt-0.5 text-[11px] text-muted-foreground tabular-nums">{{ row.date }}</p>
+                                </div>
+                                <span
+                                    class="shrink-0 whitespace-nowrap text-right text-sm font-bold tabular-nums"
+                                    :class="row.type === 'income' ? 'text-emerald-600' : 'text-destructive'"
+                                >
+                                    {{ row.type === 'income' ? '+' : '−' }}{{ formatCurrency(row.amount) }}
+                                </span>
+                            </div>
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge
+                                    :class="row.type === 'income'
+                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        : 'bg-destructive/15 text-destructive hover:bg-destructive/25'"
+                                >
+                                    {{ row.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
+                                </Badge>
+                                <span v-if="row.category_label" class="text-[11px] italic text-muted-foreground">
+                                    #{{ row.category_label }}
+                                </span>
+                                <span v-if="row.detail" class="min-w-0 break-words text-[11px] text-muted-foreground">
+                                    {{ row.detail }}
+                                </span>
+                                <Button
+                                    v-if="row.order_id"
+                                    variant="outline"
+                                    size="sm"
+                                    class="ml-auto h-7 text-xs"
+                                    @click="viewOrder(row.order_id)"
+                                >
+                                    Detail
+                                </Button>
+                            </div>
+                        </div>
+                        <p v-if="history.data.length === 0" class="px-4 py-12 text-center text-muted-foreground">
+                            Tidak ada data dalam periode ini.
+                        </p>
+                    </div>
+
+                    <div class="hidden w-full md:block">
+                        <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b bg-muted/30">
                                     <TableHeadSortable
                                         label="Tanggal"
                                         sort-key="date"
-                                        class="hidden md:table-cell"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
                                         @sort="setSort"
@@ -453,7 +522,6 @@ function clearFilters() {
                                     <TableHeadSortable
                                         label="Tipe"
                                         sort-key="type"
-                                        class="hidden sm:table-cell"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
                                         @sort="setSort"
@@ -468,7 +536,7 @@ function clearFilters() {
                                     <TableHeadSortable
                                         label="Kategori"
                                         sort-key="category_label"
-                                        class="hidden lg:table-cell"
+                                        class-names="hidden lg:table-cell"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
                                         @sort="setSort"
@@ -476,7 +544,7 @@ function clearFilters() {
                                     <TableHeadSortable
                                         label="Oleh"
                                         sort-key="detail"
-                                        class="hidden md:table-cell"
+                                        class-names="hidden lg:table-cell"
                                         :current-sort-key="sortKey"
                                         :sort-dir="sortDir"
                                         @sort="setSort"
@@ -489,7 +557,7 @@ function clearFilters() {
                                         :sort-dir="sortDir"
                                         @sort="setSort"
                                     />
-                                    <th class="w-20 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"></th>
+                                    <th class="w-20 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span class="sr-only">Aksi</span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -498,8 +566,8 @@ function clearFilters() {
                                     :key="row.id"
                                     class="border-b transition-colors last:border-0 hover:bg-muted/30"
                                 >
-                                    <td class="px-4 py-3 text-muted-foreground hidden md:table-cell whitespace-nowrap">{{ row.date }}</td>
-                                    <td class="px-4 py-3 hidden sm:table-cell">
+                                    <td class="whitespace-nowrap px-4 py-3 text-muted-foreground">{{ row.date }}</td>
+                                    <td class="px-4 py-3">
                                         <Badge
                                             class="w-fit"
                                             :class="row.type === 'income'
@@ -509,38 +577,20 @@ function clearFilters() {
                                             {{ row.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
                                         </Badge>
                                     </td>
-                                    <td class="px-4 py-3">
+                                    <td class="min-w-0 px-4 py-3">
                                         <div class="flex flex-col gap-0.5">
-                                            <span class="font-bold text-foreground">{{ row.description }}</span>
-                                            <div class="flex items-center gap-1.5 md:hidden">
-                                                <span class="text-[10px] text-muted-foreground">{{ row.date }}</span>
-                                                <span class="h-1 w-1 rounded-full bg-border" />
-                                                <span class="text-[10px]" :class="row.type === 'income' ? 'text-emerald-600' : 'text-destructive font-semibold'">
-                                                    {{ row.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
-                                                </span>
-                                            </div>
-                                            <span v-if="row.category_label" class="text-[11px] text-muted-foreground lg:hidden italic">#{{ row.category_label }}</span>
+                                            <span class="break-words font-bold text-foreground">{{ row.description }}</span>
+                                            <span v-if="row.category_label" class="text-[11px] italic text-muted-foreground lg:hidden">#{{ row.category_label }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3 text-muted-foreground hidden lg:table-cell">
+                                    <td class="hidden px-4 py-3 text-muted-foreground lg:table-cell">
                                         {{ row.category_label ?? '—' }}
                                     </td>
-                                    <td class="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell">{{ row.detail ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-right font-bold tabular-nums" :class="row.type === 'income' ? 'text-emerald-600' : 'text-destructive'">
-                                        <div class="flex flex-col items-end">
-                                            <span>{{ row.type === 'income' ? '+' : '−' }}{{ formatCurrency(row.amount) }}</span>
-                                            <Button
-                                                v-if="row.order_id"
-                                                variant="link"
-                                                size="sm"
-                                                class="h-auto p-0 text-[10px] text-primary"
-                                                @click="viewOrder(row.order_id)"
-                                            >
-                                                #DETAIL
-                                            </Button>
-                                        </div>
+                                    <td class="hidden px-4 py-3 text-xs text-muted-foreground lg:table-cell">{{ row.detail ?? '—' }}</td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-right font-bold tabular-nums" :class="row.type === 'income' ? 'text-emerald-600' : 'text-destructive'">
+                                        {{ row.type === 'income' ? '+' : '−' }}{{ formatCurrency(row.amount) }}
                                     </td>
-                                    <td class="px-4 py-3 hidden md:table-cell">
+                                    <td class="px-4 py-3">
                                         <Button
                                             v-if="row.order_id"
                                             variant="ghost"
@@ -564,9 +614,9 @@ function clearFilters() {
                     <!-- Pagination -->
                     <div
                         v-if="history.last_page > 1"
-                        class="flex items-center justify-between border-t px-4 py-3"
+                        class="flex flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                     >
-                        <p class="text-sm text-muted-foreground">
+                        <p class="text-xs text-muted-foreground sm:text-sm">
                             Menampilkan {{ history.from }}–{{ history.to }} dari {{ history.total }} transaksi
                         </p>
                         <div class="flex items-center gap-1">
@@ -594,37 +644,37 @@ function clearFilters() {
 
         <!-- Detail Order Modal -->
         <Dialog :open="showDetailModal" @update:open="showDetailModal = $event">
-            <DialogContent class="max-w-md sm:max-w-lg p-0 overflow-hidden border-none shadow-2xl">
+            <DialogContent class="w-[95vw] max-w-md overflow-hidden border-none p-0 shadow-2xl sm:max-w-lg">
                 <div v-if="loadingDetail" class="flex flex-col items-center justify-center py-20 gap-3">
                     <Loader2 class="h-8 w-8 animate-spin text-primary" />
                     <p class="text-sm text-muted-foreground animate-pulse">Memuat detail transaksi...</p>
                 </div>
                 <template v-else-if="selectedOrder">
-                    <div class="bg-primary/5 px-6 py-5 border-b border-primary/10">
-                        <div class="flex items-center justify-between">
-                            <div class="space-y-1">
+                    <div class="border-b border-primary/10 bg-primary/5 px-4 py-4 sm:px-6 sm:py-5">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0 space-y-1">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-primary/60">Detail Transaksi</p>
-                                <DialogTitle class="text-xl font-black tracking-tight flex items-center gap-2">
-                                    <FileText class="h-5 w-5 text-primary" />
+                                <DialogTitle class="flex items-center gap-2 break-all text-lg font-black tracking-tight sm:text-xl">
+                                    <FileText class="h-5 w-5 shrink-0 text-primary" />
                                     {{ selectedOrder.order_code }}
                                 </DialogTitle>
                             </div>
-                            <Badge variant="outline" class="bg-background/50 backdrop-blur-sm border-primary/20 text-primary capitalize">
+                            <Badge variant="outline" class="w-fit shrink-0 border-primary/20 bg-background/50 capitalize text-primary backdrop-blur-sm">
                                 {{ selectedOrder.type.replace('_', ' ') }}
                             </Badge>
                         </div>
                     </div>
                     
-                    <div class="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
+                    <div class="max-h-[70vh] space-y-6 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                         <!-- Store & Cashier Info -->
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
                             <div class="space-y-1">
                                 <p class="text-[10px] font-bold uppercase text-muted-foreground">Toko</p>
-                                <p class="text-sm font-semibold">{{ selectedOrder.store_name }}</p>
+                                <p class="break-words text-sm font-semibold">{{ selectedOrder.store_name }}</p>
                             </div>
                             <div class="space-y-1 text-right">
                                 <p class="text-[10px] font-bold uppercase text-muted-foreground">Kasir</p>
-                                <p class="text-sm font-semibold">{{ selectedOrder.cashier_name ?? '—' }}</p>
+                                <p class="break-words text-sm font-semibold">{{ selectedOrder.cashier_name ?? '—' }}</p>
                             </div>
                             <div class="space-y-1">
                                 <p class="text-[10px] font-bold uppercase text-muted-foreground">Waktu</p>
@@ -645,14 +695,14 @@ function clearFilters() {
                                 <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted">{{ selectedOrder.items.length }} Items</span>
                             </div>
                             <div class="space-y-3">
-                                <div v-for="(item, i) in selectedOrder.items" :key="i" class="flex justify-between items-start group">
-                                    <div class="min-w-0 pr-4">
-                                        <p class="text-sm font-bold group-hover:text-primary transition-colors">{{ item.product_name }}</p>
+                                <div v-for="(item, i) in selectedOrder.items" :key="i" class="group flex items-start justify-between gap-2">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="break-words text-sm font-bold transition-colors group-hover:text-primary">{{ item.product_name }}</p>
                                         <p class="text-[11px] text-muted-foreground italic font-medium">
                                             {{ item.quantity }} {{ item.unit }} × {{ formatCurrency(item.unit_price) }}
                                         </p>
                                     </div>
-                                    <p class="text-sm font-black tabular-nums whitespace-nowrap">{{ formatCurrency(item.subtotal) }}</p>
+                                    <p class="shrink-0 whitespace-nowrap text-sm font-black tabular-nums">{{ formatCurrency(item.subtotal) }}</p>
                                 </div>
                             </div>
                         </div>
@@ -668,7 +718,7 @@ function clearFilters() {
                             </div>
                             <div class="flex justify-between pt-2 border-t border-border/50 flex-col items-end gap-1">
                                 <span class="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Total Bayar ({{ selectedOrder.payment_method }})</span>
-                                <span class="text-2xl font-black text-primary p-0 leading-none tabular-nums">{{ formatCurrency(selectedOrder.final_amount) }}</span>
+                                <span class="break-words p-0 text-xl font-black leading-none tabular-nums text-primary sm:text-2xl">{{ formatCurrency(selectedOrder.final_amount) }}</span>
                             </div>
                         </div>
 
@@ -678,7 +728,7 @@ function clearFilters() {
                         </div>
                     </div>
                     
-                    <div class="p-6 pt-0">
+                    <div class="p-4 pt-0 sm:p-6 sm:pt-0">
                         <Button variant="outline" class="w-full rounded-xl h-12 font-bold hover:bg-muted transition-all" @click="showDetailModal = false">
                             Tutup Detail
                         </Button>

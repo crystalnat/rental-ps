@@ -4,6 +4,7 @@ import { router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import StatCard from '@/components/StatCard.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -481,7 +482,56 @@ function onDateInputChange() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent class="p-0">
-                            <div class="w-full overflow-x-auto overflow-y-hidden">
+                            <!-- Mobile: kartu per catatan supaya daftar tidak perlu digeser horizontal -->
+                            <div class="divide-y md:hidden">
+                                <div v-for="e in expenses.data" :key="`card-${e.id}`" class="flex gap-3 p-3">
+                                    <a
+                                        v-if="e.receipt_url"
+                                        :href="e.receipt_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="shrink-0"
+                                    >
+                                        <img :src="e.receipt_url" alt="Bukti" class="h-14 w-14 rounded-md border object-cover" />
+                                    </a>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <span class="text-xs font-bold tabular-nums text-muted-foreground">{{ e.created_at }}</span>
+                                            <span class="shrink-0 whitespace-nowrap font-black tabular-nums text-destructive">
+                                                {{ formatCurrency(e.amount) }}
+                                            </span>
+                                        </div>
+                                        <p class="mt-0.5 break-words font-medium">{{ e.description }}</p>
+                                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                            <Badge variant="secondary" class="rounded-md text-[10px] font-bold uppercase">
+                                                {{ categoryLabels[e.category] ?? e.category }}
+                                            </Badge>
+                                            <span class="text-[11px] text-muted-foreground">{{ e.creator_name ?? '—' }}</span>
+                                        </div>
+                                        <div v-if="e.can_edit" class="mt-2 flex items-center gap-1">
+                                            <Button variant="outline" size="sm" class="h-8 px-2 text-xs" @click="openEdit(e)">
+                                                <Pencil class="mr-1 h-3.5 w-3.5" />
+                                                Ubah
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                class="h-8 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                @click="deleteTarget = e"
+                                            >
+                                                <Trash2 class="mr-1 h-3.5 w-3.5" />
+                                                Hapus
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-if="!expenses.data.length" class="flex flex-col items-center gap-2 px-4 py-16 text-center">
+                                    <BookOpen class="h-10 w-10 text-muted-foreground/30" />
+                                    <p class="text-sm font-medium text-muted-foreground">Belum ada pengeluaran pada tanggal ini</p>
+                                </div>
+                            </div>
+
+                            <div class="hidden w-full md:block">
                                 <table class="w-full min-w-full text-sm">
                                     <thead>
                                         <tr class="border-b bg-muted/30 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

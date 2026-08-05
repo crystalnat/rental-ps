@@ -636,7 +636,7 @@ function qrImageUrl(url: string) {
         </template>
 
         <!-- Toolbar -->
-        <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+        <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2 sm:p-3">
             <!-- Zoom -->
             <div class="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
                 <button
@@ -667,7 +667,7 @@ function qrImageUrl(url: string) {
                     <Maximize2 class="h-4 w-4" />
                 </button>
             </div>
-            <div class="mx-2 h-4 w-px bg-border" />
+            <div class="mx-2 hidden h-4 w-px bg-border sm:block" />
             <!-- Rotate -->
             <div class="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
                 <button
@@ -688,13 +688,13 @@ function qrImageUrl(url: string) {
                     <RotateCw class="h-4 w-4" />
                 </button>
             </div>
-            <div class="mx-2 h-4 w-px bg-border" />
+            <div class="mx-2 hidden h-4 w-px bg-border sm:block" />
             <label class="flex cursor-pointer items-center gap-2">
                 <Checkbox v-model:checked="autoRapi" />
                 <span class="text-sm font-medium">Auto Rapi</span>
             </label>
-            <span class="text-xs text-muted-foreground">(snap ke grid & align)</span>
-            <div class="mx-2 h-4 w-px bg-border" />
+            <span class="hidden text-xs text-muted-foreground lg:inline">(snap ke grid &amp; align)</span>
+            <div class="mx-2 hidden h-4 w-px bg-border sm:block" />
             <Button variant="outline" size="sm" @click="showAddTable = true">
                 <Gamepad2 class="h-4 w-4" />
                 Tambah Unit PS
@@ -714,7 +714,7 @@ function qrImageUrl(url: string) {
                     Cetak QR Meja
                 </Button>
             </a>
-            <Button class="ml-auto" :disabled="processing" @click="submitSave">
+            <Button class="w-full sm:ml-auto sm:w-auto" :disabled="processing" @click="submitSave">
                 <Save class="h-4 w-4" />
                 Simpan Denah
             </Button>
@@ -725,7 +725,7 @@ function qrImageUrl(url: string) {
             ref="viewportRef"
             class="flex items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-slate-900"
             :class="scale > fitScale ? 'overflow-auto' : 'overflow-hidden'"
-            style="height: calc(100vh - 220px); min-height: 400px;"
+            style="height: calc(100dvh - 260px); min-height: 320px;"
         >
             <div
                 class="relative m-auto shrink-0 bg-slate-900 shadow-inner"
@@ -815,7 +815,7 @@ function qrImageUrl(url: string) {
                         <component :is="elementIcons[el.type] || MoreHorizontal" class="h-3 w-3 shrink-0" />
                         <span>{{ element_types[el.type] || el.type }}</span>
                         <button
-                            class="ml-0.5 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-white/20 text-white"
+                            class="ml-0.5 shrink-0 rounded p-0.5 text-white opacity-100 hover:bg-white/20 md:opacity-0 md:group-hover:opacity-100"
                             title="Copy"
                             @click.stop="copyElement(el)"
                         >
@@ -858,7 +858,7 @@ function qrImageUrl(url: string) {
                         <Gamepad2 class="h-5 w-5 shrink-0 text-slate-400" />
                         <span class="text-center text-[10px] font-bold leading-none text-white">{{ t.name }}</span>
                         <span class="text-[9px] text-slate-400">Unit PS</span>
-                        <div class="mt-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div class="mt-1 flex gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                             <button
                                 class="rounded bg-white/10 p-1 text-white hover:bg-white/20"
                                 title="Edit"
@@ -898,7 +898,7 @@ function qrImageUrl(url: string) {
         </div>
 
         <!-- Legend -->
-        <div class="mt-4 flex flex-wrap items-center gap-6 rounded-lg border bg-muted/20 p-4 text-sm">
+        <div class="mt-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-3 text-xs sm:gap-6 sm:p-4 sm:text-sm">
             <div class="flex items-center gap-2">
                 <div class="h-6 w-6 rounded border-2 border-amber-400 bg-amber-50" />
                 <span>Unit PS: drag pindah, klik kanan → Edit, QR, Salin, Hapus</span>
@@ -914,7 +914,7 @@ function qrImageUrl(url: string) {
 
         <!-- Add Table Dialog -->
         <Dialog :open="showAddTable" @update:open="showAddTable = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Tambah Unit PS</DialogTitle>
                     <DialogDescription>Unit PS akan muncul di denah. Atur Device Address & Harga nanti.</DialogDescription>
@@ -938,7 +938,7 @@ function qrImageUrl(url: string) {
 
         <!-- Edit PS Unit Dialog -->
         <Dialog :open="showEditTable" @update:open="showEditTable = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Edit Unit PS — {{ editTableTarget?.name }}</DialogTitle>
                     <DialogDescription>Atur detail unit PS dan koneksi TV (Android ADB / Hisense VIDAA).</DialogDescription>
@@ -977,7 +977,7 @@ function qrImageUrl(url: string) {
 
         <!-- Add Element Dialog -->
         <Dialog :open="showAddElement" @update:open="showAddElement = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Tambah Elemen Denah</DialogTitle>
                     <DialogDescription>Tiang, tangga, kasir, dll. Ukuran dalam meter.</DialogDescription>
@@ -1013,7 +1013,7 @@ function qrImageUrl(url: string) {
 
         <!-- QR Dialog -->
         <Dialog :open="showQrDialog" @update:open="showQrDialog = $event">
-            <DialogContent class="max-w-sm">
+            <DialogContent class="w-[95vw] max-w-sm">
                 <DialogHeader>
                     <DialogTitle>QR Order — {{ selectedTable?.name }}</DialogTitle>
                     <DialogDescription>Scan untuk order. Cetak dan letakkan di meja.</DialogDescription>
