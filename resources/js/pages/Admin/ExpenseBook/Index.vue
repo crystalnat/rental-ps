@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
 import { BookOpen, Plus, Pencil, Trash2, Search, TrendingDown, ChevronLeft, ChevronRight, Calendar } from 'lucide-vue-next'
+import ReceiptUpload from '@/components/shared/ReceiptUpload.vue'
 
 interface StoreItem {
     id: number
@@ -189,15 +190,6 @@ function goToToday() {
 const receiptFile = ref<File | null>(null)
 const editReceiptFile = ref<File | null>(null)
 
-function pickReceipt(event: Event, target: 'create' | 'edit') {
-    const file = (event.target as HTMLInputElement).files?.[0] ?? null
-    if (target === 'create') {
-        receiptFile.value = file
-    } else {
-        editReceiptFile.value = file
-    }
-}
-
 function submitForm() {
     if (!form.value.description.trim() || !form.value.amount || Number(form.value.amount) < 0) return
     processing.value = true
@@ -226,6 +218,7 @@ function submitForm() {
 function openEdit(expense: ExpenseItem) {
     if (!expense.can_edit) return
     editTarget.value = expense
+    editReceiptFile.value = null
     editForm.value = {
         category: expense.category,
         description: expense.description,
@@ -454,17 +447,11 @@ function onDateInputChange() {
                                         <p v-if="isCashier" class="text-[10px] text-muted-foreground italic">Kasir hanya bisa mencatat hari ini.</p>
                                     </div>
                                 </div>
-                                <div class="space-y-1.5">
-                                    <Label for="receipt" class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Foto Bukti (Opsional)</Label>
-                                    <Input
-                                        id="receipt"
-                                        type="file"
-                                        accept="image/*"
-                                        class="h-10 font-medium file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-bold"
-                                        @change="pickReceipt($event, 'create')"
-                                    />
-                                    <p class="text-[10px] text-muted-foreground italic">Maksimal 4 MB. Muncul di laporan PDF dan sebagai tautan di Excel.</p>
-                                </div>
+                                <ReceiptUpload
+                                    v-model="receiptFile"
+                                    label="Foto Bukti (Opsional)"
+                                    hint="Muncul di laporan PDF dan sebagai tautan di Excel."
+                                />
                                 <Button type="submit" class="w-full h-11 font-black uppercase tracking-widest shadow-lg shadow-primary/20" :disabled="processing">
                                     {{ processing ? 'Menyimpan...' : 'Simpan Pengeluaran' }}
                                 </Button>
@@ -646,24 +633,11 @@ function onDateInputChange() {
                             <Input v-model="editForm.expense_date" type="date" class="mt-1" required />
                         </div>
                     </div>
-                    <div>
-                        <Label>Foto Bukti</Label>
-                        <img
-                            v-if="editTarget.receipt_url"
-                            :src="editTarget.receipt_url"
-                            alt="Bukti pengeluaran"
-                            class="mt-1 h-20 w-20 rounded border object-cover"
-                        />
-                        <Input
-                            type="file"
-                            accept="image/*"
-                            class="mt-1"
-                            @change="pickReceipt($event, 'edit')"
-                        />
-                        <p class="mt-1 text-[10px] text-muted-foreground italic">
-                            Kosongkan jika tidak ingin mengganti bukti.
-                        </p>
-                    </div>
+                    <ReceiptUpload
+                        v-model="editReceiptFile"
+                        :existing-url="editTarget.receipt_url"
+                        hint="Kosongkan jika tidak ingin mengganti bukti."
+                    />
                     <DialogFooter>
                         <Button type="button" variant="outline" @click="editTarget = null">
                             Batal
