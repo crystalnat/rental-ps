@@ -8,6 +8,7 @@ use App\Models\Store;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -83,6 +84,7 @@ class DailyExpenseController extends Controller
             'expense_date' => $e->expense_date->format('Y-m-d'),
             'created_at'   => $e->created_at->format('H:i'),
             'creator_name' => $e->creator?->name,
+            'receipt_url'  => $e->receipt_image ? Storage::disk('public')->url($e->receipt_image) : null,
             'can_edit'     => ($user->role === 'owner' || $user->role === 'admin' || (int) $e->created_by === (int) $user->id),
         ])->values()->all();
 
@@ -126,6 +128,7 @@ class DailyExpenseController extends Controller
             'description'  => ['required', 'string', 'max:500'],
             'amount'       => ['required', 'numeric', 'min:0'],
             'expense_date' => ['required', 'date'],
+            'receipt'      => ['nullable', 'image', 'max:4096'],
         ]);
 
         // Kasir selalu mencatat untuk hari ini
@@ -147,6 +150,9 @@ class DailyExpenseController extends Controller
             'description'  => $validated['description'],
             'amount'       => $validated['amount'],
             'expense_date' => $validated['expense_date'],
+            'receipt_image'=> $request->hasFile('receipt')
+                ? $request->file('receipt')->store('expenses/receipts', 'public')
+                : null,
         ]);
 
         return back()->with('success', 'Pengeluaran berhasil dicatat.');
@@ -166,6 +172,7 @@ class DailyExpenseController extends Controller
             'description'  => ['required', 'string', 'max:500'],
             'amount'       => ['required', 'numeric', 'min:0'],
             'expense_date' => ['required', 'date'],
+            'receipt'      => ['nullable', 'image', 'max:4096'],
         ]);
 
         // Restrict cashier to today only
@@ -174,6 +181,15 @@ class DailyExpenseController extends Controller
             if ($date !== now()->toDateString()) {
                 return back()->with('error', 'Kasir hanya boleh mengubah pengeluaran ke tanggal hari ini.');
             }
+        }
+
+        unset($validated['receipt']);
+
+        if ($request->hasFile('receipt')) {
+            if ($dailyExpense->receipt_image) {
+                Storage::disk('public')->delete($dailyExpense->receipt_image);
+            }
+            $validated['receipt_image'] = $request->file('receipt')->store('expenses/receipts', 'public');
         }
 
         $dailyExpense->update($validated);
@@ -190,6 +206,7 @@ class DailyExpenseController extends Controller
             return back()->with('error', 'Anda hanya dapat menghapus pengeluaran yang Anda buat sendiri.');
         }
 
+        // File bukti tidak ikut dihapus: record-nya soft delete, bukti tetap dibutuhkan saat restore atau audit
         $dailyExpense->delete();
 
         return back()->with('success', 'Pengeluaran berhasil dihapus.');

@@ -34,6 +34,7 @@ interface ExpenseItem {
     created_at: string
     creator_name: string | null
     can_edit: boolean
+    receipt_url: string | null
 }
 
 interface CategoryOption {
@@ -185,6 +186,18 @@ function goToToday() {
     goToDay(t)
 }
 
+const receiptFile = ref<File | null>(null)
+const editReceiptFile = ref<File | null>(null)
+
+function pickReceipt(event: Event, target: 'create' | 'edit') {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null
+    if (target === 'create') {
+        receiptFile.value = file
+    } else {
+        editReceiptFile.value = file
+    }
+}
+
 function submitForm() {
     if (!form.value.description.trim() || !form.value.amount || Number(form.value.amount) < 0) return
     processing.value = true
@@ -192,7 +205,9 @@ function submitForm() {
         ...form.value,
         amount: Number(form.value.amount),
         store: props.store.id,
+        receipt: receiptFile.value,
     }, {
+        forceFormData: true,
         preserveScroll: true,
         onFinish: () => { processing.value = false },
         onSuccess: () => {
@@ -202,6 +217,7 @@ function submitForm() {
                 amount: '',
                 expense_date: new Date().toISOString().slice(0, 10),
             }
+            receiptFile.value = null
         },
     })
 }
@@ -224,12 +240,16 @@ function submitEdit() {
     const id = snapshot.id
     processing.value = true
     editTarget.value = null
-    router.put(`/admin/expense-book/${id}`, {
+    // Upload file tidak bisa lewat PUT, jadi dikirim sebagai POST dengan method spoofing
+    router.post(`/admin/expense-book/${id}`, {
+        _method: 'put',
         category: editForm.value.category,
         description: editForm.value.description,
         amount: Number(editForm.value.amount),
         expense_date: editForm.value.expense_date,
+        receipt: editReceiptFile.value,
     }, {
+        forceFormData: true,
         preserveScroll: true,
         onError: (errors) => {
             editTarget.value = snapshot
@@ -237,6 +257,7 @@ function submitEdit() {
         },
         onFinish: () => {
             processing.value = false
+            editReceiptFile.value = null
         },
     })
 }
@@ -433,6 +454,17 @@ function onDateInputChange() {
                                         <p v-if="isCashier" class="text-[10px] text-muted-foreground italic">Kasir hanya bisa mencatat hari ini.</p>
                                     </div>
                                 </div>
+                                <div class="space-y-1.5">
+                                    <Label for="receipt" class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Foto Bukti (Opsional)</Label>
+                                    <Input
+                                        id="receipt"
+                                        type="file"
+                                        accept="image/*"
+                                        class="h-10 font-medium file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-bold"
+                                        @change="pickReceipt($event, 'create')"
+                                    />
+                                    <p class="text-[10px] text-muted-foreground italic">Maksimal 4 MB. Muncul di laporan PDF dan sebagai tautan di Excel.</p>
+                                </div>
                                 <Button type="submit" class="w-full h-11 font-black uppercase tracking-widest shadow-lg shadow-primary/20" :disabled="processing">
                                     {{ processing ? 'Menyimpan...' : 'Simpan Pengeluaran' }}
                                 </Button>
@@ -482,6 +514,15 @@ function onDateInputChange() {
                                                 <div class="flex flex-col gap-1">
                                                     <span class="text-xs font-bold text-muted-foreground tabular-nums">{{ e.created_at }}</span>
                                                     <span class="font-medium text-foreground line-clamp-2">{{ e.description }}</span>
+                                                    <a
+                                                        v-if="e.receipt_url"
+                                                        :href="e.receipt_url"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        class="mt-1 w-fit"
+                                                    >
+                                                        <img :src="e.receipt_url" alt="Bukti pengeluaran" class="h-12 w-12 rounded border object-cover" />
+                                                    </a>
                                                 </div>
                                             </td>
                                             <td class="px-4 md:px-6 py-4">
@@ -604,6 +645,24 @@ function onDateInputChange() {
                             <Label>Tanggal</Label>
                             <Input v-model="editForm.expense_date" type="date" class="mt-1" required />
                         </div>
+                    </div>
+                    <div>
+                        <Label>Foto Bukti</Label>
+                        <img
+                            v-if="editTarget.receipt_url"
+                            :src="editTarget.receipt_url"
+                            alt="Bukti pengeluaran"
+                            class="mt-1 h-20 w-20 rounded border object-cover"
+                        />
+                        <Input
+                            type="file"
+                            accept="image/*"
+                            class="mt-1"
+                            @change="pickReceipt($event, 'edit')"
+                        />
+                        <p class="mt-1 text-[10px] text-muted-foreground italic">
+                            Kosongkan jika tidak ingin mengganti bukti.
+                        </p>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" @click="editTarget = null">

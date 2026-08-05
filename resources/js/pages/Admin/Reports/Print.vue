@@ -14,6 +14,11 @@ interface SalesByCashier { cashier_id: number | null; cashier_name: string; orde
 interface SalesByType { type: string; label: string; count: number; total: number }
 interface SalesByPayment { method: string; label: string; count: number; total: number }
 interface ExpenseCategoryDetail { category: string; category_label: string; total: number; count: number }
+interface ExpenseRow {
+    expense_date: string; created_at: string; store_name: string
+    category: string; category_label: string; description: string | null
+    amount: number; created_by_name: string | null; receipt_url: string | null
+}
 
 interface StoreReport {
     id: number; name: string; slug: string; income: number; hpp: number; expenses: number
@@ -33,6 +38,7 @@ interface OverallReport {
     top_products: TopProduct[]; sales_by_cashier: SalesByCashier[]
     sales_by_type: SalesByType[]; sales_by_payment: SalesByPayment[]
     expense_by_category_detail: ExpenseCategoryDetail[]
+    expense_list: ExpenseRow[]
     orders: Array<{ order_code: string; store_name: string; cashier_name: string; final_amount: number; type: string; payment_method: string; created_at: string }>
 }
 
@@ -70,7 +76,24 @@ const marginPct = computed(() => {
 })
 
 const ready = ref(false)
-onMounted(() => { setTimeout(() => { ready.value = true; setTimeout(() => window.print(), 1500) }, 800) })
+
+// Cetak ditunda sampai gambar bukti selesai dimuat, kalau tidak thumbnail keluar kosong di PDF
+function waitForImages(): Promise<unknown> {
+    const images = Array.from(document.querySelectorAll('img'))
+    return Promise.all(images.map(img => img.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+            img.addEventListener('load', resolve, { once: true })
+            img.addEventListener('error', resolve, { once: true })
+        })))
+}
+
+onMounted(() => {
+    setTimeout(() => {
+        ready.value = true
+        setTimeout(() => { waitForImages().then(() => window.print()) }, 1500)
+    }, 800)
+})
 </script>
 
 <template>
@@ -277,6 +300,51 @@ onMounted(() => { setTimeout(() => { ready.value = true; setTimeout(() => window
             </td></tr></tbody>
         </table>
 
+        <!-- ==================== SECTION 5: EXPENSE LOG ==================== -->
+        <table class="sec sec-break">
+            <thead><tr><td class="sec-hdr-cell">
+                <div class="sec-hdr">
+                    <span class="sec-hdr-l">OFFICIAL REPORT</span>
+                    <span class="sec-hdr-r">Periode {{ date_from }} s/d {{ date_to }}</span>
+                </div>
+            </td></tr></thead>
+            <tfoot><tr><td class="sec-ftr-cell">
+                <div class="sec-ftr">Dokumen Internal — Dicetak: {{ new Date().toLocaleDateString('id-ID') }}</div>
+            </td></tr></tfoot>
+            <tbody><tr><td class="sec-body-cell">
+
+                <div class="badge badge-dark">DAFTAR PENGELUARAN DETAIL — GABUNGAN</div>
+
+                <table class="tb tbs">
+                    <thead><tr>
+                        <th class="tal">Tanggal</th><th class="tal">Cabang</th><th class="tal">Kategori</th>
+                        <th class="tal">Keterangan</th><th class="tal">Dicatat Oleh</th><th>Jumlah</th><th>Bukti</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr v-for="(e,i) in overall.expense_list" :key="'ex-'+i">
+                            <td class="tal mono faded">{{ e.expense_date }}</td>
+                            <td class="tal bld up">{{ e.store_name }}</td>
+                            <td class="tal up">{{ e.category_label }}</td>
+                            <td class="tal">{{ e.description || '—' }}</td>
+                            <td class="tal faded">{{ e.created_by_name || '—' }}</td>
+                            <td class="bld cv-accent">{{ fmt(e.amount) }}</td>
+                            <td>
+                                <img v-if="e.receipt_url" :src="e.receipt_url" class="rcpt" alt="Bukti" />
+                                <span v-else class="faded">—</span>
+                            </td>
+                        </tr>
+                        <tr v-if="!overall.expense_list?.length"><td colspan="7" class="empty">Tidak ada pengeluaran.</td></tr>
+                        <tr v-else class="ttl-row">
+                            <td class="tal bld up" colspan="5">Total Pengeluaran</td>
+                            <td class="bld cv-accent">{{ fmt(overall.expenses) }}</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </td></tr></tbody>
+        </table>
+
         <!-- ==================== SIGNATURE PAGE ==================== -->
         <table class="sec sec-break">
             <thead><tr><td class="sec-hdr-cell">
@@ -462,6 +530,9 @@ onMounted(() => { setTimeout(() => { ready.value = true; setTimeout(() => window
 .mb16 { margin-bottom: 16px; }
 .mb20 { margin-bottom: 20px; }
 .empty { text-align: center !important; color: #d1d5db; font-style: italic; padding: 20px !important; }
+.ttl-row td { background: #f8fafc; border-top: 2px solid #cbd5e1; }
+/* Thumbnail bukti dibuat kecil agar satu baris pengeluaran tetap muat di lebar A4 */
+.rcpt { display: block; margin: 0 auto; width: 46px; height: 46px; object-fit: cover; border: 1px solid #e2e8f0; border-radius: 3px; }
 
 /* ==============================================
    PRINT — display:table menjamin header & footer

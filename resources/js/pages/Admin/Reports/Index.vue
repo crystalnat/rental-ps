@@ -121,7 +121,7 @@ interface ExpenseRow {
     description: string | null
     amount: number
     created_by_name: string | null
-    has_receipt: boolean
+    receipt_url: string | null
 }
 
 interface StoreReport {
@@ -351,6 +351,11 @@ const SHEET_ACCENTS: Record<string, string> = {
     rental: '1D4ED8',
     fnb: 'B45309',
     expense: 'B91C1C',
+}
+
+// Excel butuh URL absolut, sedangkan backend mengirim path relatif dari storage
+function absoluteUrl(url: string): string {
+    return url.startsWith('http') ? url : `${window.location.origin}${url}`
 }
 
 const CURRENCY_FORMAT = '"Rp"#,##0'
@@ -602,7 +607,7 @@ function buildXlsx() {
     const wsExpenses_data: any[][] = [
         ["DAFTAR PENGELUARAN DETAIL", `Periode: ${props.date_from} s/d ${props.date_to}`],
         [""],
-        ["Tanggal", "Waktu Input", "Toko", "Kategori", "Keterangan", "Dicatat Oleh", "Bukti", "Jumlah"],
+        ["Tanggal", "Waktu Input", "Toko", "Kategori", "Keterangan", "Dicatat Oleh", "Jumlah", "Bukti"],
     ]
     props.overall.expense_list.forEach(e => {
         wsExpenses_data.push([
@@ -612,18 +617,29 @@ function buildXlsx() {
             e.category_label,
             e.description || '-',
             e.created_by_name || '-',
-            e.has_receipt ? 'Ada' : 'Tidak ada',
             e.amount,
+            e.receipt_url ? 'Lihat Bukti' : '-',
         ])
     })
     const expenseTotalRow = wsExpenses_data.length
-    wsExpenses_data.push(["Total", "", "", "", "", "", "", expenseTotal])
+    wsExpenses_data.push(["Total", "", "", "", "", "", expenseTotal, ""])
     const wsExpenses = makeStyledSheet(wsExpenses_data, {
         accent: SHEET_ACCENTS.expense,
         titleRows: [0],
         headerRows: [2],
         boldRows: [expenseTotalRow],
-        currencyColumns: [7],
+        currencyColumns: [6],
+    })
+    // Excel tidak bisa menyisipkan gambar lewat SheetJS, jadi bukti dipasang sebagai tautan ke file aslinya
+    const RECEIPT_COLUMN = 7
+    const FIRST_EXPENSE_ROW = 3
+    props.overall.expense_list.forEach((e, i) => {
+        if (!e.receipt_url) return
+        const address = XLSX.utils.encode_cell({ r: FIRST_EXPENSE_ROW + i, c: RECEIPT_COLUMN })
+        const cell = wsExpenses[address]
+        if (!cell) return
+        cell.l = { Target: absoluteUrl(e.receipt_url), Tooltip: 'Buka bukti pengeluaran' }
+        cell.s = { ...cell.s, font: { color: { rgb: '0563C1' }, underline: true } }
     })
     XLSX.utils.book_append_sheet(wb, wsExpenses, "Daftar Pengeluaran")
 

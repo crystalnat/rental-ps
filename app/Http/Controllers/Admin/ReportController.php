@@ -11,6 +11,7 @@ use App\Models\Store;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -636,7 +637,7 @@ class ReportController extends Controller
                 'description'    => $e->description,
                 'amount'         => (float) $e->amount,
                 'created_by_name'=> $e->creator?->name,
-                'has_receipt'    => (bool) $e->receipt_image,
+                'receipt_url'    => $e->receipt_image ? Storage::disk('public')->url($e->receipt_image) : null,
             ])->toArray();
     }
 
