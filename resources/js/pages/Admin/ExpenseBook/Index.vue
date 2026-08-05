@@ -486,9 +486,11 @@ function onDateInputChange() {
                                     <thead>
                                         <tr class="border-b bg-muted/30 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                             <th class="px-4 md:px-6 py-4">Waktu & Deskripsi</th>
+                                            <th class="px-3 py-4 w-16 text-center">Bukti</th>
                                             <th class="px-4 md:px-6 py-4 hidden sm:table-cell">Kategori</th>
                                             <th class="px-4 md:px-6 py-4 text-right">Nominal</th>
-                                            <th class="px-4 md:px-6 py-4 w-16 text-center">Aksi</th>
+                                            <th class="px-4 md:px-6 py-4 hidden md:table-cell">Dicatat Oleh</th>
+                                            <th class="px-4 md:px-6 py-4 w-24 text-right">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y">
@@ -497,35 +499,43 @@ function onDateInputChange() {
                                             :key="e.id"
                                             class="group hover:bg-muted/50 transition-colors"
                                         >
-                                            <td class="px-4 md:px-6 py-4">
-                                                <div class="flex flex-col gap-1">
+                                            <td class="px-4 md:px-6 py-3">
+                                                <div class="flex flex-col gap-0.5">
                                                     <span class="text-xs font-bold text-muted-foreground tabular-nums">{{ e.created_at }}</span>
                                                     <span class="font-medium text-foreground line-clamp-2">{{ e.description }}</span>
-                                                    <a
-                                                        v-if="e.receipt_url"
-                                                        :href="e.receipt_url"
-                                                        target="_blank"
-                                                        rel="noopener"
-                                                        class="mt-1 w-fit"
-                                                    >
-                                                        <img :src="e.receipt_url" alt="Bukti pengeluaran" class="h-12 w-12 rounded border object-cover" />
-                                                    </a>
                                                 </div>
                                             </td>
-                                            <td class="px-4 md:px-6 py-4">
+                                            <td class="px-3 py-3 text-center">
+                                                <a
+                                                    v-if="e.receipt_url"
+                                                    :href="e.receipt_url"
+                                                    target="_blank"
+                                                    rel="noopener"
+                                                    class="inline-block"
+                                                    title="Lihat bukti"
+                                                >
+                                                    <img
+                                                        :src="e.receipt_url"
+                                                        alt="Bukti"
+                                                        class="h-10 w-10 rounded-md border object-cover transition-transform hover:scale-110"
+                                                    />
+                                                </a>
+                                                <span v-else class="text-xs text-muted-foreground">—</span>
+                                            </td>
+                                            <td class="px-4 md:px-6 py-3 hidden sm:table-cell">
                                                 <Badge variant="secondary" class="rounded-md font-bold text-[10px] uppercase">
                                                     {{ categoryLabels[e.category] ?? e.category }}
                                                 </Badge>
                                             </td>
-                                            <td class="px-4 md:px-6 py-4 text-right">
-                                                <span class="font-black text-destructive tabular-nums">
+                                            <td class="px-4 md:px-6 py-3 text-right">
+                                                <span class="font-black text-destructive tabular-nums whitespace-nowrap">
                                                     {{ formatCurrency(e.amount) }}
                                                 </span>
                                             </td>
-                                            <td class="px-4 md:px-6 py-4 hidden md:table-cell">
-                                                <span class="text-xs text-muted-foreground font-medium">{{ e.creator_name ?? '—' }}</span>
+                                            <td class="px-4 md:px-6 py-3 hidden md:table-cell">
+                                                <span class="text-xs text-muted-foreground font-medium whitespace-nowrap">{{ e.creator_name ?? '—' }}</span>
                                             </td>
-                                            <td class="px-4 md:px-6 py-4 text-right">
+                                            <td class="px-4 md:px-6 py-3 text-right">
                                                 <div v-if="e.can_edit" class="flex items-center justify-end gap-1">
                                                     <Button
                                                         variant="ghost"

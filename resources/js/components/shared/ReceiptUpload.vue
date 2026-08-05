@@ -15,7 +15,11 @@ const emit = defineEmits<{
 }>()
 
 const MAX_SIZE_MB = 4
+const MAX_DIMENSION_PX = 1600
+const JPEG_QUALITY = 0.8
+
 const inputRef = ref<HTMLInputElement | null>(null)
+const isCompressing = ref(false)
 const previewUrl = ref<string | null>(null)
 const errorMessage = ref('')
 const isDragging = ref(false)
@@ -36,21 +40,77 @@ const fileSizeLabel = computed(() =>
     props.modelValue ? `${(props.modelValue.size / 1024 / 1024).toFixed(2)} MB` : '',
 )
 
-function setFile(file: File | null) {
+/**
+ * Foto kamera ponsel bisa beberapa MB dan ditolak batas upload server,
+ * jadi gambar dikecilkan di browser sebelum dikirim. Struk hanya perlu terbaca,
+ * bukan resolusi penuh.
+ */
+function compressImage(file: File): Promise<File> {
+    return new Promise((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file)
+        const image = new Image()
+
+        image.onload = () => {
+            const scale = Math.min(1, MAX_DIMENSION_PX / Math.max(image.width, image.height))
+            const canvas = document.createElement('canvas')
+            canvas.width = Math.round(image.width * scale)
+            canvas.height = Math.round(image.height * scale)
+
+            const context = canvas.getContext('2d')
+            if (!context) {
+                URL.revokeObjectURL(objectUrl)
+                reject(new Error('Canvas tidak tersedia'))
+                return
+            }
+            context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+            canvas.toBlob((blob) => {
+                URL.revokeObjectURL(objectUrl)
+                if (!blob) {
+                    reject(new Error('Gagal memproses gambar'))
+                    return
+                }
+                const name = file.name.replace(/\.[^.]+$/, '') + '.jpg'
+                resolve(new File([blob], name, { type: 'image/jpeg' }))
+            }, 'image/jpeg', JPEG_QUALITY)
+        }
+
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl)
+            reject(new Error('Gambar tidak dapat dibaca'))
+        }
+
+        image.src = objectUrl
+    })
+}
+
+async function setFile(file: File | null) {
     errorMessage.value = ''
 
-    if (file) {
-        if (!file.type.startsWith('image/')) {
-            errorMessage.value = 'File harus berupa gambar (JPG, PNG, atau WebP).'
-            return
-        }
-        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-            errorMessage.value = `Ukuran maksimal ${MAX_SIZE_MB} MB.`
-            return
-        }
+    if (!file) {
+        emit('update:modelValue', null)
+        return
     }
 
-    emit('update:modelValue', file)
+    if (!file.type.startsWith('image/')) {
+        errorMessage.value = 'File harus berupa gambar (JPG, PNG, atau WebP).'
+        return
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        errorMessage.value = `Ukuran maksimal ${MAX_SIZE_MB} MB.`
+        return
+    }
+
+    isCompressing.value = true
+    try {
+        const compressed = await compressImage(file)
+        // Kalau hasil kompresi malah lebih besar (gambar sudah kecil), pakai file aslinya
+        emit('update:modelValue', compressed.size < file.size ? compressed : file)
+    } catch {
+        errorMessage.value = 'Gambar gagal diproses. Coba file lain.'
+    } finally {
+        isCompressing.value = false
+    }
 }
 
 function onSelect(event: Event) {
@@ -105,12 +165,16 @@ function openPicker() {
                 <ImagePlus class="h-5 w-5" />
             </div>
             <div>
-                <p class="text-sm font-bold">Unggah foto struk</p>
+                <p class="text-sm font-bold">
+                    {{ isCompressing ? 'Memproses gambar...' : 'Unggah foto struk' }}
+                </p>
                 <p class="text-[11px] text-muted-foreground">
                     Klik atau seret gambar ke sini
                 </p>
             </div>
-            <p class="text-[10px] text-muted-foreground">JPG, PNG, atau WebP &middot; maks {{ MAX_SIZE_MB }} MB</p>
+            <p class="text-[10px] text-muted-foreground">
+                JPG, PNG, atau WebP &middot; maks {{ MAX_SIZE_MB }} MB &middot; otomatis dikecilkan
+            </p>
         </div>
 
         <div v-else class="flex items-center gap-3 rounded-lg border bg-muted/30 p-2.5">
