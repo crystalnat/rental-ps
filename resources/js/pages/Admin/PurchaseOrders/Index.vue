@@ -11,7 +11,7 @@ import TableToolbar from '@/components/TableToolbar.vue'
 import { TableHeadSortable } from '@/components/ui/table'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { 
-    FileText, Plus, Eye, XCircle, Trash2, 
+    FileText, Plus, Eye, Trash2,
     Clock, CheckCircle2, Warehouse, Pencil
 } from 'lucide-vue-next'
 

@@ -17,7 +17,7 @@ import {
     ArrowLeft, Save, Plus, LayoutGrid, Box, ArrowDownToLine, CreditCard,
     DoorOpen, Square, MoreHorizontal, Trash2, QrCode, Copy, Pencil,
     ZoomIn, ZoomOut, Maximize2, RotateCw, RotateCcw, Printer,
-    Gamepad2, Gamepad,
+    Gamepad2,
 } from 'lucide-vue-next'
 
 const BASE_PIXELS_PER_METER = 80

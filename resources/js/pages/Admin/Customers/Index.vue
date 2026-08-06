@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { 
-    UserCircle, Search, Plus, Pencil, Trash2, 
+    UserCircle, Plus, Pencil, Trash2,
     History, Loader2, Eye, Contact, Mail, Phone, ShoppingBag
 } from 'lucide-vue-next'
 import { debounce } from 'lodash'

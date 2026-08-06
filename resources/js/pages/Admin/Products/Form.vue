@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { ArrowLeft, Loader2, Package, Plus, Trash2, GripVertical, Gamepad2, ShoppingBag } from 'lucide-vue-next'
+import { ArrowLeft, Loader2, Package, Plus, Trash2, GripVertical, Gamepad2, ShoppingBag, Clock, AlertTriangle } from 'lucide-vue-next'
 
 interface ModifierOption {
     id?: number
@@ -72,7 +72,7 @@ const props = defineProps<{
 
 const isEdit = computed(() => !!props.product)
 
-// ─── Step 1: Choose type ────────────────────────────────────────────────────────
+// --- Step 1: Choose type ---
 // On edit, skip step 1 and go straight to form
 const typeChosen = ref(isEdit.value)
 const productType = ref<'regular' | 'rental'>(
@@ -98,7 +98,7 @@ const pageTitle = computed(() => {
     return productType.value === 'rental' ? 'Tambah Paket Rental PS' : 'Tambah Produk Biasa'
 })
 
-// ─── Form ───────────────────────────────────────────────────────────────────────
+// --- Form ---
 const form = useForm({
     name:         props.product?.name         ?? '',
     image:        null as File | null,
@@ -122,7 +122,7 @@ watch(productType, (val) => {
     form.is_rental_package = val === 'rental'
 })
 
-// ─── Modifier helpers ──────────────────────────────────────────────────────────
+// --- Modifier helpers ---
 function addModifierGroup() {
     form.modifiers.push({
         name: '', is_required: false, min_select: 0, max_select: 1,
@@ -135,7 +135,7 @@ function addOption(gi: number) {
 }
 function removeOption(gi: number, oi: number) { form.modifiers[gi].options.splice(oi, 1) }
 
-// ─── Included items — product picker ──────────────────────────────────────────
+// --- Included items: product picker ---
 const pickerSearch = ref('')
 const pickerQty = ref(1)
 const pickerSelectedId = ref<number | null>(null)
@@ -180,7 +180,7 @@ function addIncludedItem() {
 }
 function removeIncludedItem(i: number) { form.included_items_json.splice(i, 1) }
 
-// ─── Submit ────────────────────────────────────────────────────────────────────
+// --- Submit ---
 function submit() {
     if (isEdit.value) {
         form.transform((data) => ({ ...data, _method: 'put' })).post(`/admin/products/${props.product!.id}`)
@@ -205,7 +205,7 @@ function formatDuration(m: number) {
 <template>
     <AdminLayout :title="pageTitle">
         <div class="mx-auto max-w-2xl">
-            <!-- ─── Back button in body ─────────────────────────────────── -->
+            <!-- Back button in body -->
             <div class="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <Link href="/admin/products">
                     <Button variant="outline" size="sm" class="gap-2">
@@ -226,7 +226,7 @@ function formatDuration(m: number) {
                 </div>
             </div>
 
-            <!-- ─── STEP 1: Choose type (only on create) ──────────────── -->
+            <!-- STEP 1: Choose type (only on create) -->
             <div v-if="!typeChosen" class="space-y-4">
                 <div class="text-center mb-6">
                     <h1 class="text-xl font-bold">Anda ingin menambahkan apa?</h1>
@@ -262,7 +262,7 @@ function formatDuration(m: number) {
                         <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 text-violet-600 mb-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
                             <Gamepad2 class="h-6 w-6" />
                         </div>
-                        <h3 class="font-bold text-base mb-1">Paket Rental PS 🎮</h3>
+                        <h3 class="font-bold text-base mb-1">Paket Rental PS</h3>
                         <p class="text-xs text-muted-foreground leading-relaxed">
                             Paket sewa PlayStation dengan durasi tertentu. Bisa menyertakan produk tambahan (makan, minum) yang otomatis masuk keranjang saat rental dimulai.
                         </p>
@@ -275,10 +275,10 @@ function formatDuration(m: number) {
                 </div>
             </div>
 
-            <!-- ─── STEP 2: Form ───────────────────────────────────────── -->
+            <!-- STEP 2: Form -->
             <form v-else @submit.prevent="submit" class="space-y-6">
 
-                <!-- ── Rental Package Banner ── -->
+                <!-- Rental Package Banner -->
                 <div v-if="productType === 'rental'" class="flex flex-wrap items-center gap-3 rounded-xl border-2 border-violet-300 bg-violet-50 px-4 py-3">
                     <Gamepad2 class="h-5 w-5 text-violet-600 shrink-0" />
                     <div class="min-w-0 flex-1 break-words">
@@ -294,7 +294,7 @@ function formatDuration(m: number) {
                 </div>
                 <div v-else-if="!isEdit" class="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 px-4 py-3">
                     <ShoppingBag class="h-5 w-5 text-muted-foreground shrink-0" />
-                    <p class="min-w-0 flex-1 break-words text-sm text-muted-foreground">Mode: <strong>Produk Biasa</strong> — Makanan, minuman, atau item satuan</p>
+                    <p class="min-w-0 flex-1 break-words text-sm text-muted-foreground">Mode: <strong>Produk Biasa</strong> - Makanan, minuman, atau item satuan</p>
                     <button
                         type="button"
                         class="text-xs text-muted-foreground underline hover:text-foreground"
@@ -302,7 +302,7 @@ function formatDuration(m: number) {
                     >Ganti tipe</button>
                 </div>
 
-                <!-- ── Card: Info Utama ── -->
+                <!-- Card: Info Utama -->
                 <Card>
                     <CardHeader>
                         <div class="flex items-center gap-3">
@@ -380,10 +380,13 @@ function formatDuration(m: number) {
                     </CardContent>
                 </Card>
 
-                <!-- ── Card: Paket Rental — Durasi & Harga ── -->
+                <!-- Card: Paket Rental - Durasi dan Harga -->
                 <Card v-if="productType === 'rental'" class="border-violet-200 bg-violet-50/30">
                     <CardHeader>
-                        <CardTitle class="text-violet-800">⏱️ Durasi & Harga Paket</CardTitle>
+                        <CardTitle class="text-violet-800 flex items-center gap-2">
+                            <Clock class="h-4 w-4" />
+                            Durasi &amp; Harga Paket
+                        </CardTitle>
                         <CardDescription>Tentukan berapa lama dan berapa harga paket ini. Harga sudah termasuk durasi + semua item yang disertakan.</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-5">
@@ -453,7 +456,7 @@ function formatDuration(m: number) {
                     </CardContent>
                 </Card>
 
-                <!-- ── Card: Produk yang Disertakan (rental only) ── -->
+                <!-- Card: Produk yang Disertakan (rental only) -->
                 <Card v-if="productType === 'rental'" class="border-violet-200">
                     <CardHeader>
                         <CardTitle class="flex items-center gap-2 text-violet-800">
@@ -490,7 +493,10 @@ function formatDuration(m: number) {
 
                         <!-- Product Picker -->
                         <div class="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/40 p-3 space-y-2">
-                            <p class="text-xs font-semibold text-violet-700 mb-2">➕ Tambah Produk ke Paket</p>
+                            <p class="text-xs font-semibold text-violet-700 mb-2 flex items-center gap-1.5">
+                                <Plus class="h-3.5 w-3.5" />
+                                Tambah Produk ke Paket
+                            </p>
                             <div class="flex flex-wrap gap-2">
                                 <!-- Qty -->
                                 <Input
@@ -514,7 +520,7 @@ function formatDuration(m: number) {
                                     <span
                                         v-if="pickerSelectedId"
                                         class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white"
-                                    >✓ Dipilih</span>
+                                    >Dipilih</span>
 
                                     <!-- Dropdown -->
                                     <div
@@ -551,8 +557,9 @@ function formatDuration(m: number) {
                                     Tambah
                                 </Button>
                             </div>
-                            <p v-if="allProducts.length === 0" class="text-[10px] text-amber-600">
-                                ⚠️ Belum ada produk biasa yang tersedia. Tambahkan produk reguler terlebih dahulu.
+                            <p v-if="allProducts.length === 0" class="text-[10px] text-amber-600 flex items-start gap-1.5">
+                                <AlertTriangle class="h-3.5 w-3.5 shrink-0 mt-px" />
+                                Belum ada produk biasa yang tersedia. Tambahkan produk reguler terlebih dahulu.
                             </p>
                             <p v-else class="text-[10px] text-muted-foreground">
                                 Klik produk dari dropdown, atur jumlah (qty), lalu klik Tambah.
@@ -561,7 +568,7 @@ function formatDuration(m: number) {
                     </CardContent>
                 </Card>
 
-                <!-- ── Card: Harga & Unit (Produk Biasa only) ── -->
+                <!-- Card: Harga dan Unit (Produk Biasa only) -->
                 <Card v-if="productType === 'regular'">
                     <CardHeader>
                         <CardTitle>Harga & Unit Penjualan</CardTitle>
@@ -605,7 +612,7 @@ function formatDuration(m: number) {
                     </CardContent>
                 </Card>
 
-                <!-- ── Card: Varian & Modifier (Produk Biasa only) ── -->
+                <!-- Card: Varian dan Modifier (Produk Biasa only) -->
                 <Card v-if="productType === 'regular'">
                     <CardHeader class="flex flex-col items-start gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
                         <div class="min-w-0">
@@ -671,7 +678,7 @@ function formatDuration(m: number) {
                     </CardContent>
                 </Card>
 
-                <!-- ── Card: Pengaturan ── -->
+                <!-- Card: Pengaturan -->
                 <Card>
                     <CardHeader>
                         <CardTitle>Pengaturan</CardTitle>
@@ -698,14 +705,14 @@ function formatDuration(m: number) {
                     </CardContent>
                 </Card>
 
-                <!-- ── Submit bar ── -->
+                <!-- Submit bar -->
                 <div class="flex flex-col-reverse gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                     <Link href="/admin/products" class="w-full sm:w-auto">
                         <Button type="button" variant="outline" class="w-full sm:w-auto" :disabled="form.processing">Batal</Button>
                     </Link>
                     <Button type="submit" class="w-full sm:w-auto" :disabled="form.processing" :class="productType === 'rental' ? 'bg-violet-600 hover:bg-violet-700' : ''">
                         <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
-                        {{ isEdit ? 'Simpan Perubahan' : (productType === 'rental' ? '🎮 Buat Paket Rental' : 'Buat Produk') }}
+                        {{ isEdit ? 'Simpan Perubahan' : (productType === 'rental' ? 'Buat Paket Rental' : 'Buat Produk') }}
                     </Button>
                 </div>
             </form>

@@ -151,7 +151,7 @@ class DailyExpenseController extends Controller
             'amount'       => $validated['amount'],
             'expense_date' => $validated['expense_date'],
             'receipt_image'=> $request->hasFile('receipt')
-                ? $request->file('receipt')->store('expenses/receipts', 'public')
+                ? $this->storeReceipt($request->file('receipt'))
                 : null,
         ]);
 
@@ -189,7 +189,7 @@ class DailyExpenseController extends Controller
             if ($dailyExpense->receipt_image) {
                 Storage::disk('public')->delete($dailyExpense->receipt_image);
             }
-            $validated['receipt_image'] = $request->file('receipt')->store('expenses/receipts', 'public');
+            $validated['receipt_image'] = $this->storeReceipt($request->file('receipt'));
         }
 
         $dailyExpense->update($validated);
@@ -210,6 +210,54 @@ class DailyExpenseController extends Controller
         $dailyExpense->delete();
 
         return back()->with('success', 'Pengeluaran berhasil dihapus.');
+    }
+
+    private const RECEIPT_MAX_SIDE = 1600;
+    private const RECEIPT_JPEG_QUALITY = 80;
+
+    /**
+     * Simpan bukti sebagai JPEG yang sudah dikecilkan. Kompresi di browser sudah ada,
+     * tapi request bisa datang tanpa lewat form (API client, JS mati), jadi ukuran
+     * file di storage tetap harus dibatasi di sisi server.
+     */
+    private function storeReceipt(\Illuminate\Http\UploadedFile $file): string
+    {
+        $path = 'expenses/receipts/' . \Illuminate\Support\Str::uuid() . '.jpg';
+
+        // ponytail: GD, sudah bundled PHP. Pindah ke Intervention Image kalau
+        // nanti butuh EXIF orientation, watermark, atau format selain JPEG.
+        $image = @imagecreatefromstring(file_get_contents($file->getRealPath()));
+
+        if ($image === false) {
+            return $file->store('expenses/receipts', 'public');
+        }
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $scale = min(1, self::RECEIPT_MAX_SIDE / max($width, $height));
+
+        if ($scale < 1) {
+            $resized = imagescale($image, (int) round($width * $scale), (int) round($height * $scale));
+            if ($resized !== false) {
+                imagedestroy($image);
+                $image = $resized;
+            }
+        }
+
+        // Latar putih supaya PNG/WebP transparan tidak jadi hitam saat dikonversi ke JPEG
+        $canvas = imagecreatetruecolor(imagesx($image), imagesy($image));
+        imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
+        imagecopy($canvas, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
+        imagedestroy($image);
+
+        ob_start();
+        imagejpeg($canvas, null, self::RECEIPT_JPEG_QUALITY);
+        $jpeg = ob_get_clean();
+        imagedestroy($canvas);
+
+        Storage::disk('public')->put($path, $jpeg);
+
+        return $path;
     }
 
     private function resolveStore($user, Request $request): ?Store

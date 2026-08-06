@@ -72,9 +72,29 @@ const typeLabels: Record<string, string> = {
     walk_in: 'Walk In',
 }
 
+// Cetak ditunda sampai logo selesai dimuat, kalau tidak logo keluar kosong di struk
+function waitForImages(): Promise<unknown> {
+    const images = Array.from(document.querySelectorAll('img'))
+    return Promise.all(images.map(img => img.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+            img.addEventListener('load', resolve, { once: true })
+            img.addEventListener('error', resolve, { once: true })
+        })))
+}
+
 onMounted(() => {
-    setTimeout(() => window.print(), 400)
+    setTimeout(() => { waitForImages().then(() => window.print()) }, 400)
 })
+
+// window bukan global yang dikenali template Vue, pemanggilan harus lewat script
+function goBack() {
+    window.history.back()
+}
+
+function reprint() {
+    window.print()
+}
 </script>
 
 <template>
@@ -125,7 +145,7 @@ onMounted(() => {
             <div class="items">
                 <!-- Biaya Rental -->
                 <div v-if="rentalFee > 0" class="item">
-                    <div class="item-name">Biaya Rental{{ order.table_name ? ' — ' + order.table_name : '' }}</div>
+                    <div class="item-name">Biaya Rental{{ order.table_name ? ' - ' + order.table_name : '' }}</div>
                     <div class="item-detail">
                         <span v-if="order.rental_duration_minutes">Durasi: {{ formatDuration(order.rental_duration_minutes) }}</span>
                         <span v-else></span>
@@ -140,7 +160,7 @@ onMounted(() => {
                         </div>
                     </div>
                     <div class="item-detail">
-                        <span>{{ item.quantity }} {{ item.unit }} × {{ formatRp(item.unit_price) }}</span>
+                        <span>{{ item.quantity }} {{ item.unit }} x {{ formatRp(item.unit_price) }}</span>
                         <span class="item-subtotal">{{ formatRp(item.subtotal) }}</span>
                     </div>
                     <div v-if="item.discount_amount > 0" class="item-discount">
@@ -186,26 +206,30 @@ onMounted(() => {
             <div class="receipt-footer">
                 <p v-if="order.notes" class="notes">Catatan: {{ order.notes }}</p>
                 <p class="thank-you">Terima Kasih</p>
-                <p class="thank-you-sub">Selamat Menikmati ✨</p>
+                <p class="thank-you-sub">Selamat Menikmati</p>
                 <p v-if="order.paid_at" class="paid-at">Dibayar: {{ order.paid_at }}</p>
             </div>
         </div>
 
         <!-- No-print: Back button -->
         <div class="no-print-actions">
-            <button class="btn-back" @click="() => { window.history.back() }">
-                ← Kembali
+            <button class="btn-back" type="button" @click="goBack">
+                Kembali
             </button>
-            <button class="btn-print" @click="() => { window.print() }">
-                🖨️ Cetak Ulang
+            <button class="btn-print" type="button" @click="reprint">
+                Cetak Ulang
             </button>
         </div>
     </div>
 </template>
 
 <style>
-/* Reset for receipt */
+/* Struk 80mm.
+   Font sistem saja, dokumen cetak tidak boleh bergantung pada unduhan font.
+   Serif untuk nama toko, sans untuk isi dan angka. */
 .receipt-page {
+    --font-heading: 'Georgia', 'Cambria', 'Times New Roman', serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     margin: 0;
     padding: 0;
     background: #f5f5f5;
@@ -213,14 +237,22 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-family: 'Courier New', 'Consolas', monospace;
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
 }
 
+/* Nominal pada struk wajib rata kolom */
+.receipt, .receipt div, .receipt span, .receipt p { font-variant-numeric: tabular-nums; }
+
+/* box-sizing wajib border-box: tanpa ini width 80mm + padding melebihi lebar
+   kertas dan sisi kanan struk terpotong printer */
 .receipt {
+    box-sizing: border-box;
     width: 80mm;
     max-width: 100vw;
     background: white;
-    padding: 10mm 5mm;
+    padding: 8mm 5mm;
     margin: 20px auto;
     box-shadow: 0 2px 20px rgba(0,0,0,0.1);
     font-size: 12px;
@@ -242,6 +274,7 @@ onMounted(() => {
 }
 
 .store-name {
+    font-family: var(--font-heading);
     font-size: 16px;
     font-weight: 700;
     margin: 0 0 2px;
@@ -252,7 +285,7 @@ onMounted(() => {
 .store-info {
     font-size: 10px;
     margin: 0;
-    color: #333;
+    color: #1f2937;
 }
 
 .divider {
@@ -288,11 +321,11 @@ onMounted(() => {
 }
 
 .item-name {
-    font-weight: 600;
+    font-weight: 500;
 }
 .item-modifiers {
     font-size: 9px;
-    color: #444;
+    color: #374151;
     padding-left: 10px;
     margin: 1px 0 2px;
 }
@@ -304,16 +337,16 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     font-size: 10px;
-    color: #333;
+    color: #1f2937;
 }
 
 .item-subtotal {
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .item-discount {
     font-size: 9px;
-    color: #888;
+    color: #4b5563;
     font-style: italic;
 }
 
@@ -340,12 +373,13 @@ onMounted(() => {
 
 .notes {
     font-size: 9px;
-    color: #666;
+    color: #4b5563;
     margin-bottom: 6px;
     font-style: italic;
 }
 
 .thank-you {
+    font-family: var(--font-heading);
     font-size: 14px;
     font-weight: 700;
     margin: 6px 0 2px;
@@ -353,13 +387,13 @@ onMounted(() => {
 
 .thank-you-sub {
     font-size: 10px;
-    color: #666;
+    color: #4b5563;
     margin: 0;
 }
 
 .paid-at {
     font-size: 9px;
-    color: #888;
+    color: #4b5563;
     margin-top: 6px;
 }
 
@@ -407,15 +441,33 @@ onMounted(() => {
         margin: 0 !important;
     }
 
+    /* box-sizing border-box supaya 80mm sudah termasuk padding, tidak terpotong */
     .receipt {
+        box-sizing: border-box !important;
         box-shadow: none !important;
         margin: 0 !important;
         padding: 4mm 3mm !important;
         width: 80mm !important;
+        max-width: 80mm !important;
     }
 
     .no-print-actions {
         display: none !important;
+    }
+
+    /* Struk gulungan biasanya satu halaman, tapi kalau item banyak jangan
+       memotong di tengah satu item atau di tengah blok ringkasan */
+    .item,
+    .info-row,
+    .summary-row,
+    .summary,
+    .receipt-header,
+    .receipt-footer { page-break-inside: avoid; }
+
+    /* Garis pemisah dan teks abu tetap tercetak */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 }
 </style>

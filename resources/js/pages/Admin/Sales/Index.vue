@@ -386,10 +386,18 @@ function getPaymentLabel(code: string) {
                         </div>
                         <div class="flex flex-col gap-1.5" :class="stores.length > 1 ? 'sm:col-start-2' : 'sm:col-span-2'">
                             <Label class="text-xs font-medium text-muted-foreground">Periode</Label>
-                            <div class="flex items-center gap-2">
-                                <Input v-model="filterState.date_from" type="date" class="h-9 flex-1 min-w-0" />
-                                <span class="shrink-0 text-muted-foreground">s/d</span>
-                                <Input v-model="filterState.date_to" type="date" class="h-9 flex-1 min-w-0" />
+                            <!-- Pemisah "s/d" di tengah memakan lebar dan bikin ikon kalender bawaan
+                                 browser terpotong di 320px. Diganti label per input supaya tetap muat
+                                 bersampingan. -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="min-w-0">
+                                    <span class="mb-1 block text-[10px] text-muted-foreground">Dari</span>
+                                    <Input v-model="filterState.date_from" type="date" aria-label="Tanggal mulai" class="h-9 w-full min-w-0 px-2 sm:px-3" />
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="mb-1 block text-[10px] text-muted-foreground">Sampai</span>
+                                    <Input v-model="filterState.date_to" type="date" aria-label="Tanggal akhir" class="h-9 w-full min-w-0 px-2 sm:px-3" />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -735,5 +743,7 @@ function getPaymentLabel(code: string) {
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25rem 1.25rem;
+    /* Panah digambar sebagai background, tanpa ruang ini teks panjang tertutup panah */
+    padding-right: 2rem;
 }
 </style>

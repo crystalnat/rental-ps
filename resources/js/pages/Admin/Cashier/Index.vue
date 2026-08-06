@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { router, Link, useForm } from '@inertiajs/vue3'
+import { router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import RentalPanel from '@/components/RentalPanel.vue'
+import CashierFloorPlan from '@/components/CashierFloorPlan.vue'
 import {
     Search, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone,
     ShoppingBag, Mic, MicOff, X, Clock, Loader2, RotateCcw, ShoppingCart,
@@ -2011,6 +2012,8 @@ const showQrOrAccount = computed(() => {
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25rem 1.25rem;
+    /* Panah digambar sebagai background, tanpa ruang ini teks panjang tertutup panah */
+    padding-right: 2rem;
 }
 
 :global(.theme-dark) .filter-select {

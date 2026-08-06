@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { router } from '@inertiajs/vue3'
-import { Bar, Doughnut, Line } from 'vue-chartjs'
+import { Bar, Doughnut } from 'vue-chartjs'
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -30,11 +30,8 @@ import {
     Wallet,
     Package,
     Search,
-    Store,
-    ChevronDown,
     ShoppingBag,
     FileSpreadsheet,
-    FileText,
     Printer,
 } from 'lucide-vue-next'
 
@@ -703,17 +700,26 @@ function exportPdf() {
                                 <span v-if="isLoading" class="ml-2 normal-case text-primary">memuat...</span>
                             </Label>
                             <!-- Dua input tanggal berdampingan tidak muat di layar 320px, jadi ditumpuk dulu -->
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                <Input v-model="filterState.date_from" type="date" class="h-10 w-full min-w-0 font-medium sm:flex-1 lg:w-36" @change="applyFilters" />
-                                <span class="hidden font-black text-muted-foreground sm:inline">/</span>
-                                <Input v-model="filterState.date_to" type="date" class="h-10 w-full min-w-0 font-medium sm:flex-1 lg:w-36" @change="applyFilters" />
+                            <!-- Pemisah "s/d" di tengah memakan lebar dan bikin ikon kalender bawaan
+                                 browser terpotong di 320px. Diganti label per input supaya tetap muat
+                                 bersampingan. -->
+                            <div class="grid grid-cols-2 gap-2 lg:flex lg:items-end">
+                                <div class="min-w-0">
+                                    <span class="mb-1 block text-[10px] text-muted-foreground">Dari</span>
+                                    <Input v-model="filterState.date_from" type="date" aria-label="Tanggal mulai" class="h-10 w-full min-w-0 px-2 font-medium sm:px-3 lg:w-36" @change="applyFilters" />
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="mb-1 block text-[10px] text-muted-foreground">Sampai</span>
+                                    <Input v-model="filterState.date_to" type="date" aria-label="Tanggal akhir" class="h-10 w-full min-w-0 px-2 font-medium sm:px-3 lg:w-36" @change="applyFilters" />
+                                </div>
                             </div>
                         </div>
 
                         <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end lg:ml-auto">
                             <div class="min-w-0 space-y-1.5" v-if="hasData">
                                 <Label class="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unduh Excel</Label>
-                                <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                                <!-- Satu kolom di HP: nama segmen panjang dan kalau dua kolom labelnya terpotong -->
+                                <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                                     <Button variant="outline" class="h-10 w-full min-w-0 justify-center border-green-200 bg-green-50 px-3 text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-900/50 sm:w-auto" @click="exportXlsx" title="Export Excel lengkap">
                                         <FileSpreadsheet class="mr-2 h-4 w-4 shrink-0" /> <span class="truncate">Lengkap</span>
                                     </Button>

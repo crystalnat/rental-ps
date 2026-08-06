@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { Link } from '@inertiajs/vue3'
 import { Bell, Package, ShoppingCart, Target, X, Check, ExternalLink } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import axios from 'axios'
 

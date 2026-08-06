@@ -27,8 +27,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle,
-    DialogDescription,
+    Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/utils'
@@ -41,8 +40,6 @@ import {
     Receipt,
     ChevronLeft,
     ChevronRight,
-    ArrowUpRight,
-    ArrowDownRight,
     Loader2,
     FileText,
 } from 'lucide-vue-next'
@@ -376,11 +373,18 @@ function clearFilters() {
                         </div>
                         <div class="flex flex-col gap-1.5" :class="stores.length > 1 ? 'md:col-start-2' : 'md:col-span-2'">
                             <Label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Periode</Label>
-                            <!-- Dua input tanggal berdampingan tidak muat di layar 320px, jadi ditumpuk dulu -->
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                <Input v-model="filterState.date_from" type="date" class="h-10 w-full min-w-0 sm:flex-1" />
-                                <span class="hidden shrink-0 px-1 text-xs font-bold text-muted-foreground sm:inline">s/d</span>
-                                <Input v-model="filterState.date_to" type="date" class="h-10 w-full min-w-0 sm:flex-1" />
+                            <!-- Pemisah "s/d" di tengah memakan lebar dan bikin ikon kalender bawaan
+                                 browser terpotong di 320px. Diganti label per input supaya tetap muat
+                                 bersampingan. -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="min-w-0">
+                                    <span class="mb-1 block text-[10px] text-muted-foreground">Dari</span>
+                                    <Input v-model="filterState.date_from" type="date" aria-label="Tanggal mulai" class="h-10 w-full min-w-0 px-2 sm:px-3" />
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="mb-1 block text-[10px] text-muted-foreground">Sampai</span>
+                                    <Input v-model="filterState.date_to" type="date" aria-label="Tanggal akhir" class="h-10 w-full min-w-0 px-2 sm:px-3" />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -746,5 +750,7 @@ function clearFilters() {
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25rem 1.25rem;
+    /* Panah digambar sebagai background, tanpa ruang ini teks panjang tertutup panah */
+    padding-right: 2rem;
 }
 </style>

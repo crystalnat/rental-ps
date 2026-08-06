@@ -18,7 +18,7 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
-import { BookOpen, Plus, Pencil, Trash2, Search, TrendingDown, ChevronLeft, ChevronRight, Calendar } from 'lucide-vue-next'
+import { BookOpen, Plus, Pencil, Trash2, Search, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import ReceiptUpload from '@/components/shared/ReceiptUpload.vue'
 
 interface StoreItem {
@@ -327,12 +327,15 @@ function onDateInputChange() {
                                     <Button type="button" variant="outline" size="icon" class="h-10 w-10 shrink-0" @click="goToDay(prevDate)">
                                         <ChevronLeft class="h-4 w-4" />
                                     </Button>
-                                    <div class="relative flex-1">
-                                        <Calendar class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <!-- Input dibuat selebar isinya lalu ditengahkan sebagai satu blok.
+                                         Menengahkan teks di dalamnya tidak bisa: teks tanggal ada di
+                                         shadow DOM browser dan tidak tunduk pada text-align. -->
+                                    <div class="flex min-w-0 flex-1 justify-center">
+                                        <!-- Tanpa ikon kalender tambahan, input type=date sudah punya bawaan browser -->
                                         <Input
                                             v-model="filterState.selected_date"
                                             type="date"
-                                            class="h-10 w-full pl-9 font-medium"
+                                            class="h-10 w-auto max-w-full min-w-0 font-medium"
                                             @change="onDateInputChange"
                                         />
                                     </div>
@@ -737,5 +740,7 @@ function onDateInputChange() {
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25rem 1.25rem;
+    /* Panah digambar sebagai background, tanpa ruang ini teks panjang tertutup panah */
+    padding-right: 2rem;
 }
 </style>

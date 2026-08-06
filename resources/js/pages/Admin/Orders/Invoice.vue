@@ -48,7 +48,7 @@ interface StoreInfo {
     logo: string | null
 }
 
-const props = defineProps<{
+defineProps<{
     order: Order
     store: StoreInfo
 }>()
@@ -70,9 +70,29 @@ const paymentLabels: Record<string, string> = {
     e_wallet: 'E-Wallet',
 }
 
+// Cetak ditunda sampai logo selesai dimuat, kalau tidak logo keluar kosong di PDF
+function waitForImages(): Promise<unknown> {
+    const images = Array.from(document.querySelectorAll('img'))
+    return Promise.all(images.map(img => img.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+            img.addEventListener('load', resolve, { once: true })
+            img.addEventListener('error', resolve, { once: true })
+        })))
+}
+
 onMounted(() => {
-    setTimeout(() => window.print(), 500)
+    setTimeout(() => { waitForImages().then(() => window.print()) }, 500)
 })
+
+// window bukan global yang dikenali template Vue, pemanggilan harus lewat script
+function goBack() {
+    window.history.back()
+}
+
+function reprint() {
+    window.print()
+}
 </script>
 
 <template>
@@ -171,7 +191,7 @@ onMounted(() => {
                         <td class="col-unit">{{ item.unit }}</td>
                         <td class="col-price">{{ formatRp(item.unit_price) }}</td>
                         <td v-if="order.items.some(i => i.discount_amount > 0)" class="col-discount">
-                            {{ item.discount_amount > 0 ? formatRp(item.discount_amount * item.quantity) : '—' }}
+                            {{ item.discount_amount > 0 ? formatRp(item.discount_amount * item.quantity) : '-' }}
                         </td>
                         <td class="col-subtotal">{{ formatRp(item.subtotal) }}</td>
                     </tr>
@@ -237,19 +257,25 @@ onMounted(() => {
 
         <!-- No-print: Actions -->
         <div class="no-print-actions">
-            <button class="btn-back" @click="() => { window.history.back() }">
-                ← Kembali
+            <button class="btn-back" type="button" @click="goBack">
+                Kembali
             </button>
-            <button class="btn-print" @click="() => { window.print() }">
-                🖨️ Cetak Ulang
+            <button class="btn-print" type="button" @click="reprint">
+                Cetak Ulang
             </button>
         </div>
     </div>
 </template>
 
 <style>
-/* Invoice — A4 formal */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Invoice — A4 formal.
+   Font dipakai yang sudah terpasang di sistem: dokumen cetak tidak boleh
+   bergantung pada unduhan font, kalau gagal muat hasil cetak berubah bentuk.
+   Serif untuk judul, sans untuk angka dan tabel. */
+.invoice-page {
+    --font-heading: 'Georgia', 'Cambria', 'Times New Roman', serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
 
 .invoice-page {
     margin: 0;
@@ -259,9 +285,14 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-body);
     color: #111827;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
 }
+
+/* Angka pada faktur wajib rata kolom, jadi tabular-nums dipaksa global */
+.invoice, .invoice table, .invoice td, .invoice th { font-variant-numeric: tabular-nums; }
 
 .invoice {
     width: 210mm;
@@ -297,8 +328,10 @@ onMounted(() => {
 }
 
 .company-name {
+    font-family: var(--font-heading);
     font-size: 20px;
     font-weight: 700;
+    letter-spacing: 0;
     margin: 0 0 4px;
     color: #111827;
 }
@@ -306,7 +339,7 @@ onMounted(() => {
 .company-info {
     margin: 0;
     font-size: 11px;
-    color: #6b7280;
+    color: #4b5563;
     line-height: 1.4;
 }
 
@@ -316,11 +349,12 @@ onMounted(() => {
 }
 
 .invoice-title {
+    font-family: var(--font-heading);
     font-size: 28px;
     font-weight: 700;
     color: #059669;
     margin: 0 0 12px;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
 }
 
 .invoice-meta {
@@ -335,7 +369,7 @@ onMounted(() => {
 }
 
 .meta-label {
-    color: #6b7280;
+    color: #4b5563;
 }
 
 .meta-value {
@@ -366,8 +400,8 @@ onMounted(() => {
 
 .section-label {
     font-size: 11px;
-    font-weight: 600;
-    color: #6b7280;
+    font-weight: 700;
+    color: #374151;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin: 0 0 8px;
@@ -381,7 +415,7 @@ onMounted(() => {
 }
 
 .info-grid .label {
-    color: #6b7280;
+    color: #4b5563;
 }
 
 /* Items Table */
@@ -399,7 +433,7 @@ onMounted(() => {
 .items-table th {
     padding: 10px 12px;
     text-align: left;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 11px;
     color: #374151;
     text-transform: uppercase;
@@ -409,17 +443,19 @@ onMounted(() => {
 
 .items-table td {
     padding: 10px 12px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
     vertical-align: top;
+    font-weight: 500;
 }
 
 .p-name {
-    font-weight: 600;
+    font-weight: 500;
+    color: #111827;
 }
 
 .item-modifiers {
     font-size: 10px;
-    color: #6b7280;
+    color: #4b5563;
     padding-left: 12px;
     margin-top: 2px;
     font-style: italic;
@@ -479,7 +515,7 @@ onMounted(() => {
 
 .order-notes {
     font-size: 11px;
-    color: #6b7280;
+    color: #4b5563;
     padding: 12px 16px;
     background: #f9fafb;
     border-radius: 6px;
@@ -510,7 +546,7 @@ onMounted(() => {
 .sig-col p {
     margin: 0;
     font-size: 11px;
-    color: #6b7280;
+    color: #4b5563;
 }
 
 .sig-name {
@@ -524,7 +560,7 @@ onMounted(() => {
 .footer-note {
     text-align: center;
     font-size: 10px;
-    color: #9ca3af;
+    color: #6b7280;
     font-style: italic;
     margin: 0;
 }
@@ -544,7 +580,7 @@ onMounted(() => {
     cursor: pointer;
     background: white;
     transition: all 0.15s;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-body);
 }
 
 .btn-back:hover { background: #f3f4f6; }
@@ -558,9 +594,10 @@ onMounted(() => {
 
 /* Print styles */
 @media print {
+    /* Margin dokumen dipindah ke @page karena padding .invoice dinolkan saat cetak */
     @page {
-        size: A4;
-        margin: 10mm;
+        size: A4 portrait;
+        margin: 15mm 14mm;
     }
 
     html, body {
@@ -585,6 +622,26 @@ onMounted(() => {
 
     .no-print-actions {
         display: none !important;
+    }
+
+    /* Tabel item boleh pindah halaman, tapi jangan memotong satu baris item.
+       Header tabel diulang di tiap halaman. */
+    .items-table { page-break-inside: auto; }
+    .items-table thead { display: table-header-group; }
+    .items-table tbody tr { page-break-inside: avoid; page-break-after: auto; }
+
+    /* Blok yang tidak boleh terpotong di tengah */
+    .invoice-header,
+    .info-section,
+    .summary-section,
+    .order-notes,
+    .invoice-footer,
+    .signature-area { page-break-inside: avoid; }
+
+    /* Warna latar/teks tetap tercetak (status LUNAS, header tabel, kotak catatan) */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 }
 </style>

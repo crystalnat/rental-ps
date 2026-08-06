@@ -14,7 +14,6 @@ import {
     DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import TableToolbar from '@/components/TableToolbar.vue'
-import { TableHeadSortable } from '@/components/ui/table'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Truck, Plus, Pencil, Trash2, UserCircle } from 'lucide-vue-next'
 

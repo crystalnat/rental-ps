@@ -9,7 +9,7 @@ interface Table {
     qr_url: string
 }
 
-const props = defineProps<{
+defineProps<{
     store: { id: number; name: string; slug: string }
     floor: { id: number; name: string }
     tables: Table[]
@@ -19,13 +19,25 @@ function qrImageUrl(url: string, size = 120) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`
 }
 
+// QR diambil dari layanan eksternal, cetak harus menunggu semua gambar selesai
+// dimuat kalau tidak sebagian kotak QR keluar kosong di kertas
+function waitForImages(): Promise<unknown> {
+    const images = Array.from(document.querySelectorAll('img'))
+    return Promise.all(images.map(img => img.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+            img.addEventListener('load', resolve, { once: true })
+            img.addEventListener('error', resolve, { once: true })
+        })))
+}
+
 function doPrint() {
-    window.print()
+    waitForImages().then(() => window.print())
 }
 </script>
 
 <template>
-    <div class="min-h-screen bg-background">
+    <div class="min-h-screen bg-background print:min-h-0 print:bg-white">
         <!-- Header: tampil di layar, sembunyi saat print -->
         <header class="print:hidden border-b bg-card px-4 py-3">
             <div class="mx-auto flex max-w-5xl items-center justify-between">
@@ -37,7 +49,7 @@ function doPrint() {
                         </Button>
                     </Link>
                     <span class="text-sm text-muted-foreground">
-                        {{ store.name }} — {{ floor.name }} · {{ tables.length }} meja
+                        {{ store.name }} - {{ floor.name }} - {{ tables.length }} meja
                     </span>
                 </div>
                 <Button @click="doPrint">
@@ -48,16 +60,16 @@ function doPrint() {
         </header>
 
         <!-- Area cetak -->
-        <main class="mx-auto max-w-5xl px-4 py-6 print:py-4 print:px-0">
+        <main class="qr-print mx-auto max-w-5xl px-4 py-6 print:py-0 print:px-0">
             <!-- Judul cetak -->
-            <div class="mb-6 text-center print:mb-4">
-                <h1 class="text-xl font-semibold print:text-lg">
-                    QR Order — {{ store.name }}
+            <div class="qr-doc-head mb-6 text-center print:mb-4">
+                <h1 class="qr-title text-xl font-semibold print:text-lg">
+                    QR Order - {{ store.name }}
                 </h1>
-                <p class="mt-1 text-sm text-muted-foreground">
-                    {{ floor.name }} · {{ tables.length }} meja
+                <p class="qr-sub mt-1 text-sm text-muted-foreground">
+                    {{ floor.name }} - {{ tables.length }} meja
                 </p>
-                <p class="mt-0.5 text-xs text-muted-foreground">
+                <p class="qr-sub mt-0.5 text-xs text-muted-foreground">
                     Scan untuk order di meja. Cetak, potong, tempel di masing-masing meja.
                 </p>
             </div>
@@ -70,19 +82,19 @@ function doPrint() {
                 <div
                     v-for="t in tables"
                     :key="t.id"
-                    class="flex flex-col items-center rounded-xl border-2 border-border bg-white p-4 print:rounded-lg print:p-4 print:break-inside-avoid"
+                    class="qr-card flex flex-col items-center rounded-xl border-2 border-border bg-white p-4 print:rounded-lg print:p-4 print:break-inside-avoid"
                 >
                     <div class="mb-2 flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border bg-white p-2 print:h-24 print:w-24">
                         <img
-                            :src="qrImageUrl(t.qr_url, 96)"
+                            :src="qrImageUrl(t.qr_url, 300)"
                             :alt="`QR ${t.name}`"
                             class="h-full w-full object-contain"
                         />
                     </div>
-                    <p class="text-center font-bold text-base">
+                    <p class="qr-table-name text-center text-base">
                         Meja {{ t.name }}
                     </p>
-                    <p class="mt-0.5 text-center text-[10px] text-muted-foreground break-all max-w-full print:text-[9px]">
+                    <p class="qr-sub mt-0.5 text-center text-[10px] text-muted-foreground break-words max-w-full print:text-[9px]">
                         Scan untuk order
                     </p>
                 </div>
@@ -99,8 +111,57 @@ function doPrint() {
 </template>
 
 <style>
+/* Font sistem saja, halaman cetak tidak boleh bergantung pada unduhan font.
+   Serif untuk judul, sans untuk isi. */
+.qr-print {
+    --font-heading: 'Georgia', 'Cambria', 'Times New Roman', serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+}
+
+.qr-title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.qr-table-name {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.qr-sub { font-family: var(--font-body); }
+
 @media print {
-    body { background: white; }
-    @page { margin: 1.5cm; }
+    @page {
+        size: A4 portrait;
+        margin: 12mm;
+    }
+
+    html, body {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Halaman cetak selalu terang, jangan ikut tema gelap aplikasi */
+    .qr-print { max-width: none !important; color: #111827 !important; }
+    .qr-print .qr-sub { color: #4b5563 !important; }
+    .qr-card {
+        background: #ffffff !important;
+        border-color: #9ca3af !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    /* Judul dokumen diulang tidak mungkin tanpa tabel, minimal jangan terpotong */
+    .qr-doc-head { break-inside: avoid; page-break-inside: avoid; }
+
+    /* Kotak QR dan garis potong wajib ikut tercetak */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
 }
 </style>

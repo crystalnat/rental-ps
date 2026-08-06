@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Menu, SunMedium, MoonStar, Bell } from 'lucide-vue-next'
+import { Menu, SunMedium, MoonStar } from 'lucide-vue-next'
 import { useTheme } from '@/lib/theme'
 import NotificationDrawer from '@/components/NotificationDrawer.vue'
 

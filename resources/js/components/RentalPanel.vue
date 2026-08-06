@@ -6,12 +6,10 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import {
-    Power, Play, Square, Clock, Gamepad2, Zap,
-    ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, Info, CreditCard, X,
+    Power, Play, Square, Gamepad2,
+    ZoomIn, ZoomOut, Maximize2, Timer, ShoppingCart, Wifi, WifiOff, CreditCard, X,
 } from 'lucide-vue-next'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────

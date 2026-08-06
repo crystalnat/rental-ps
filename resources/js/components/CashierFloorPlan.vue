@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
-import { LayoutGrid, ZoomIn, ZoomOut, Maximize2, Receipt, Loader2, Power, Square, Clock, Gamepad2 } from 'lucide-vue-next'
+import { ZoomIn, ZoomOut, Maximize2, Receipt, Power, Square, Clock, Gamepad2 } from 'lucide-vue-next'
 import { router } from '@inertiajs/vue3'
 
 const BASE_PIXELS_PER_METER = 80

@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { Head, router } from '@inertiajs/vue3'
-import { Plus, Trash2, Printer, FileText, RotateCcw, Search, Save } from 'lucide-vue-next'
+import { Plus, Trash2, RotateCcw, Search, Save } from 'lucide-vue-next'
 
 interface StoreInfo {
     name: string
@@ -103,6 +103,12 @@ function openDropdown(itemId: number) {
 
 function closeDropdown() {
     activeDropdownId.value = null
+}
+
+// Jeda supaya klik pada item dropdown sempat terproses sebelum dropdown ditutup.
+// window bukan global yang dikenali template Vue, jadi tidak bisa dipanggil dari sana.
+function closeDropdownDelayed() {
+    window.setTimeout(closeDropdown, 150)
 }
 
 function selectProduct(itemId: number, product: ProductOption) {
@@ -290,7 +296,7 @@ function printInvoice() {
                                                 class="w-full rounded-lg border py-1.5 pl-8 pr-3 text-sm"
                                                 @input="onItemNameInput(item.id, ($event.target as HTMLInputElement).value)"
                                                 @focus="openDropdown(item.id)"
-                                                @blur="() => window.setTimeout(closeDropdown, 150)"
+                                                @blur="closeDropdownDelayed"
                                             />
                                             <!-- Dropdown -->
                                             <div

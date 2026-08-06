@@ -31,14 +31,12 @@ import {
     TrendingUp,
     ShoppingCart,
     Wallet,
-    Clock,
     TrendingDown,
     CalendarDays,
     Package,
     Users,
     UserCog,
     AlertTriangle,
-    Store,
     Receipt,
     BarChart3,
     CreditCard,
@@ -865,5 +863,7 @@ const isCashier = computed(() => usePage().props.auth.user.role === 'cashier')
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25rem 1.25rem;
+    /* Panah digambar sebagai background, tanpa ruang ini teks panjang tertutup panah */
+    padding-right: 2rem;
 }
 </style>

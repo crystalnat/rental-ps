@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Star, X, MessageSquare, ThumbsUp, Loader2 } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/button'
+import { Star, MessageSquare, ThumbsUp, Loader2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import axios from 'axios'

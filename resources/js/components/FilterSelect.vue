@@ -37,6 +37,8 @@ defineEmits<{ (e: 'update:modelValue', v: string): void }>()
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.25rem 1.25rem;
+    /* Panah digambar sebagai background, tanpa ruang ini teks panjang tertutup panah */
+    padding-right: 2rem;
 }
 
 :global(.theme-dark) .filter-select {

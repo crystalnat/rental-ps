@@ -13,7 +13,7 @@ import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { 
-    Plus, Search, Pencil, Trash2, Tag, Check, X, 
+    Plus, Pencil, Trash2, Tag,
     Ticket, Activity, Calendar, Percent, Banknote 
 } from 'lucide-vue-next'
 import { debounce } from 'lodash'
