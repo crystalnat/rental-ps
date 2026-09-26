@@ -6,6 +6,7 @@ import {
     Settings, LogOut, ChevronDown, ShoppingCart,
     CreditCard, BarChart3, Wallet, UserCircle, LayoutGrid, BookOpen, Clock, RotateCcw,
     Truck, Globe, Gamepad2, FileEdit,
+    KeyRound,
 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import type { PageProps } from '@/types'
@@ -124,6 +125,7 @@ const navigationGroups = computed((): NavGroup[] => {
             label: 'Sistem',
             items: [
                 { label: 'Pengaturan', href: '/admin/settings', icon: Settings, roles: ['owner', 'admin'] },
+                { label: 'Ubah Password', href: '/admin/profile', icon: KeyRound, roles: ['owner', 'admin', 'cashier', 'staff'] },
             ],
         },
     ]

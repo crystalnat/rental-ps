@@ -360,3 +360,323 @@ gejalanya.
 - Berkas bukti lama tidak diproses ulang setelah kompresi server dipasang. Isi
   direktori bukti hanya satu berkas berukuran 299 KB, jadi tidak ada yang perlu
   dihemat.
+
+---
+---
+
+# Dokumentasi Perubahan â€” Landing Page
+
+Catatan pekerjaan yang dilakukan pada tanggal 8 sampai 9 Agustus 2026.
+
+---
+
+## 1. Latar Belakang
+
+Sebelumnya `/` hanya mengalihkan ke `/admin/dashboard`, yang berarti pengunjung
+yang belum masuk selalu mendarat di halaman login. Berkas
+`resources/views/welcome.blade.php` (225 baris, bawaan Laravel) tidak dipakai
+route mana pun.
+
+Sudah ada CMS landing per merek (`/p/{brandSlug}`, `LandingPageController@show`,
+`Landing/Show.vue`, tabel `landing_settings` dan `landing_sections`), tetapi tidak
+ada seeder untuk kedua tabel itu. Akibatnya `/p/spot-duren-tiga` selalu menjawab
+404 karena `isPublished()` tidak pernah terpenuhi. Yang dibangun di sesi ini adalah
+landing statis terpisah, bukan menyentuh CMS tersebut.
+
+---
+
+## 2. Route dan Alur Masuk
+
+**`routes/web.php`**
+
+- `/` sekarang ke `LandingPageController@home`, dinamai `home`, diletakkan bersama
+  route publik lain di bagian atas berkas.
+- Komentar lama yang menyebut "jatuh ke login jika landing belum dipublish" dibuang
+  karena sudah tidak menggambarkan perilaku sebenarnya.
+
+**`app/Http/Controllers/Auth/LoginController.php`**
+
+`destroy()` sebelumnya mengalihkan ke `/login`, sehingga setelah keluar pengguna
+terlempar kembali ke formulir masuk. Sekarang ke `route('home')`.
+
+`EnsureAuthenticated` sengaja tidak diubah â€” halaman admin memang harus meminta
+login.
+
+Alur yang berlaku sekarang:
+
+| Aksi | Tujuan |
+|---|---|
+| Buka `/` | Landing, tanpa autentikasi |
+| Keluar (logout) | Landing |
+| Buka `/admin/*` tanpa sesi | `/login` |
+| Masuk berhasil | `/admin/dashboard` |
+
+---
+
+## 3. Controller
+
+**`LandingPageController@home`**
+
+Mengambil merek dari `config('app.landing_brand')`, dan bila kosong memakai merek
+aktif pertama berdasarkan id. Merender `Landing/Home` dengan `brand`, `whatsappUrl`,
+dan `loginUrl`. Semua akses properti memakai tanda tanya panah supaya aman ketika
+belum ada merek aktif.
+
+**`buildWhatsappUrl()`**
+
+Menormalkan nomor telepon menjadi format yang diterima `wa.me`: karakter non-digit
+dibuang, awalan `0` diganti `62`, lalu ditempeli pesan awal yang sudah terisi.
+Mengembalikan `null` bila nomor kosong, dan tombol pada landing otomatis berubah
+menjadi tautan ke bagian daftar unit.
+
+**`config/app.php`**
+
+Kunci baru `landing_brand` dari environment `LANDING_BRAND`. Kosong berarti memakai
+merek aktif pertama.
+
+```
+LANDING_BRAND=spot-duren-tiga
+```
+
+```
+php artisan config:clear
+```
+
+---
+
+## 4. Komponen ScrollOrb
+
+Titik awalnya adalah komponen React shadcn `landing-page.tsx` beserta dependensi
+`globe.tsx`. Proyek ini memakai Vue 3 dan Inertia, jadi berkas tersebut tidak bisa
+dipakai langsung dan seluruhnya ditulis ulang sebagai Vue SFC.
+
+Berkas: `resources/js/components/ui/scroll-orb/ScrollOrb.vue` dan `index.ts`,
+mengikuti pola folder yang sudah dipakai `ui/badge`.
+
+### 4.1 Perbedaan dari Versi Asal
+
+| Versi React | Yang dipakai di sini | Alasan |
+|---|---|---|
+| React hooks | `script setup` dan `computed` | Proyek ini Vue |
+| Globe bumi dengan gambar dari `r2.dev` | Stik PS berupa SVG sebaris | Bumi tidak berkaitan dengan rental PS, dan gambar eksternal menambah titik gagal |
+| `min-h-screen`, satuan `vh` | `min-h-dvh`, satuan `dvh` | Bagian 4 `rule.md` |
+| `onClick: console.log` | Tautan `a href` ke WhatsApp dan jangkar | Landing memerlukan tautan sungguhan |
+| `lerp`, `parsePercent`, `navLabelTimeoutRef`, `NodeJS.Timeout` | dibuang | `lerp` tidak pernah dipanggil di berkas asalnya |
+| Label navigasi lewat `animate-fadeOut` | Label section aktif saja, `lg:` ke atas | Keyframe `fadeOut` tidak pernah terpakai, dan tidak bergantung hover |
+| `opacity-100` yang ditulis tetap | IntersectionObserver | Di versi asal kelas itu statis, jadi tidak pernah menganimasikan apa pun |
+
+### 4.2 Pelacakan Scroll
+
+`measure()` menghitung `scrollProgress` untuk bilah kemajuan, lalu menentukan
+`sectionOffset` sebagai posisi pecahan antar section. Nilai 1.4 berarti 40 persen
+perjalanan dari section kedua ke ketiga. Satuannya adalah jarak antar titik tengah
+section.
+
+Semula posisi stik langsung mengunci ke section aktif lalu diperhalus dengan
+transisi CSS 1400ms. Hasilnya justru selalu tertinggal dari scroll. Sekarang
+transisi CSS dibuang dan posisi diinterpolasi per frame dengan `lerp`, ditambah
+`easeInOut` di kedua ujung agar tidak berhenti mendadak saat scroll cepat.
+
+Pendengar scroll memakai opsi passive dan dibatasi `requestAnimationFrame`.
+Semuanya dilepas pada `onBeforeUnmount`.
+
+### 4.3 Reveal Konten
+
+IntersectionObserver dengan threshold 0.2. Section yang sudah tampil langsung
+di-unobserve sehingga tidak dianimasikan ulang saat scroll balik.
+
+### 4.4 Tipe
+
+Ditambahkan ke `resources/js/types/index.d.ts` sesuai bagian 2 `rule.md`, bukan
+inline di komponen: `OrbPosition`, `ScrollSectionAction`, `ScrollSection`.
+
+---
+
+## 5. Stik PS 3D
+
+Bentuk dasarnya diambil dari `ps-controller-svgrepo-com.svg` milik pengguna.
+Empat path siluet (badan atas, dua pegangan, penghubung bawah) disimpan sebagai
+konstanta `PAD_SILHOUETTE`.
+
+### 5.1 Cara Kesan 3D Dibentuk
+
+Tanpa three.js dan tanpa dependensi baru:
+
+- **Ekstrusi.** Siluet yang sama dirender 22 kali, masing-masing digeser
+  `translateZ` sebesar 2.2px ke belakang dengan `brightness` menurun. Total
+  ketebalan 48px.
+- **Taper.** `PAD_EXTRUDE_TAPER` mengecilkan tiap lapisan 0.42 persen. Tanpa ini
+  semua lapisan identik dan bentuknya terbaca sebagai balok lurus, bukan benda
+  bervolume.
+- **Perspektif.** `perspective: 1400px` pada `.pad-stage` dan `transform-style:
+  preserve-3d` pada elemen di dalamnya.
+- **Parallax kontrol.** Kontrol yang menonjol diangkat ke `translateZ(10px)`
+  sehingga bergeser relatif terhadap bodi ketika diputar. Ini isyarat kedalaman
+  yang paling menentukan, karena mata menilai volume dari pergeseran relatif antar
+  bagian, bukan dari gradien.
+
+### 5.2 Pemisahan Lapisan Berdasarkan Bentuk Fisik
+
+Bagian yang cekung atau rata dengan bodi tetap berada di bidang bodi, agar
+bayangannya tidak melayang: sumur analog, rim, bayangan kontak, touchpad, lubang
+speaker, lubang mic, port USB-C, dan kilau plastik. Kilau khususnya harus tetap di
+bidang bodi supaya tepinya tidak lepas dari siluet saat diputar.
+
+Yang menonjol berada di lapisan terangkat: tutup analog beserta knurling dan
+cekungan jempol, D-pad, tutup tombol beserta simbol, tombol Create dan Options,
+tombol PS, dan LED indikator pemain.
+
+### 5.3 Rotasi Mengikuti Scroll
+
+Semula yaw dihitung akumulatif, yaitu minus 22 ditambah `sectionOffset` kali 40.
+Di section terakhir nilainya mencapai 98 derajat sehingga stik terlihat hampir dari
+sisi tipisnya â€” tepat pada bagian penutup yang seharusnya paling kuat.
+
+Sekarang rotasi dipetakan ke seluruh panjang halaman:
+
+```
+progress = sectionOffset / (jumlah section - 1)
+yaw      = PAD_YAW_START * (1 - progress) + sin(progress * PI) * PAD_YAW_PEAK
+pitch    = PAD_PITCH_START menuju PAD_PITCH_END
+roll     = sin(progress * PI) * -6
+```
+
+Mulai miring 18 derajat, memutar paling jauh sekitar 35 derajat di tengah, lalu
+kembali menghadap kamera di section terakhir. Stik mendarat frontal dan besar tepat
+ketika tombol pemesanan muncul.
+
+### 5.4 Detail SVG
+
+Analog terdiri dari enam lapis: bayangan kontak, sumur `pad-well` yang gelap di
+tengah dan terang di tepi sehingga terasa cekung, rim, tutup bergradien, knurling,
+cekungan jempol, dan titik spekular. Tekstur knurling memakai `stroke-dasharray`
+2 dan 4.2 pada satu lingkaran, bukan puluhan node path.
+
+Setiap tombol terdiri dari tiga lapis: sumur gelap radius 19.4, tutup bergradien
+radius 18.54, dan gloss elips di kiri atas. Ditambah satu `pad-contact` radial di
+bawah gugusan tombol dan D-pad, supaya tidak terlihat seperti tempelan datar.
+
+Lightbar memakai `feGaussianBlur` dengan `stdDeviation` 7 pada salinan stroke yang
+lebih tebal di belakang stroke tajamnya. Animasi denyut dipasang di grup pembungkus
+agar halo dan stroke berdenyut bersama.
+
+Detail lain: touchpad kaca dengan gradien, sheen diagonal, dan garis belah tengah;
+grille speaker sepuluh lubang; dua lubang mic; port USB-C di sisi atas; garis
+sambungan bodi dengan pegangan; dan highlight di bibir atas bodi.
+
+Warna simbol dipertahankan seperti aslinya (hijau, merah muda, biru) sebagai
+satu-satunya aksen non-merah, karena justru itu yang membuatnya langsung dikenali.
+
+---
+
+## 6. Latar Bercahaya
+
+Latar tetap gelap. Stik memiliki lightbar menyala, glow, dan highlight spekular
+yang hanya bekerja di atas dasar gelap; latar terang akan mematikan semuanya
+sekaligus merusak `.theme-dark` yang sudah menjadi identitas panel admin.
+
+Yang diperbaiki adalah kesan ratanya, memakai empat lapis:
+
+1. Base gradien radial dari atas, biru gelap menuju hampir hitam.
+2. Dua sumber cahaya bergerak berlawanan arah mengikuti scroll: merah
+   `--color-primary` dan biru PlayStation. Keduanya bersilangan di tengah halaman
+   sehingga setiap section memiliki suasana warna berbeda tanpa mengganti tema.
+   Biru dipilih sebagai counter-light karena membuat merahnya terasa lebih panas
+   dibanding bila berdiri sendiri.
+3. Grid 68px dengan opacity 0.045, di-mask agar memudar di tepi. Tanpa grid, glow
+   hanya terlihat seperti noda tanpa skala ruang.
+4. Vignette menggelapkan tepi sehingga perhatian tertarik ke tengah.
+
+Glow digeser dengan `translate3d` pada dua div, bukan dengan mengubah posisi
+gradien. Mengubah posisi gradien akan memaksa browser melukis ulang gradien
+seukuran viewport penuh setiap frame, dan itu berat di perangkat mobile.
+
+---
+
+## 7. Tipografi
+
+Ditemukan masalah lama: `--font-sans: 'Inter'` sudah tertulis di blok `@theme` pada
+`resources/css/app.css`, tetapi Inter tidak pernah dimuat di mana pun. Seluruh
+aplikasi sejak awal jatuh ke font sistem.
+
+- `resources/views/app.blade.php` memuat Inter dan Space Grotesk dengan
+  `preconnect` dan `display=swap`.
+- `resources/css/app.css` menambahkan `--font-display` berisi Space Grotesk.
+  Badan teks tetap Inter agar angka dan tabel pada panel admin tidak berubah bentuk.
+
+---
+
+## 8. Tata Letak
+
+- Lebar teks dibatasi `max-w-prose`. Sebelumnya `max-w-5xl`, yang membuat satu baris
+  bisa mencapai sekitar 120 karakter.
+- Judul memakai `text-balance`, deskripsi memakai `text-pretty`.
+- Posisi stik diatur per section: teks rata kiri mendapat stik di kanan, teks rata
+  tengah mendapat stik di belakang teks.
+- Scrim gradien menjaga kontras teks saat stik lewat di belakangnya.
+- Di layar kecil stik diredam menjadi opacity 70 persen dan skala 0.42 agar teks
+  menang.
+- Nominal memakai `tabular-nums` sesuai bagian 4 `rule.md`.
+- Navigasi titik di kanan tidak bergantung hover, dan label hanya tampil untuk
+  section aktif.
+
+---
+
+## 9. Halaman Landing
+
+`resources/js/pages/Landing/Home.vue` berisi empat section: hero, unit dan harga,
+fasilitas, serta lokasi. Aksi utama mengarah ke WhatsApp dengan pesan yang sudah
+terisi, dan aksi kedua ke jangkar daftar unit atau ke halaman masuk staf.
+
+---
+
+## 10. Yang Sengaja Tidak Dikerjakan
+
+- **Formulir pemesanan di landing.** Memakai WhatsApp lebih dahulu. Formulir berarti
+  perlu validasi slot, penanganan bentrok jadwal, dan notifikasi. Ditambahkan bila
+  volume pesanan sudah ramai.
+- **Galeri foto dan testimoni.** Belum ada asetnya.
+- **three.js dengan model GLB.** Batas dari cara sekarang: sisi belakang stik tidak
+  bisa dilihat dan tidak ada pantulan lingkungan. Tersedia slot bernama `orb` bila
+  suatu saat ingin diganti WebGL tanpa menyentuh logika scroll.
+- **Bayangan jatuh di lantai dan pantulan lingkungan.** Memerlukan bidang lantai
+  terpisah.
+- **Partikel bergerak dan noise film.** Grid sudah memberi tekstur; partikel mudah
+  membuat tampilan ramai.
+- **Animasi berbasis `animation-timeline`.** Dukungan browser belum merata.
+
+---
+
+## 11. Keputusan yang Diambil
+
+- Landing ini statis di dalam kode, terpisah dari CMS `/admin/landing` yang isinya
+  berasal dari basis data. Keduanya dibiarkan hidup berdampingan agar CMS yang sudah
+  ada tidak rusak. Bila nanti landing ini perlu bisa disunting dari panel,
+  `Home.vue` disambungkan ke `landing_sections`.
+- Tulisan SONY pada berkas SVG asal (empat path berwarna abu-abu) dibuang. Itu merek
+  dagang dan tidak diperlukan pada landing rental.
+- Properti `filter` tidak boleh dipasang pada elemen `preserve-3d` karena browser
+  akan meratakan konteks 3D-nya dan ekstrusi menjadi gepeng. Drop-shadow dipasang
+  pada SVG terdalam, dan sudah ditinggalkan komentar di tempatnya agar tidak
+  dipindah kembali.
+- `welcome.blade.php` dibiarkan. Berkas itu memang tidak dipakai route mana pun,
+  tetapi menghapusnya di luar lingkup pekerjaan ini.
+- Kolom boolean `is_published` pada `landing_settings` dan `is_visible` pada
+  `landing_sections` sudah tidak dibaca sama sekali; controller hanya memakai
+  bitmask. Belum dibereskan.
+
+---
+
+## 12. Catatan Terbuka
+
+- **Harga dan jam operasional pada `Home.vue` masih angka karangan** (Rp 10.000 per
+  jam, PS5 VIP Rp 20.000, PS4 Rp 7.000, paket nobar Rp 90.000 per 6 jam, buka 10.00
+  sampai 24.00, fasilitas parkir dan kantin). Semuanya harus diganti dengan data
+  sebenarnya sebelum landing dipakai pengunjung.
+- Jumlah node path untuk sisi ekstrusi ada 88. Bila terasa berat di perangkat lama,
+  turunkan `PAD_EXTRUDE_LAYERS` ke 14 dan naikkan `PAD_EXTRUDE_STEP` ke 3.4;
+  ketebalan tetap 48px dengan sisi yang sedikit lebih kasar.
+- Dua kolom boolean mati pada tabel landing, seperti dicatat di bagian 11.
+- Foto ruangan asli akan lebih menaikkan daya tarik dibanding penyesuaian gradien
+  lanjutan, khususnya sebagai latar section fasilitas dan lokasi.
+

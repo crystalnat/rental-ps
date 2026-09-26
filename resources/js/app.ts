@@ -10,7 +10,7 @@ const appName = document.title
 initTheme()
 
 createInertiaApp({
-    title: (title) => title ? `${title} — ${appName}` : appName,
+    title: (title) => title ? (title.startsWith('SPOT') ? title : `${title} - ${appName}`) : appName,
     resolve: (name) =>
         resolvePageComponent(
             `./pages/${name}.vue`,

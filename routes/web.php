@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CashierController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\FloorPlanController;
 use App\Http\Controllers\Admin\InventoryController;
 use App\Http\Controllers\Admin\OrderController;
@@ -25,6 +26,9 @@ use App\Http\Controllers\LandingPageController;
 use App\Http\Middleware\EnsureAuthenticated;
 use Illuminate\Support\Facades\Route;
 
+// Landing page publik
+Route::get('/', [LandingPageController::class, 'home'])->name('home');
+
 // Customer order via QR (public, no auth)
 Route::get('/order/{storeSlug}/{qrCode}', [CustomerOrderController::class, 'show'])->name('order.show');
 Route::post('/order', [CustomerOrderController::class, 'store'])->name('order.store');
@@ -40,6 +44,8 @@ Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
 // Admin routes
 Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function () {
+    Route::get('/profile', [ProfileController::class, 'index'])->name('admin.profile');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('admin.profile.password');
     // Dashboard (owner, admin, cashier, staff)
     Route::middleware(EnsureAuthenticated::class . ':owner,admin,cashier,staff')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
@@ -250,8 +256,5 @@ Route::prefix('admin')->middleware(EnsureAuthenticated::class)->group(function (
     });
 });
 
-// Public landing page per brand
+// Landing page CMS per brand (butuh landing_settings yang sudah dipublish)
 Route::get('/p/{brandSlug}', [LandingPageController::class, 'show'])->name('landing.show');
-
-// Redirect root to dashboard or login
-Route::get('/', fn () => redirect('/admin/dashboard'));

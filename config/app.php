@@ -15,6 +15,12 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Slug brand yang landing-nya tampil di root. Kosong berarti pakai brand aktif pertama.
+    'landing_brand' => env('LANDING_BRAND'),
+
+    // Nomor WhatsApp tujuan tombol booking landing; menimpa nomor brand. Kosongkan di .env untuk pakai nomor brand
+    'landing_whatsapp' => env('LANDING_WHATSAPP', '6281387295387'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
