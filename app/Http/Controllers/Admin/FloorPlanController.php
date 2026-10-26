@@ -10,6 +10,7 @@ use App\Models\Store;
 use App\Models\Order;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -386,9 +387,14 @@ class FloorPlanController extends Controller
         abort_unless($floor->store_id === $store->id && $table->floor_id === $floor->id, 403);
 
         $data = $request->validate([
-            'name'                  => ['nullable', 'string', 'max:50'],
+            'name'                  => [
+                'sometimes', 'filled', 'string', 'max:50',
+                Rule::unique('dining_tables', 'name')->where('store_id', $store->id)->ignore($table->id),
+            ],
             'tuya_device_id'        => ['nullable', 'string', 'max:100'],
             'rental_price_per_hour' => ['nullable', 'numeric', 'min:0'],
+        ], [
+            'name.unique' => 'Nama unit sudah dipakai di store ini.',
         ]);
 
         $table->update($data);
